@@ -113,7 +113,7 @@ Create `packages/shared/package.json`:
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "tsc -p tsconfig.build.json",
     "test": "vitest run",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
@@ -253,6 +253,8 @@ git commit -m "chore: scaffold workspace tooling"
 
 **Files:**
 - Create: `packages/shared/tsconfig.json`
+- Create: `packages/shared/tsconfig.build.json`
+- Create: `packages/shared/vitest.config.ts`
 - Create: `packages/shared/src/index.ts`
 - Create: `packages/shared/src/models.ts`
 - Create: `packages/shared/src/events.ts`
@@ -280,6 +282,16 @@ describe("scoreSubmissions", () => {
     });
 
     expect(result.correctParticipantIds).toEqual(["p1", "p2"]);
+  });
+
+  it("normalizes answer casing deterministically", () => {
+    const result = scoreSubmissions({
+      answerCandidates: ["Blue Archive"],
+      aliases: [],
+      submissions: [{ participantId: "p1", rawAnswer: " BLUE   ARCHIVE ", skipped: false }]
+    });
+
+    expect(result.correctParticipantIds).toEqual(["p1"]);
   });
 
   it("re-scores with host aliases", () => {
@@ -337,6 +349,28 @@ Create `packages/shared/tsconfig.json`:
   },
   "include": ["src"]
 }
+```
+
+Create `packages/shared/tsconfig.build.json`:
+
+```json
+{
+  "extends": "./tsconfig.json",
+  "exclude": ["src/**/*.test.ts"]
+}
+```
+
+Create `packages/shared/vitest.config.ts`:
+
+```ts
+import { defineConfig } from "vitest/config";
+
+export default defineConfig({
+  test: {
+    include: ["src/**/*.test.ts"],
+    exclude: ["dist/**", "node_modules/**"]
+  }
+});
 ```
 
 - [ ] **Step 4: Implement shared models**
@@ -575,7 +609,7 @@ Create `packages/shared/src/normalize.ts`:
 
 ```ts
 export function normalizeAnswer(value: string): string {
-  return value.trim().replace(/\s+/g, "").toLocaleLowerCase();
+  return value.trim().replace(/\s+/g, "").toLowerCase();
 }
 ```
 

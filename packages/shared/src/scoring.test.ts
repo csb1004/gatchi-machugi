@@ -15,6 +15,16 @@ describe("scoreSubmissions", () => {
     expect(result.correctParticipantIds).toEqual(["p1", "p2"]);
   });
 
+  it("normalizes answer casing deterministically", () => {
+    const result = scoreSubmissions({
+      answerCandidates: ["Blue Archive"],
+      aliases: [],
+      submissions: [{ participantId: "p1", rawAnswer: " BLUE   ARCHIVE ", skipped: false }]
+    });
+
+    expect(result.correctParticipantIds).toEqual(["p1"]);
+  });
+
   it("re-scores with host aliases", () => {
     const result = scoreSubmissions({
       answerCandidates: ["answer"],
