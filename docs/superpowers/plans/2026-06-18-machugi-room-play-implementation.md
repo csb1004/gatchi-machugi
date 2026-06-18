@@ -61,7 +61,7 @@ Create `package.json`:
   "devDependencies": {
     "@types/node": "^22.10.2",
     "typescript": "^5.7.2",
-    "vitest": "^2.1.8"
+    "vitest": "^4.1.9"
   }
 }
 ```
@@ -122,7 +122,7 @@ Create `packages/shared/package.json`:
   },
   "devDependencies": {
     "typescript": "^5.7.2",
-    "vitest": "^2.1.8"
+    "vitest": "^4.1.9"
   }
 }
 ```
@@ -162,7 +162,7 @@ Create `apps/server/package.json`:
     "supertest": "^7.0.0",
     "tsx": "^4.19.2",
     "typescript": "^5.7.2",
-    "vitest": "^2.1.8"
+    "vitest": "^4.1.9"
   }
 }
 ```
@@ -196,7 +196,7 @@ Create `apps/web/package.json`:
     "@types/react-dom": "^19.0.2",
     "jsdom": "^25.0.1",
     "typescript": "^5.7.2",
-    "vitest": "^2.1.8"
+    "vitest": "^4.1.9"
   }
 }
 ```
@@ -224,7 +224,7 @@ Create `apps/extension/package.json`:
     "@types/chrome": "^0.0.287",
     "jsdom": "^25.0.1",
     "typescript": "^5.7.2",
-    "vitest": "^2.1.8"
+    "vitest": "^4.1.9"
   }
 }
 ```
