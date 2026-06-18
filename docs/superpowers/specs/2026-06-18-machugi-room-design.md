@@ -179,7 +179,7 @@ Before comparison, both submitted answers and answer candidates are normalized b
 - trimming leading/trailing whitespace,
 - optionally applying case normalization where applicable.
 
-For example, `텅 비드` and `텅비드` are treated as the same answer.
+For example, `blue archive` and `bluearchive` are treated as the same answer.
 
 The host can add accepted answers and aliases for the current question after reveal. When a new alias is added, the server re-scores existing submissions immediately and broadcasts the updated result and scoreboard.
 
