@@ -109,4 +109,40 @@ describe("RoomService", () => {
     expect(revealedPlayer?.correct).toBe(true);
     expect(rescoredPlayer?.score).toBe(1);
   });
+
+  it("adjusts scores, changes settings, kicks participants, and expires rooms", async () => {
+    const service = new RoomService({ hostTokenPepper: "pepper" });
+    const { roomCode } = await service.createRoom({ title: "Room", visibility: "public" });
+    const player = service.joinParticipant({ roomCode, nickname: "Mina" });
+
+    service.adjustScore({ roomCode, participantId: player.participant.id, delta: 3, reason: "manual correction" });
+    expect(service.getState(roomCode).participants.find((participant) => participant.id === player.participant.id)?.score).toBe(3);
+
+    service.updateSettings({ roomCode, settings: { visibility: "private", title: "Private Room" } });
+    expect(service.getState(roomCode).settings.visibility).toBe("private");
+    expect(service.getState(roomCode).settings.title).toBe("Private Room");
+
+    service.kickParticipant({ roomCode, participantId: player.participant.id });
+    expect(service.getState(roomCode).participants.find((participant) => participant.id === player.participant.id)?.connected).toBe(false);
+
+    service.expireRoom(roomCode);
+    expect(service.getState(roomCode).phase).toBe("expired");
+    expect(service.listPublicRooms()).toEqual([]);
+  });
+
+  it("records chat message count for room state", async () => {
+    const service = new RoomService({ hostTokenPepper: "pepper" });
+    const { roomCode } = await service.createRoom({ title: "Room", visibility: "public" });
+    const player = service.joinParticipant({ roomCode, nickname: "Mina" });
+
+    const message = service.addChatMessage({
+      roomCode,
+      participantId: player.participant.id,
+      text: "hello"
+    });
+
+    expect(message.text).toBe("hello");
+    expect(message.nickname).toBe("Mina");
+    expect(service.getState(roomCode).chatMessageCount).toBe(1);
+  });
 });

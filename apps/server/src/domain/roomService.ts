@@ -1,4 +1,13 @@
-import { scoreSubmissions, type Participant, type QuizState, type RevealedSubmission, type RoomState, type RoomVisibility } from "@gatchi/shared";
+import {
+  scoreSubmissions,
+  type ChatMessagePayload,
+  type Participant,
+  type QuizState,
+  type RevealedSubmission,
+  type RoomSettings,
+  type RoomState,
+  type RoomVisibility
+} from "@gatchi/shared";
 import { customAlphabet, nanoid } from "nanoid";
 import { createHostToken, hashHostToken, verifyHostToken } from "../security/hostToken.js";
 
@@ -9,6 +18,7 @@ interface StoredRoom {
   state: RoomState;
   aliases: string[];
   rawSubmissions: Map<string, { rawAnswer: string; skipped: boolean }>;
+  chatMessages: ChatMessagePayload[];
   expiresAt: Date;
 }
 
@@ -39,6 +49,7 @@ export class RoomService {
       state,
       aliases: [],
       rawSubmissions: new Map(),
+      chatMessages: [],
       expiresAt: new Date(Date.now() + 12 * 60 * 60 * 1000)
     });
 
@@ -170,6 +181,58 @@ export class RoomService {
       this.applyRevealScoreDiff(room.state.participants, previousCorrect, this.correctParticipantIds(nextRevealedSubmissions));
     }
 
+    return room.state;
+  }
+
+  addChatMessage(input: { roomCode: string; participantId: string; text: string }): ChatMessagePayload {
+    const room = this.requireRoom(input.roomCode);
+    const participant = this.requireParticipant(room, input.participantId);
+    const text = input.text.trim();
+
+    if (!text) {
+      throw new Error("Chat message is empty");
+    }
+
+    const message: ChatMessagePayload = {
+      id: nanoid(12),
+      roomCode: input.roomCode,
+      participantId: input.participantId,
+      nickname: participant.nickname,
+      text,
+      createdAt: new Date().toISOString()
+    };
+
+    room.chatMessages.push(message);
+    room.state.chatMessageCount = room.chatMessages.length;
+    return message;
+  }
+
+  adjustScore(input: { roomCode: string; participantId: string; delta: number; reason: string }): RoomState {
+    const room = this.requireRoom(input.roomCode);
+    const participant = this.requireParticipant(room, input.participantId);
+    participant.score = Math.max(0, participant.score + input.delta);
+    return room.state;
+  }
+
+  updateSettings(input: { roomCode: string; settings: Partial<RoomSettings> }): RoomState {
+    const room = this.requireRoom(input.roomCode);
+    room.state.settings = { ...room.state.settings, ...input.settings };
+    return room.state;
+  }
+
+  kickParticipant(input: { roomCode: string; participantId: string }): RoomState {
+    const room = this.requireRoom(input.roomCode);
+    const participant = this.requireParticipant(room, input.participantId);
+    participant.connected = false;
+    return room.state;
+  }
+
+  expireRoom(roomCode: string): RoomState {
+    const room = this.requireRoom(roomCode);
+    room.state.phase = "expired";
+    room.rawSubmissions.clear();
+    room.state.submissions = [];
+    room.state.revealedSubmissions = [];
     return room.state;
   }
 

@@ -2,14 +2,18 @@ import type { Server as HttpServer } from "node:http";
 import type {
   Ack,
   AddAliasPayload,
+  AdjustScorePayload,
   ClientToServerEvents,
   ExtensionStatePayload,
   HostPairAck,
   HostPairPayload,
   JoinRoomAck,
   JoinRoomPayload,
+  KickParticipantPayload,
   RevealAnswerPayload,
+  RoomSettings,
   RoomState,
+  SendChatPayload,
   SubmitAnswerPayload
 } from "@gatchi/shared";
 import { Server } from "socket.io";
@@ -56,6 +60,34 @@ const addAliasSchema = z.object({
   alias: z.string()
 });
 
+const sendChatSchema = z.object({
+  roomCode: z.string().trim().min(1).transform((value) => value.toUpperCase()),
+  participantId: z.string().trim().min(1),
+  text: z.string().max(500)
+});
+
+const adjustScoreSchema = z.object({
+  roomCode: z.string().trim().min(1).transform((value) => value.toUpperCase()),
+  participantId: z.string().trim().min(1),
+  delta: z.number().finite().min(-1000).max(1000),
+  reason: z.string().trim().min(1).max(120)
+});
+
+const updateSettingsSchema = z.object({
+  roomCode: z.string().trim().min(1).transform((value) => value.toUpperCase()),
+  settings: z.object({
+    visibility: z.enum(["public", "private"]).optional(),
+    submissionVisibility: z.enum(["status-only", "hidden"]).optional(),
+    timerSeconds: z.number().int().positive().nullable().optional(),
+    title: z.string().trim().min(1).max(100).optional()
+  })
+});
+
+const kickParticipantSchema = z.object({
+  roomCode: z.string().trim().min(1).transform((value) => value.toUpperCase()),
+  participantId: z.string().trim().min(1)
+});
+
 function ackError<T>(ack: Ack<T>, error: string) {
   ack({ ok: false, error });
 }
@@ -64,6 +96,21 @@ function requireHostSession(session: SocketSession, roomCode: string) {
   if (session.role !== "host" || session.roomCode !== roomCode) {
     throw new Error("Host authorization required");
   }
+}
+
+function requireParticipantSession(session: SocketSession, roomCode: string, participantId: string) {
+  if (session.roomCode !== roomCode || session.participantId !== participantId) {
+    throw new Error("Participant authorization required");
+  }
+}
+
+function definedSettings(settings: z.infer<typeof updateSettingsSchema>["settings"]): Partial<RoomSettings> {
+  const next: Partial<RoomSettings> = {};
+  if (settings.visibility !== undefined) next.visibility = settings.visibility;
+  if (settings.submissionVisibility !== undefined) next.submissionVisibility = settings.submissionVisibility;
+  if (settings.timerSeconds !== undefined) next.timerSeconds = settings.timerSeconds;
+  if (settings.title !== undefined) next.title = settings.title;
+  return next;
 }
 
 function markParticipantDisconnected(roomService: RoomService, socket: SocketSession): RoomState | null {
@@ -250,6 +297,78 @@ export function createSocketServer(httpServer: HttpServer, { roomService }: { ro
         ack({ ok: true, data: undefined });
       } catch (error) {
         ackError(ack, error instanceof Error ? error.message : "Alias failed");
+      }
+    });
+
+    socket.on("chat:send", (payload: SendChatPayload, ack: Ack<void>) => {
+      const parsed = sendChatSchema.safeParse(payload);
+      if (!parsed.success) {
+        ackError(ack, "Invalid chat payload");
+        return;
+      }
+
+      try {
+        requireParticipantSession(session, parsed.data.roomCode, parsed.data.participantId);
+        const message = roomService.addChatMessage(parsed.data);
+        io.to(parsed.data.roomCode).emit("chat:message", message);
+        io.to(parsed.data.roomCode).emit("room:state", roomService.getState(parsed.data.roomCode));
+        ack({ ok: true, data: undefined });
+      } catch (error) {
+        ackError(ack, error instanceof Error ? error.message : "Chat failed");
+      }
+    });
+
+    socket.on("score:adjust", (payload: AdjustScorePayload, ack: Ack<void>) => {
+      const parsed = adjustScoreSchema.safeParse(payload);
+      if (!parsed.success) {
+        ackError(ack, "Invalid score adjustment payload");
+        return;
+      }
+
+      try {
+        requireHostSession(session, parsed.data.roomCode);
+        const state = roomService.adjustScore(parsed.data);
+        io.to(parsed.data.roomCode).emit("room:state", state);
+        ack({ ok: true, data: undefined });
+      } catch (error) {
+        ackError(ack, error instanceof Error ? error.message : "Score adjustment failed");
+      }
+    });
+
+    socket.on("room:update-settings", (payload, ack: Ack<void>) => {
+      const parsed = updateSettingsSchema.safeParse(payload);
+      if (!parsed.success) {
+        ackError(ack, "Invalid settings payload");
+        return;
+      }
+
+      try {
+        requireHostSession(session, parsed.data.roomCode);
+        const state = roomService.updateSettings({
+          roomCode: parsed.data.roomCode,
+          settings: definedSettings(parsed.data.settings)
+        });
+        io.to(parsed.data.roomCode).emit("room:state", state);
+        ack({ ok: true, data: undefined });
+      } catch (error) {
+        ackError(ack, error instanceof Error ? error.message : "Settings update failed");
+      }
+    });
+
+    socket.on("participant:kick", (payload: KickParticipantPayload, ack: Ack<void>) => {
+      const parsed = kickParticipantSchema.safeParse(payload);
+      if (!parsed.success) {
+        ackError(ack, "Invalid kick payload");
+        return;
+      }
+
+      try {
+        requireHostSession(session, parsed.data.roomCode);
+        const state = roomService.kickParticipant(parsed.data);
+        io.to(parsed.data.roomCode).emit("room:state", state);
+        ack({ ok: true, data: undefined });
+      } catch (error) {
+        ackError(ack, error instanceof Error ? error.message : "Kick failed");
       }
     });
 
