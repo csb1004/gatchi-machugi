@@ -1,0 +1,18 @@
+import "dotenv/config";
+import { createServer } from "node:http";
+import { createApp } from "./app.js";
+import { RoomService } from "./domain/roomService.js";
+import { createSocketServer } from "./socket/createSocketServer.js";
+
+const port = Number(process.env.PORT ?? 3000);
+const roomService = new RoomService({
+  hostTokenPepper: process.env.HOST_TOKEN_PEPPER ?? "development-host-pepper"
+});
+const app = createApp({ roomService });
+const server = createServer(app);
+
+createSocketServer(server, { roomService });
+
+server.listen(port, () => {
+  console.log(`@gatchi/server listening on http://localhost:${port}`);
+});
