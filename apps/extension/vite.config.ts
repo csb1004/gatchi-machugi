@@ -8,6 +8,7 @@ export default defineConfig({
     rollupOptions: {
       input: {
         background: resolve(__dirname, "src/background.ts"),
+        contentScript: resolve(__dirname, "src/contentScript.ts"),
         popup: resolve(__dirname, "src/popup.ts")
       },
       output: {
@@ -18,6 +19,7 @@ export default defineConfig({
     }
   },
   test: {
+    environment: "jsdom",
     include: ["src/**/*.test.ts"],
     exclude: ["dist/**", "node_modules/**"]
   }

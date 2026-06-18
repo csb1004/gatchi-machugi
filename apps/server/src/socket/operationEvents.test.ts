@@ -1,4 +1,4 @@
-import { createServer, type Server as HttpServer } from "node:http";
+import { createServer, request, type Server as HttpServer } from "node:http";
 import type { AddressInfo } from "node:net";
 import type {
   ChatMessagePayload,
@@ -23,13 +23,34 @@ async function listen(server: HttpServer): Promise<number> {
 }
 
 async function createRoom(baseUrl: string) {
-  const response = await fetch(`${baseUrl}/api/rooms`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ roomName: "Room", public: false })
-  });
+  return await new Promise<{ roomCode: string; hostToken: string }>((resolve, reject) => {
+    const body = JSON.stringify({ roomName: "Room", public: false });
+    const url = new URL("/api/rooms", baseUrl);
+    const req = request(
+      url,
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "content-length": Buffer.byteLength(body)
+        }
+      },
+      (response) => {
+        const chunks: Buffer[] = [];
+        response.on("data", (chunk: Buffer) => chunks.push(chunk));
+        response.on("end", () => {
+          try {
+            resolve(JSON.parse(Buffer.concat(chunks).toString("utf8")) as { roomCode: string; hostToken: string });
+          } catch (error) {
+            reject(error);
+          }
+        });
+      }
+    );
 
-  return (await response.json()) as { roomCode: string; hostToken: string };
+    req.on("error", reject);
+    req.end(body);
+  });
 }
 
 async function connectClient(baseUrl: string): Promise<Socket<ServerToClientEvents, ClientToServerEvents>> {

@@ -9,6 +9,13 @@
     "service_worker": "background.js",
     "type": "module"
   },
+  "content_scripts": [
+    {
+      "matches": ["https://machugi.io/*", "https://*.machugi.io/*"],
+      "js": ["contentScript.js"],
+      "run_at": "document_idle"
+    }
+  ],
   "action": {
     "default_title": "Pair host room",
     "default_popup": "popup.html"

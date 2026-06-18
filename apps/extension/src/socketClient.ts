@@ -1,4 +1,12 @@
-import type { ClientToServerEvents, HostPairAck, HostPairPayload, RoomState, ServerToClientEvents } from "@gatchi/shared";
+import type {
+  ClientToServerEvents,
+  ExtensionStatePayload,
+  HostPairAck,
+  HostPairPayload,
+  QuizCommandPayload,
+  RoomState,
+  ServerToClientEvents
+} from "@gatchi/shared";
 import { io, type Socket } from "socket.io-client";
 
 export const PAIRING_STORAGE_KEY = "pairingSettings";
@@ -108,6 +116,31 @@ export class MachugiSocketClient {
   async connectAndPair(settings: PairingSettings): Promise<HostPairGatewayAck> {
     await this.connect(settings.serverUrl);
     return await this.pair(settings);
+  }
+
+  sendExtensionState(payload: ExtensionStatePayload): Promise<void> {
+    if (!this.socket) {
+      throw new Error("Socket client is not connected");
+    }
+
+    return new Promise((resolve, reject) => {
+      this.socket?.emit("extension:state", payload, (response) => {
+        if (response.ok) {
+          resolve();
+          return;
+        }
+
+        reject(new Error(response.error));
+      });
+    });
+  }
+
+  onQuizCommand(handler: (payload: QuizCommandPayload) => void) {
+    if (!this.socket) {
+      throw new Error("Socket client is not connected");
+    }
+
+    this.socket.on("quiz:command" as never, handler as never);
   }
 
   disconnect() {

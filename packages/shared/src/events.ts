@@ -10,6 +10,7 @@ export interface ServerToClientEvents {
   "answer:revealed": (submissions: RevealedSubmission[]) => void;
   "chat:message": (message: ChatMessagePayload) => void;
   "chat:system": (message: SystemMessagePayload) => void;
+  "quiz:command": (payload: QuizCommandPayload) => void;
 }
 
 export interface ClientToServerEvents {

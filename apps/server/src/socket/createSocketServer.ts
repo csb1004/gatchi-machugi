@@ -10,6 +10,7 @@ import type {
   JoinRoomAck,
   JoinRoomPayload,
   KickParticipantPayload,
+  QuizCommandPayload,
   RevealAnswerPayload,
   RoomSettings,
   RoomState,
@@ -53,6 +54,12 @@ const submitAnswerSchema = z.object({
 const revealAnswersSchema = z.object({
   roomCode: z.string().trim().min(1).transform((value) => value.toUpperCase()),
   skippedParticipantIds: z.array(z.string().trim().min(1))
+});
+
+const quizCommandSchema = z.object({
+  roomCode: z.string().trim().min(1).transform((value) => value.toUpperCase()),
+  command: z.enum(["configure", "start", "next", "previous", "skip", "reset", "reveal-original-answer"]),
+  values: z.record(z.union([z.string(), z.number(), z.boolean(), z.null()])).optional()
 });
 
 const addAliasSchema = z.object({
@@ -239,6 +246,22 @@ export function createSocketServer(httpServer: HttpServer, { roomService }: { ro
         ack({ ok: true, data: undefined });
       } catch (error) {
         ackError(ack, error instanceof Error ? error.message : "State update failed");
+      }
+    });
+
+    socket.on("quiz:command", (payload: QuizCommandPayload, ack: Ack<void>) => {
+      const parsed = quizCommandSchema.safeParse(payload);
+      if (!parsed.success) {
+        ackError(ack, "Invalid quiz command payload");
+        return;
+      }
+
+      try {
+        requireHostSession(session, parsed.data.roomCode);
+        io.to(parsed.data.roomCode).emit("quiz:command", parsed.data);
+        ack({ ok: true, data: undefined });
+      } catch (error) {
+        ackError(ack, error instanceof Error ? error.message : "Quiz command failed");
       }
     });
 

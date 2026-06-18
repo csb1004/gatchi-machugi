@@ -1,4 +1,6 @@
 import type { PairHostRequestMessage, PairHostResponse, PairingSettings, StoredPairingSettings } from "./socketClient.js";
+import type { QuizCommandPayload, QuizState } from "@gatchi/shared";
+import { CONTENT_COMMAND_MESSAGE, CONTENT_STATE_MESSAGE } from "./messages.js";
 import {
   MachugiSocketClient,
   PAIRING_REQUEST_TYPE,
@@ -8,6 +10,7 @@ import {
 } from "./socketClient.js";
 
 const socketClient = new MachugiSocketClient();
+let pairedRoomCode: string | null = null;
 
 function isPairHostRequestMessage(message: unknown): message is PairHostRequestMessage {
   return (
@@ -60,6 +63,10 @@ async function pairHost(payload: PairingSettings): Promise<PairHostResponse> {
 
   try {
     const pairResult = await socketClient.connectAndPair(settings);
+    pairedRoomCode = pairResult.roomCode;
+    socketClient.onQuizCommand((command) => {
+      void sendCommandToActiveMachugiTab(command);
+    });
     await savePairingSettings(settings);
     return {
       ok: true,
@@ -75,6 +82,30 @@ async function pairHost(payload: PairingSettings): Promise<PairHostResponse> {
   }
 }
 
+async function sendCommandToActiveMachugiTab(command: QuizCommandPayload): Promise<void> {
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  if (!tab?.id || !tab.url?.includes("machugi.io")) return;
+
+  await chrome.tabs.sendMessage(tab.id, {
+    type: CONTENT_COMMAND_MESSAGE,
+    command: command.command,
+    values: command.values
+  });
+}
+
+async function forwardQuizState(quiz: QuizState): Promise<void> {
+  if (!pairedRoomCode) return;
+
+  try {
+    await socketClient.sendExtensionState({
+      roomCode: pairedRoomCode,
+      quiz
+    });
+  } catch (error) {
+    console.error("Failed to forward machugi state", error);
+  }
+}
+
 async function reconnectSavedPairing() {
   try {
     const savedSettings = await readPairingSettings();
@@ -87,6 +118,17 @@ async function reconnectSavedPairing() {
 }
 
 chrome.runtime.onMessage.addListener((message: unknown, _sender, sendResponse) => {
+  if (
+    typeof message === "object" &&
+    message !== null &&
+    "type" in message &&
+    (message as { type?: unknown }).type === CONTENT_STATE_MESSAGE
+  ) {
+    void forwardQuizState((message as unknown as { payload: QuizState }).payload);
+    sendResponse({ ok: true });
+    return true;
+  }
+
   if (!isPairHostRequestMessage(message)) {
     return false;
   }
