@@ -365,6 +365,57 @@ h2 {
   font-weight: 800;
 }
 
+.host-controls,
+.extension-setup {
+  border: 1px solid #d9e0ec;
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 16px;
+}
+
+.control-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.control-grid button {
+  min-height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border: 0;
+  border-radius: 6px;
+  padding: 8px 10px;
+  background: #172033;
+  color: white;
+  font-weight: 800;
+}
+
+.control-grid button:disabled {
+  background: #aab7c8;
+}
+
+.extension-setup a {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #235797;
+  font-weight: 800;
+}
+
+.extension-setup ol {
+  margin: 12px 0 0;
+  padding-left: 22px;
+  color: #34435a;
+}
+
+.extension-setup li + li {
+  margin-top: 6px;
+}
+
 @media (max-width: 900px) {
   .room-layout {
     grid-template-columns: 1fr;
@@ -372,5 +423,9 @@ h2 {
 
   .answer-panel {
     grid-template-columns: 1fr;
+  }
+
+  .control-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
