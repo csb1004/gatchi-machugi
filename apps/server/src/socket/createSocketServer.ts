@@ -100,7 +100,7 @@ export function createSocketServer(httpServer: HttpServer, { roomService }: { ro
       }
 
       try {
-        const participantId = session.participantId ?? parsed.data.participantId;
+        const participantId = session.participantId;
         const joined = roomService.joinParticipant(
           participantId
             ? {

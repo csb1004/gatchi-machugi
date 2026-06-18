@@ -184,6 +184,50 @@ describe("answer socket events", () => {
     });
   });
 
+  it("does not let a fresh socket claim another visible participant id on join", async () => {
+    const roomService = new RoomService({ hostTokenPepper: "pepper" });
+    const app = createApp({ roomService });
+    const server = createServer(app);
+    createSocketServer(server, { roomService });
+    servers.push(server);
+
+    const port = await listen(server);
+    const baseUrl = `http://127.0.0.1:${port}`;
+    const created = await createRoom(baseUrl, { roomName: "Room", public: false });
+
+    const firstSocket = await connectClient(baseUrl);
+    const secondSocket = await connectClient(baseUrl);
+    sockets.push(firstSocket, secondSocket);
+
+    const firstJoin = await emitJoin(firstSocket, { roomCode: created.data.roomCode, nickname: "Mina" });
+    expect(firstJoin.ok).toBe(true);
+    if (!firstJoin.ok) {
+      throw new Error(firstJoin.error);
+    }
+
+    const secondJoin = await emitJoin(secondSocket, {
+      roomCode: created.data.roomCode,
+      nickname: "Ari",
+      participantId: firstJoin.data.participantId
+    });
+    expect(secondJoin.ok).toBe(true);
+    if (!secondJoin.ok) {
+      throw new Error(secondJoin.error);
+    }
+    expect(secondJoin.data.participantId).not.toBe(firstJoin.data.participantId);
+
+    const submitAck = await emitSubmitAnswer(secondSocket, {
+      roomCode: created.data.roomCode,
+      participantId: firstJoin.data.participantId,
+      rawAnswer: "hijacked"
+    });
+
+    expect(submitAck).toEqual({
+      ok: false,
+      error: "Cannot submit for another participant"
+    });
+  });
+
   it("rejects reveal, alias, and extension state changes from non-host sockets", async () => {
     const roomService = new RoomService({ hostTokenPepper: "pepper" });
     const app = createApp({ roomService });
