@@ -20,7 +20,7 @@ function resolveVisibility(input: { public: boolean | undefined; visibility: Roo
   return input.public ? "public" : "private";
 }
 
-export function createApp({ roomService }: { roomService: RoomService }) {
+export function createApp({ roomService }: { roomService: RoomService; repository?: unknown }) {
   const app = express();
 
   app.use(cors());
