@@ -1,0 +1,20 @@
+{
+  "name": "gatchi-machugi",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@9.15.0",
+  "scripts": {
+    "build": "pnpm -r build",
+    "test": "pnpm -r test",
+    "typecheck": "pnpm -r typecheck",
+    "dev": "pnpm --filter @gatchi/server dev",
+    "dev:web": "pnpm --filter @gatchi/web dev",
+    "dev:server": "pnpm --filter @gatchi/server dev",
+    "build:extension": "pnpm --filter @gatchi/extension build"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  }
+}

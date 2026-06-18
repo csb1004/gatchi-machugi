@@ -1,0 +1,23 @@
+{
+  "name": "@gatchi/extension",
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "build": "vite build && node scripts/copy-manifest.mjs",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "zip": "pnpm build && node scripts/zip-release.mjs"
+  },
+  "dependencies": {
+    "@gatchi/shared": "workspace:*",
+    "socket.io-client": "^4.8.1",
+    "vite": "^6.0.3",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.0.287",
+    "jsdom": "^25.0.1",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  }
+}
