@@ -1,4 +1,4 @@
-import type { Participant, RoomState, RoomVisibility } from "@gatchi/shared";
+import { scoreSubmissions, type Participant, type QuizState, type RevealedSubmission, type RoomState, type RoomVisibility } from "@gatchi/shared";
 import { customAlphabet, nanoid } from "nanoid";
 import { createHostToken, hashHostToken, verifyHostToken } from "../security/hostToken.js";
 
@@ -66,6 +66,27 @@ export class RoomService {
     return { participant, state: room.state };
   }
 
+  joinHostPlayer(input: { roomCode: string; nickname: string }): { participant: Participant; state: RoomState } {
+    const room = this.requireRoom(input.roomCode);
+    const existing = room.state.participants.find((participant) => participant.role === "host");
+
+    if (existing) {
+      existing.connected = true;
+      return { participant: existing, state: room.state };
+    }
+
+    const participant: Participant = {
+      id: nanoid(12),
+      nickname: this.uniqueNickname(room.state.participants, input.nickname.trim() || "Host"),
+      role: "host",
+      connected: true,
+      score: 0
+    };
+
+    room.state.participants.push(participant);
+    return { participant, state: room.state };
+  }
+
   async verifyHost(input: { roomCode: string; hostToken: string }): Promise<boolean> {
     const room = this.rooms.get(input.roomCode);
     if (!room) return false;
@@ -74,6 +95,82 @@ export class RoomService {
 
   getState(roomCode: string): RoomState {
     return this.requireRoom(roomCode).state;
+  }
+
+  updateQuizState(input: { roomCode: string; quiz: QuizState }): RoomState {
+    const room = this.requireRoom(input.roomCode);
+    const shouldResetRound = this.shouldResetRound(room.state.quiz, input.quiz);
+
+    room.state.quiz = input.quiz;
+
+    if (shouldResetRound) {
+      this.resetRound(room);
+      room.state.phase = "playing";
+    }
+
+    return room.state;
+  }
+
+  submitAnswer(input: { roomCode: string; participantId: string; rawAnswer: string }): RoomState {
+    const room = this.requireRoom(input.roomCode);
+    this.requireParticipant(room, input.participantId);
+
+    room.rawSubmissions.set(input.participantId, {
+      rawAnswer: input.rawAnswer,
+      skipped: false
+    });
+    room.state.submissions = this.publicSubmissionStatuses(room);
+
+    return room.state;
+  }
+
+  revealAnswers(input: { roomCode: string; skippedParticipantIds: string[] }): RoomState {
+    const room = this.requireRoom(input.roomCode);
+
+    for (const participantId of input.skippedParticipantIds) {
+      this.requireParticipant(room, participantId);
+      if (!room.rawSubmissions.has(participantId)) {
+        room.rawSubmissions.set(participantId, { rawAnswer: "", skipped: true });
+      }
+    }
+
+    const missingParticipants = room.state.participants.filter(
+      (participant) => participant.connected && !room.rawSubmissions.has(participant.id)
+    );
+    if (missingParticipants.length > 0) {
+      throw new Error("All active participants must submit or be skipped before reveal");
+    }
+
+    const previousCorrect = this.correctParticipantIds(room.state.revealedSubmissions);
+    const nextRevealedSubmissions = this.revealedSubmissions(room);
+
+    room.state.phase = "revealed";
+    room.state.submissions = this.publicSubmissionStatuses(room);
+    room.state.revealedSubmissions = nextRevealedSubmissions;
+    this.applyRevealScoreDiff(room.state.participants, previousCorrect, this.correctParticipantIds(nextRevealedSubmissions));
+
+    return room.state;
+  }
+
+  addAlias(input: { roomCode: string; alias: string }): RoomState {
+    const room = this.requireRoom(input.roomCode);
+    const alias = input.alias.trim();
+
+    if (!alias) {
+      return room.state;
+    }
+
+    room.aliases.push(alias);
+
+    if (room.state.phase === "revealed") {
+      const previousCorrect = this.correctParticipantIds(room.state.revealedSubmissions);
+      const nextRevealedSubmissions = this.revealedSubmissions(room);
+
+      room.state.revealedSubmissions = nextRevealedSubmissions;
+      this.applyRevealScoreDiff(room.state.participants, previousCorrect, this.correctParticipantIds(nextRevealedSubmissions));
+    }
+
+    return room.state;
   }
 
   listPublicRooms() {
@@ -108,6 +205,89 @@ export class RoomService {
     let suffix = 2;
     while (existing.has(`${requested}#${suffix}`)) suffix += 1;
     return `${requested}#${suffix}`;
+  }
+
+  private requireParticipant(room: StoredRoom, participantId: string): Participant {
+    const participant = room.state.participants.find((entry) => entry.id === participantId);
+    if (!participant) throw new Error("Participant not found");
+    return participant;
+  }
+
+  private shouldResetRound(previousQuiz: QuizState, nextQuiz: QuizState): boolean {
+    return (
+      previousQuiz.questionIndex !== nextQuiz.questionIndex ||
+      previousQuiz.questionText !== nextQuiz.questionText ||
+      previousQuiz.questionType !== nextQuiz.questionType ||
+      previousQuiz.imageUrl !== nextQuiz.imageUrl ||
+      previousQuiz.audioUrl !== nextQuiz.audioUrl ||
+      previousQuiz.videoUrl !== nextQuiz.videoUrl
+    );
+  }
+
+  private resetRound(room: StoredRoom): void {
+    room.aliases = [];
+    room.rawSubmissions.clear();
+    room.state.submissions = [];
+    room.state.revealedSubmissions = [];
+  }
+
+  private publicSubmissionStatuses(room: StoredRoom) {
+    return room.state.participants
+      .filter((participant) => room.rawSubmissions.has(participant.id))
+      .map((participant) => {
+        const submission = room.rawSubmissions.get(participant.id);
+        if (!submission) {
+          throw new Error("Submission missing");
+        }
+
+        return {
+          participantId: participant.id,
+          submitted: !submission.skipped,
+          skipped: submission.skipped
+        };
+      });
+  }
+
+  private revealedSubmissions(room: StoredRoom): RevealedSubmission[] {
+    const submissions = room.state.participants
+      .filter((participant) => room.rawSubmissions.has(participant.id))
+      .map((participant) => {
+        const submission = room.rawSubmissions.get(participant.id);
+        if (!submission) {
+          throw new Error("Submission missing");
+        }
+
+        return {
+          participantId: participant.id,
+          rawAnswer: submission.rawAnswer,
+          skipped: submission.skipped
+        };
+      });
+    const scored = scoreSubmissions({
+      answerCandidates: room.state.quiz.answerCandidates,
+      aliases: room.aliases,
+      submissions
+    });
+    const correctParticipantIds = new Set(scored.correctParticipantIds);
+
+    return submissions.map((submission) => ({
+      participantId: submission.participantId,
+      submitted: !submission.skipped,
+      skipped: submission.skipped,
+      rawAnswer: submission.rawAnswer,
+      correct: correctParticipantIds.has(submission.participantId)
+    }));
+  }
+
+  private correctParticipantIds(submissions: RevealedSubmission[]): Set<string> {
+    return new Set(submissions.filter((submission) => submission.correct).map((submission) => submission.participantId));
+  }
+
+  private applyRevealScoreDiff(participants: Participant[], previousCorrect: Set<string>, nextCorrect: Set<string>): void {
+    for (const participant of participants) {
+      const delta = Number(nextCorrect.has(participant.id)) - Number(previousCorrect.has(participant.id));
+      participant.score = Math.max(0, participant.score + delta);
+    }
   }
 
   private emptyState(roomCode: string, input: CreateRoomInput): RoomState {
