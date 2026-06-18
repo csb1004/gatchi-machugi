@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Gatchi Machugi Pairing</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        font-family: Inter, system-ui, sans-serif;
+      }
+
+      body {
+        margin: 0;
+        min-width: 320px;
+        background: #10141f;
+        color: #f5f7fb;
+      }
+
+      main {
+        padding: 16px;
+      }
+
+      h1 {
+        margin: 0 0 4px;
+        font-size: 16px;
+      }
+
+      p {
+        margin: 0 0 16px;
+        color: #b8c1d9;
+        font-size: 12px;
+      }
+
+      form {
+        display: grid;
+        gap: 12px;
+      }
+
+      label {
+        display: grid;
+        gap: 6px;
+        font-size: 12px;
+        color: #d7ddf0;
+      }
+
+      input {
+        border: 1px solid #3a435d;
+        border-radius: 8px;
+        padding: 10px 12px;
+        background: #171d2d;
+        color: inherit;
+        font: inherit;
+      }
+
+      button {
+        border: 0;
+        border-radius: 8px;
+        padding: 10px 12px;
+        background: #6d7cff;
+        color: #ffffff;
+        font: inherit;
+        font-weight: 600;
+        cursor: pointer;
+      }
+
+      button:disabled {
+        opacity: 0.65;
+        cursor: progress;
+      }
+
+      #status {
+        min-height: 18px;
+        font-size: 12px;
+        color: #b8c1d9;
+      }
+
+      #status[data-state="error"] {
+        color: #ff9b9b;
+      }
+
+      #status[data-state="success"] {
+        color: #9af0b5;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Pair host room</h1>
+      <p>Save the server and room details, then connect the extension as the room host.</p>
+      <form id="pair-form">
+        <label for="server-url">
+          Server URL
+          <input id="server-url" name="serverUrl" type="url" placeholder="https://api.machugi.io" required />
+        </label>
+        <label for="room-code">
+          Room code
+          <input id="room-code" name="roomCode" type="text" maxlength="12" autocapitalize="characters" required />
+        </label>
+        <label for="host-token">
+          Host token
+          <input id="host-token" name="hostToken" type="password" spellcheck="false" required />
+        </label>
+        <button id="pair-button" type="submit">Pair extension</button>
+      </form>
+      <output id="status" aria-live="polite"></output>
+    </main>
+    <script type="module" src="./popup.js"></script>
+  </body>
+</html>
