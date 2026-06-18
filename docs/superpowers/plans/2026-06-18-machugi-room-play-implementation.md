@@ -158,7 +158,7 @@ Create `apps/server/package.json`:
   },
   "devDependencies": {
     "@types/cors": "^2.8.17",
-    "@types/express": "^5.0.0",
+    "@types/express": "^4.17.21",
     "prisma": "^6.1.0",
     "socket.io-client": "^4.8.1",
     "supertest": "^7.0.0",
