@@ -80,8 +80,6 @@ Create `tsconfig.base.json`:
 {
   "compilerOptions": {
     "target": "ES2022",
-    "module": "ESNext",
-    "moduleResolution": "Bundler",
     "strict": true,
     "noUncheckedIndexedAccess": true,
     "exactOptionalPropertyTypes": true,
@@ -268,7 +266,7 @@ Create `packages/shared/src/scoring.test.ts`:
 
 ```ts
 import { describe, expect, it } from "vitest";
-import { scoreSubmissions } from "./scoring";
+import { scoreSubmissions } from "./scoring.js";
 
 describe("scoreSubmissions", () => {
   it("treats whitespace-insensitive answers as equal", () => {
@@ -330,6 +328,8 @@ Create `packages/shared/tsconfig.json`:
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
     "outDir": "dist",
     "rootDir": "src",
     "declaration": true,
@@ -423,7 +423,7 @@ export interface RoomState {
 Create `packages/shared/src/events.ts`:
 
 ```ts
-import type { PublicRoomSummary, QuestionType, QuizState, RevealedSubmission, RoomSettings, RoomState } from "./models";
+import type { PublicRoomSummary, QuestionType, QuizState, RevealedSubmission, RoomSettings, RoomState } from "./models.js";
 
 export interface ServerToClientEvents {
   "room:state": (state: RoomState) => void;
@@ -582,7 +582,7 @@ export function normalizeAnswer(value: string): string {
 Create `packages/shared/src/scoring.ts`:
 
 ```ts
-import { normalizeAnswer } from "./normalize";
+import { normalizeAnswer } from "./normalize.js";
 
 export interface ScoringSubmission {
   participantId: string;
@@ -630,10 +630,10 @@ export function scoreSubmissions(input: ScoreSubmissionsInput): ScoreSubmissions
 Create `packages/shared/src/index.ts`:
 
 ```ts
-export * from "./events";
-export * from "./models";
-export * from "./normalize";
-export * from "./scoring";
+export * from "./events.js";
+export * from "./models.js";
+export * from "./normalize.js";
+export * from "./scoring.js";
 ```
 
 - [ ] **Step 6: Verify shared package**
@@ -672,7 +672,7 @@ Create `apps/server/src/security/hostToken.test.ts`:
 
 ```ts
 import { describe, expect, it } from "vitest";
-import { createHostToken, hashHostToken, verifyHostToken } from "./hostToken";
+import { createHostToken, hashHostToken, verifyHostToken } from "./hostToken.js";
 
 describe("host token security", () => {
   it("creates a one-time plaintext token and stores only a hash", async () => {
@@ -693,7 +693,7 @@ Create `apps/server/src/domain/roomService.test.ts`:
 
 ```ts
 import { describe, expect, it } from "vitest";
-import { RoomService } from "./roomService";
+import { RoomService } from "./roomService.js";
 
 describe("RoomService", () => {
   it("creates a room with a public room code and one-time host token", async () => {
@@ -745,6 +745,8 @@ Create `apps/server/tsconfig.json`:
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
     "outDir": "dist",
     "rootDir": "src"
   },
@@ -788,7 +790,7 @@ Create `apps/server/src/domain/roomService.ts`:
 ```ts
 import type { Participant, RoomState, RoomVisibility } from "@gatchi/shared";
 import { customAlphabet, nanoid } from "nanoid";
-import { createHostToken, hashHostToken, verifyHostToken } from "../security/hostToken";
+import { createHostToken, hashHostToken, verifyHostToken } from "../security/hostToken.js";
 
 const createRoomCode = customAlphabet("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ", 6);
 
@@ -971,8 +973,8 @@ import { createServer } from "node:http";
 import { AddressInfo } from "node:net";
 import { io as createClient, Socket } from "socket.io-client";
 import { afterEach, describe, expect, it } from "vitest";
-import { createApp } from "../app";
-import { attachSocketServer } from "./createSocketServer";
+import { createApp } from "../app.js";
+import { attachSocketServer } from "./createSocketServer.js";
 
 describe("Socket.io room flow", () => {
   const sockets: Socket[] = [];
@@ -1029,7 +1031,7 @@ Create `apps/server/src/app.ts`:
 ```ts
 import cors from "cors";
 import express from "express";
-import { RoomService } from "./domain/roomService";
+import { RoomService } from "./domain/roomService.js";
 
 export interface AppServices {
   rooms: RoomService;
@@ -1076,7 +1078,7 @@ Create `apps/server/src/socket/createSocketServer.ts`:
 import type { Server as HttpServer } from "node:http";
 import type { ClientToServerEvents, ServerToClientEvents } from "@gatchi/shared";
 import { Server } from "socket.io";
-import type { AppServices } from "../app";
+import type { AppServices } from "../app.js";
 
 export function attachSocketServer(httpServer: HttpServer, services: AppServices) {
   const io = new Server<ClientToServerEvents, ServerToClientEvents>(httpServer, {
@@ -1138,8 +1140,8 @@ Create `apps/server/src/index.ts`:
 ```ts
 import "dotenv/config";
 import { createServer } from "node:http";
-import { createApp } from "./app";
-import { attachSocketServer } from "./socket/createSocketServer";
+import { createApp } from "./app.js";
+import { attachSocketServer } from "./socket/createSocketServer.js";
 
 const port = Number(process.env.PORT ?? 3000);
 const hostTokenPepper = process.env.HOST_TOKEN_PEPPER ?? "dev-pepper-change-me";
@@ -1672,6 +1674,8 @@ Create `apps/web/tsconfig.json`:
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
     "jsx": "react-jsx",
     "types": ["vitest/globals", "@testing-library/jest-dom"]
   },
@@ -2363,6 +2367,8 @@ Create `apps/extension/tsconfig.json`:
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
     "types": ["chrome"],
     "outDir": "dist"
   },
