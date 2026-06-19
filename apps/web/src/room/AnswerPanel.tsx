@@ -18,6 +18,7 @@ export function AnswerPanel({
   const [answer, setAnswer] = useState("");
   const canSubmit = !disabled && answer.trim().length > 0;
   const submitLabel = submitted ? (disabled ? "제출 완료" : "수정") : "제출";
+  const submittedAnswer = submitted ? answer.trim() : "";
 
   useEffect(() => {
     setAnswer("");
@@ -47,13 +48,14 @@ export function AnswerPanel({
         />
       </label>
       <button
-        className="primary-button"
+        className={`primary-button answer-submit-button${submitted && !disabled ? " is-editing" : ""}`}
         type="submit"
         disabled={!canSubmit}
       >
         <Send size={18} />
         {submitLabel}
       </button>
+      {submittedAnswer ? <p className="submitted-answer">제출한 답: {submittedAnswer}</p> : null}
     </form>
   );
 }

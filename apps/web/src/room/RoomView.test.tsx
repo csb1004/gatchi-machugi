@@ -212,4 +212,21 @@ describe("RoomView", () => {
     expect(within(chat).queryByText("FY3D3R")).not.toBeInTheDocument();
     expect(within(chat).getByText("아직 채팅 메시지가 없습니다.")).toBeInTheDocument();
   });
+
+  it("offers a room leave action from the title bar", () => {
+    const onLeaveRoom = vi.fn();
+    render(
+      <RoomView
+        state={baseState}
+        currentParticipantId="host"
+        onSubmitAnswer={() => undefined}
+        onSourceAction={() => undefined}
+        onLeaveRoom={onLeaveRoom}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "방 나가기" }));
+
+    expect(onLeaveRoom).toHaveBeenCalledTimes(1);
+  });
 });

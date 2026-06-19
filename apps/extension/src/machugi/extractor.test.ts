@@ -79,4 +79,24 @@ describe("extractQuizState", () => {
     expect(state.answerCandidates).toEqual(["디안시"]);
     expect(state.canGoNext).toBe(true);
   });
+
+  it("extracts an answer when the result label is nested next to an icon", () => {
+    document.body.innerHTML = `
+      <div class="QuizDetailPlaying_root__k7OA0">
+        <img class="ImageQuizDisplay_root__YvVai" src="https://images.machugi.io/revealed-image" alt="">
+        <section>
+          <div>
+            <span aria-hidden="true">✓</span>
+            <span>정답!</span>
+          </div>
+          <h2>은랑</h2>
+          <button type="button">›</button>
+        </section>
+      </div>
+    `;
+
+    const state = extractQuizState(document);
+    expect(state.resultMessage).toBe("정답!");
+    expect(state.answerCandidates).toEqual(["은랑"]);
+  });
 });

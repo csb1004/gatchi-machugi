@@ -54,7 +54,16 @@ function directText(element: Element): string {
 
 function findResultMessageElement(root: ParentNode): Element | null {
   const stable = root.querySelector("[data-result-message], [role='alert'], [class*='QuizDetailAnswerResult_questionResultCorrectLabel']");
-  if (stable) return stable;
+  if (stable) {
+    const stableValue = (directText(stable) || stable.textContent?.trim() || "").trim();
+    if (resultMessagePattern.test(stableValue)) return stable;
+
+    const nested = Array.from(stable.querySelectorAll("*")).find((element) => {
+      const value = (directText(element) || element.textContent?.trim() || "").trim();
+      return resultMessagePattern.test(value);
+    });
+    if (nested) return nested;
+  }
 
   return (
     Array.from(root.querySelectorAll("*")).find((element) => {
@@ -67,21 +76,33 @@ function findResultMessageElement(root: ParentNode): Element | null {
 function answerAfterResultMessage(element: Element | null): string | null {
   if (!element) return null;
 
-  let candidate = element.nextElementSibling;
-  while (candidate) {
-    const value = candidate.textContent?.trim() ?? "";
-    if (
-      value &&
-      !resultMessagePattern.test(value) &&
-      !(candidate instanceof HTMLButtonElement) &&
-      candidate.getAttribute("role") !== "button"
-    ) {
-      return value;
+  let current: Element | null = element;
+  while (current) {
+    let candidate = current.nextElementSibling;
+    while (candidate) {
+      const value = answerCandidateText(candidate);
+      if (value) {
+        return value;
+      }
+      candidate = candidate.nextElementSibling;
     }
-    candidate = candidate.nextElementSibling;
+    current = current.parentElement;
   }
 
   return null;
+}
+
+function answerCandidateText(element: Element): string | null {
+  if (element instanceof HTMLButtonElement || element.getAttribute("role") === "button") {
+    return null;
+  }
+
+  const value = (directText(element) || element.textContent?.trim() || "").trim();
+  if (!value || resultMessagePattern.test(value) || nextButtonPattern.test(value)) {
+    return null;
+  }
+
+  return value;
 }
 
 function hasNextButton(root: ParentNode): boolean {

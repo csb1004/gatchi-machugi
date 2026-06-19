@@ -6,6 +6,7 @@ import type {
   HostPairPayload,
   JoinRoomPayload,
   PublicRoomSummary,
+  RoomLeavePayload,
   ServerToClientEvents,
   SourceMirrorActionPayload,
   SubmitAnswerPayload
@@ -110,6 +111,15 @@ function emitAnswerSubmit(
 ): Promise<{ ok: true; data: void } | { ok: false; error: string }> {
   return new Promise((resolve) => {
     socket.emit("answer:submit", payload, resolve);
+  });
+}
+
+function emitRoomLeave(
+  socket: Socket<ServerToClientEvents, ClientToServerEvents>,
+  payload: RoomLeavePayload
+): Promise<{ ok: true; data: void } | { ok: false; error: string }> {
+  return new Promise((resolve) => {
+    socket.emit("room:leave", payload, resolve);
   });
 }
 
@@ -351,6 +361,50 @@ describe("socket server", () => {
     await disconnectedEvent;
     const expiredState = await disconnectedState;
     expect(expiredState.hostExtensionConnected).toBe(false);
+    expect(expiredState.phase).toBe("expired");
+    expect(roomService.listPublicRooms()).toEqual([]);
+  });
+
+  it("expires the room when the host web session leaves the room", async () => {
+    const roomService = new RoomService();
+    const app = createApp({ roomService });
+    const server = createServer(app);
+    createSocketServer(server, { roomService });
+    servers.push(server);
+
+    const port = await listen(server);
+    const baseUrl = `http://127.0.0.1:${port}`;
+    const created = await createRoom(baseUrl, { roomName: "Public room", public: true });
+
+    const participantSocket = await connectClient(baseUrl);
+    sockets.push(participantSocket);
+    const participantJoin = await emitJoin(participantSocket, {
+      roomCode: created.data.roomCode,
+      nickname: "Mina"
+    });
+    expect(participantJoin.ok).toBe(true);
+
+    const hostWebSocket = await connectClient(baseUrl);
+    sockets.push(hostWebSocket);
+    const hostJoinedStatePromise = waitForEvent(participantSocket, "room:state");
+    const hostJoin = await emitJoin(hostWebSocket, {
+      roomCode: created.data.roomCode,
+      nickname: "Host",
+      participantId: created.data.hostParticipantId,
+      participantCode: created.data.hostCode
+    });
+    expect(hostJoin.ok).toBe(true);
+    await hostJoinedStatePromise;
+
+    const expiredStatePromise = waitForEvent(participantSocket, "room:state");
+    await expect(
+      emitRoomLeave(hostWebSocket, {
+        roomCode: created.data.roomCode,
+        participantId: created.data.hostParticipantId
+      })
+    ).resolves.toEqual({ ok: true, data: undefined });
+
+    const expiredState = await expiredStatePromise;
     expect(expiredState.phase).toBe("expired");
     expect(roomService.listPublicRooms()).toEqual([]);
   });

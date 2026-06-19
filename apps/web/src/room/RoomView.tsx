@@ -1,4 +1,4 @@
-import { Plus } from "lucide-react";
+import { LogOut, Plus } from "lucide-react";
 import { useState } from "react";
 import type { ChatMessagePayload, RoomState, SourceMirrorAction } from "@gatchi/shared";
 import { AnswerPanel } from "./AnswerPanel";
@@ -78,6 +78,7 @@ export function RoomView(props: {
   onAddAlias?: (alias: string) => void;
   onSendChat?: (text: string) => void;
   onSourceAction: (action: SourceMirrorAction) => void;
+  onLeaveRoom?: () => void;
 }) {
   const currentParticipant = props.state.participants.find((participant) => participant.id === props.currentParticipantId);
   const currentSubmission = props.state.submissions.find((submission) => submission.participantId === props.currentParticipantId);
@@ -104,6 +105,10 @@ export function RoomView(props: {
             <span className={sourceConnected ? "host-badge online" : "host-badge"}>
               원본 창 {sourceConnected ? "연결됨" : "대기"}
             </span>
+            <button className="room-leave-button" type="button" onClick={props.onLeaveRoom} aria-label="방 나가기">
+              <LogOut size={16} />
+              방 나가기
+            </button>
           </div>
         </header>
         <SourceMirrorView state={props.state.sourceMirror} isHost={Boolean(isHost)} onAction={props.onSourceAction} />

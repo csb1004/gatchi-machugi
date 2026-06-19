@@ -39,7 +39,6 @@ function resultCompatibleQuestionIdentity(quiz: QuizState): string {
     quiz.questionIndex,
     quiz.totalQuestions,
     quiz.questionType,
-    quiz.questionText,
     quiz.choices.map((choice) => [choice.id, choice.label])
   ]);
 }
@@ -201,22 +200,41 @@ export class RoomService {
   updateSourceMirror(input: { roomCode: string; sourceMirror: SourceMirrorState }): RoomState {
     const room = this.requireRoom(input.roomCode);
     const rawQuiz = quizFromSourceMirror(input.sourceMirror);
+    const playableSourceMirror =
+      input.sourceMirror.kind === "playing" || input.sourceMirror.kind === "result" ? input.sourceMirror : null;
 
     if (
       rawQuiz &&
-      input.sourceMirror.kind === "result" &&
+      playableSourceMirror &&
       room.state.fairPlay.originalSubmitStatus === "submitting" &&
       room.state.fairPlay.questionKey &&
-      this.matchesCurrentOriginalResult(room, rawQuiz) &&
-      hasOriginalResult(rawQuiz)
+      this.matchesCurrentOriginalResult(room, rawQuiz)
     ) {
-      const state = this.applyOriginalResult({
-        roomCode: input.roomCode,
-        questionKey: room.state.fairPlay.questionKey,
-        quiz: rawQuiz
-      });
-      state.sourceMirror = input.sourceMirror;
-      return state;
+      if (hasOriginalResult(rawQuiz)) {
+        const state = this.applyOriginalResult({
+          roomCode: input.roomCode,
+          questionKey: room.state.fairPlay.questionKey,
+          quiz: rawQuiz
+        });
+        state.sourceMirror = {
+          kind: "result",
+          url: playableSourceMirror.url,
+          title: playableSourceMirror.title,
+          lastSeenAt: playableSourceMirror.lastSeenAt,
+          quiz: rawQuiz
+        };
+        return state;
+      }
+
+      room.state.sourceMirror = {
+        kind: "loading",
+        url: playableSourceMirror.url,
+        title: playableSourceMirror.title,
+        lastSeenAt: playableSourceMirror.lastSeenAt,
+        action: null,
+        message: "정답 화면을 읽는 중입니다."
+      };
+      return room.state;
     }
 
     const sourceMirror = this.publicSourceMirror(room, input.sourceMirror);

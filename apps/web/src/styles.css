@@ -400,6 +400,19 @@ h2 {
   color: #166349;
 }
 
+.room-leave-button {
+  min-height: 32px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid #c9d3e4;
+  border-radius: 6px;
+  padding: 0 10px;
+  background: #ffffff;
+  color: #34435a;
+  font-weight: 800;
+}
+
 .quiz-panel {
   display: grid;
   gap: 14px;
@@ -504,6 +517,18 @@ h2 {
   border: 1px solid #c9d3e4;
   border-radius: 6px;
   padding: 0 12px;
+}
+
+.answer-submit-button.is-editing {
+  background: #0f766e;
+}
+
+.submitted-answer {
+  grid-column: 1 / -1;
+  margin: -4px 0 0;
+  color: #40516c;
+  font-size: 0.9rem;
+  font-weight: 800;
 }
 
 .personal-result {

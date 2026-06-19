@@ -15,6 +15,7 @@ import type {
   OriginalFailurePayload,
   OriginalSubmitRequestPayload,
   QuizCommandPayload,
+  RoomLeavePayload,
   RevealAnswerPayload,
   RoomSettings,
   RoomState,
@@ -42,6 +43,11 @@ const joinRoomSchema = z.object({
   nickname: z.string().trim().min(1).max(40),
   participantId: z.string().trim().min(1).optional(),
   participantCode: z.string().trim().min(1).optional()
+});
+
+const roomLeaveSchema = z.object({
+  roomCode: z.string().trim().min(1).transform((value) => value.toUpperCase()),
+  participantId: z.string().trim().min(1)
 });
 
 const hostPairSchema = z.object({
@@ -354,6 +360,44 @@ export function createSocketServer(httpServer: HttpServer, { roomService }: { ro
         io.to(parsed.data.roomCode).emit("room:state", state);
       } catch (error) {
         ackError(ack, error instanceof Error ? error.message : "Failed to pair host");
+      }
+    });
+
+    socket.on("room:leave", (payload: RoomLeavePayload, ack: Ack<void>) => {
+      const parsed = roomLeaveSchema.safeParse(payload);
+      if (!parsed.success) {
+        ackError(ack, "Invalid room leave payload");
+        return;
+      }
+
+      try {
+        requireParticipantSession(session, parsed.data.roomCode, parsed.data.participantId);
+
+        if (session.role === "host") {
+          const extensionSocketId = hostExtensionSocketIds.get(parsed.data.roomCode);
+          if (extensionSocketId) {
+            io.sockets.sockets.get(extensionSocketId)?.leave(parsed.data.roomCode);
+            hostExtensionSocketIds.delete(parsed.data.roomCode);
+          }
+
+          const state = roomService.expireRoom(parsed.data.roomCode);
+          state.hostExtensionConnected = false;
+          io.to(parsed.data.roomCode).emit("host:disconnected");
+          io.to(parsed.data.roomCode).emit("room:state", state);
+        } else {
+          const state = roomService.disconnectParticipant(parsed.data);
+          io.to(parsed.data.roomCode).emit("room:state", state);
+        }
+
+        socket.leave(parsed.data.roomCode);
+        deleteHostExtensionSocketId(parsed.data.roomCode, socket.id);
+        delete session.roomCode;
+        delete session.participantId;
+        delete session.role;
+        delete session.clientKind;
+        ack({ ok: true, data: undefined });
+      } catch (error) {
+        ackError(ack, error instanceof Error ? error.message : "Room leave failed");
       }
     });
 

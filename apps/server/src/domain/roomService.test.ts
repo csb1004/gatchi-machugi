@@ -783,6 +783,154 @@ describe("RoomService", () => {
     ]);
   });
 
+  it("keeps first-screen submissions while waiting when the answer screen is misread as another playing screen", async () => {
+    const service = new RoomService();
+    const { roomCode, hostParticipantId } = await service.createRoom({ title: "Room", visibility: "private", hostNickname: "Host" });
+    const player = service.joinParticipant({ roomCode, nickname: "Mina" });
+
+    const playingQuiz = {
+      ...service.getState(roomCode).quiz,
+      quizTitle: "눈 맞추기",
+      questionIndex: 3,
+      totalQuestions: 10,
+      questionText: null,
+      questionType: "free-text" as const,
+      imageUrl: "https://images.machugi.io/blurred-eye.png"
+    };
+    service.updateSourceMirror({
+      roomCode,
+      sourceMirror: {
+        kind: "playing",
+        url: "https://machugi.io/quiz/123/play",
+        title: "눈 맞추기",
+        lastSeenAt: "2026-06-19T00:00:00.000Z",
+        quiz: playingQuiz
+      }
+    });
+    service.submitAnswer({ roomCode, participantId: hostParticipantId, rawAnswer: "은랑" });
+    service.submitAnswer({ roomCode, participantId: player.participant.id, rawAnswer: "은랑" });
+    service.requestOriginalSubmission({ roomCode, questionKey: service.getState(roomCode).fairPlay.questionKey ?? "" });
+
+    const waiting = service.updateSourceMirror({
+      roomCode,
+      sourceMirror: {
+        kind: "playing",
+        url: "https://machugi.io/quiz/123/play",
+        title: "눈 맞추기",
+        lastSeenAt: "2026-06-19T00:00:01.000Z",
+        quiz: {
+          ...playingQuiz,
+          imageUrl: "https://images.machugi.io/revealed-eye.png",
+          canGoNext: true
+        }
+      }
+    });
+
+    expect(waiting.phase).toBe("playing");
+    expect(waiting.fairPlay.originalSubmitStatus).toBe("submitting");
+    expect(waiting.sourceMirror.kind).toBe("loading");
+    expect(waiting.submissions).toEqual([
+      { participantId: hostParticipantId, submitted: true, skipped: false },
+      { participantId: player.participant.id, submitted: true, skipped: false }
+    ]);
+  });
+
+  it("applies original result even when the source mirror classifies it as playing", async () => {
+    const service = new RoomService();
+    const { roomCode, hostParticipantId } = await service.createRoom({ title: "Room", visibility: "private", hostNickname: "Host" });
+
+    const playingQuiz = {
+      ...service.getState(roomCode).quiz,
+      quizTitle: "Pokemon",
+      questionIndex: 1,
+      totalQuestions: 10,
+      questionText: "Who is this?",
+      questionType: "free-text" as const
+    };
+    service.updateSourceMirror({
+      roomCode,
+      sourceMirror: {
+        kind: "playing",
+        url: "https://machugi.io/quiz/123/play",
+        title: "Pokemon",
+        lastSeenAt: "2026-06-19T00:00:00.000Z",
+        quiz: playingQuiz
+      }
+    });
+    service.submitAnswer({ roomCode, participantId: hostParticipantId, rawAnswer: "diancie" });
+    service.requestOriginalSubmission({ roomCode, questionKey: service.getState(roomCode).fairPlay.questionKey ?? "" });
+
+    const revealed = service.updateSourceMirror({
+      roomCode,
+      sourceMirror: {
+        kind: "playing",
+        url: "https://machugi.io/quiz/123/play",
+        title: "Pokemon",
+        lastSeenAt: "2026-06-19T00:00:01.000Z",
+        quiz: {
+          ...playingQuiz,
+          resultMessage: "정답!",
+          answerCandidates: ["디안시", "diancie"],
+          canGoNext: true
+        }
+      }
+    });
+
+    expect(revealed.phase).toBe("revealed");
+    expect(revealed.fairPlay.originalSubmitStatus).toBe("result-opened");
+    expect(revealed.revealedSubmissions).toEqual([
+      { participantId: hostParticipantId, submitted: true, skipped: false, rawAnswer: "diancie", correct: true }
+    ]);
+  });
+
+  it("applies original result when the answer screen replaces the question text with the accepted answer", async () => {
+    const service = new RoomService();
+    const { roomCode, hostParticipantId } = await service.createRoom({ title: "Room", visibility: "private", hostNickname: "Host" });
+
+    const playingQuiz = {
+      ...service.getState(roomCode).quiz,
+      quizTitle: "Character Quiz",
+      questionIndex: 4,
+      totalQuestions: 10,
+      questionText: "Who is this?",
+      questionType: "free-text" as const
+    };
+    service.updateSourceMirror({
+      roomCode,
+      sourceMirror: {
+        kind: "playing",
+        url: "https://machugi.io/quiz/123/play",
+        title: "Character Quiz",
+        lastSeenAt: "2026-06-19T00:00:00.000Z",
+        quiz: playingQuiz
+      }
+    });
+    service.submitAnswer({ roomCode, participantId: hostParticipantId, rawAnswer: "은랑" });
+    service.requestOriginalSubmission({ roomCode, questionKey: service.getState(roomCode).fairPlay.questionKey ?? "" });
+
+    const revealed = service.updateSourceMirror({
+      roomCode,
+      sourceMirror: {
+        kind: "result",
+        url: "https://machugi.io/quiz/123/play",
+        title: "Character Quiz",
+        lastSeenAt: "2026-06-19T00:00:01.000Z",
+        quiz: {
+          ...playingQuiz,
+          questionText: "은랑",
+          resultMessage: "정답!",
+          answerCandidates: ["은랑"],
+          canGoNext: true
+        }
+      }
+    });
+
+    expect(revealed.phase).toBe("revealed");
+    expect(revealed.revealedSubmissions).toEqual([
+      { participantId: hostParticipantId, submitted: true, skipped: false, rawAnswer: "은랑", correct: true }
+    ]);
+  });
+
   it("does not require late participants after original submission starts", async () => {
     const service = new RoomService();
     const { roomCode, hostParticipantId } = await service.createRoom({ title: "Room", visibility: "private", hostNickname: "Host" });
@@ -930,7 +1078,7 @@ describe("RoomService", () => {
         questionKey,
         quiz: {
           ...service.getState(roomCode).quiz,
-          questionText: "Changed question",
+          questionIndex: 2,
           resultMessage: "correct",
           answerCandidates: ["blue archive"],
           canGoNext: true

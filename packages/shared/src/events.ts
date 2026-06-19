@@ -31,6 +31,7 @@ export interface ServerToClientEvents {
 
 export interface ClientToServerEvents {
   "room:join": (payload: JoinRoomPayload, ack: Ack<JoinRoomAck>) => void;
+  "room:leave": (payload: RoomLeavePayload, ack: Ack<void>) => void;
   "host:pair": (payload: HostPairPayload, ack: Ack<HostPairAck>) => void;
   "quiz:search": (payload: QuizSearchPayload, ack: Ack<void>) => void;
   "quiz:select": (payload: QuizSelectPayload, ack: Ack<void>) => void;
@@ -65,6 +66,11 @@ export interface JoinRoomAck {
   participantId: string;
   participantCode: string;
   state: RoomState;
+}
+
+export interface RoomLeavePayload {
+  roomCode: string;
+  participantId: string;
 }
 
 export interface HostPairPayload {

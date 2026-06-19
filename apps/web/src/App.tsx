@@ -130,6 +130,14 @@ export function App() {
             onAddAlias={roomSocket.addAlias}
             onSendChat={roomSocket.sendChat}
             onSourceAction={roomSocket.sendSourceAction}
+            onLeaveRoom={() => {
+              roomSocket.leaveRoom(() => {
+                setCreatedRoom(null);
+                setRoomCode("");
+                setExtensionSyncStatus("idle");
+                void loadPublicRooms();
+              });
+            }}
           />
           {roomSocket.error ? <p className="status-text">{roomSocket.error}</p> : null}
           {currentParticipant?.role === "host" ? (

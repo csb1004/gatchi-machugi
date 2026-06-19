@@ -37,9 +37,12 @@ describe("AnswerPanel", () => {
 
     const input = screen.getByRole("textbox", { name: "답변" });
     fireEvent.change(input, { target: { value: "미샤" } });
-    fireEvent.click(screen.getByRole("button", { name: "수정" }));
+    const editButton = screen.getByRole("button", { name: "수정" });
+    fireEvent.click(editButton);
 
     expect(input).not.toBeDisabled();
+    expect(screen.getByText("제출한 답: 미샤")).toBeInTheDocument();
+    expect(editButton).toHaveClass("is-editing");
     expect(onSubmitAnswer).toHaveBeenCalledWith("미샤");
   });
 });

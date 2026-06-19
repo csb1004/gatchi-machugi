@@ -31,6 +31,8 @@ function localizeSocketError(message: string) {
     "Chat message is empty": "채팅 메시지를 입력해주세요.",
     "Chat failed": "채팅 전송에 실패했습니다.",
     "Host authorization required": "방장 권한이 필요합니다.",
+    "Invalid room leave payload": "방 나가기 정보가 올바르지 않습니다.",
+    "Room leave failed": "방에서 나가지 못했습니다.",
     "Quiz command failed": "방장 조작을 전달하지 못했습니다."
   };
 
@@ -149,6 +151,25 @@ export function useRoomSocket() {
     );
   }
 
+  function leaveRoom(onLeft?: () => void) {
+    if (!state || !participantId) return;
+
+    const leavingRoomCode = state.roomCode;
+    socket.emit("room:leave", { roomCode: leavingRoomCode, participantId }, (ack) => {
+      if (!ack.ok) {
+        setError(localizeSocketError(ack.error));
+        return;
+      }
+
+      if (state.roomCode === leavingRoomCode) {
+        setState(null);
+        setChatMessages([]);
+        setError(null);
+        onLeft?.();
+      }
+    });
+  }
+
   return {
     state,
     participantId,
@@ -159,6 +180,7 @@ export function useRoomSocket() {
     addAlias,
     sendChat,
     sendHostCommand,
-    sendSourceAction
+    sendSourceAction,
+    leaveRoom
   };
 }
