@@ -11,6 +11,7 @@ import {
 
 const socketClient = new MachugiSocketClient();
 let pairedRoomCode: string | null = null;
+let pairedTabId: number | null = null;
 
 function isPairHostRequestMessage(message: unknown): message is PairHostRequestMessage {
   return (
@@ -27,8 +28,7 @@ function toStoredPairingSettings(payload: PairingSettings): StoredPairingSetting
 
   return {
     serverUrl: normalizeServerUrl(payload.serverUrl),
-    roomCode: pairPayload.roomCode,
-    hostToken: pairPayload.hostToken
+    roomCode: pairPayload.roomCode
   };
 }
 
@@ -45,16 +45,27 @@ async function savePairingSettings(settings: StoredPairingSettings): Promise<voi
   });
 }
 
-async function readPairingSettings(): Promise<StoredPairingSettings | null> {
-  return await new Promise((resolve, reject) => {
-    chrome.storage.local.get(PAIRING_STORAGE_KEY, (result) => {
-      if (chrome.runtime.lastError) {
-        reject(new Error(chrome.runtime.lastError.message));
-        return;
-      }
+function isMachugiUrl(url: string | undefined): boolean {
+  if (!url) return false;
 
-      resolve((result[PAIRING_STORAGE_KEY] as StoredPairingSettings | undefined) ?? null);
-    });
+  try {
+    const hostname = new URL(url).hostname;
+    return hostname === "machugi.io" || hostname.endsWith(".machugi.io");
+  } catch {
+    return false;
+  }
+}
+
+async function activeMachugiTabId(): Promise<number | null> {
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  return tab?.id && isMachugiUrl(tab.url) ? tab.id : null;
+}
+
+function registerPairedBridge(roomCode: string, tabId: number) {
+  pairedRoomCode = roomCode;
+  pairedTabId = tabId;
+  socketClient.onQuizCommand((command) => {
+    void sendCommandToPairedMachugiTab(command);
   });
 }
 
@@ -62,11 +73,13 @@ async function pairHost(payload: PairingSettings): Promise<PairHostResponse> {
   const settings = toStoredPairingSettings(payload);
 
   try {
-    const pairResult = await socketClient.connectAndPair(settings);
-    pairedRoomCode = pairResult.roomCode;
-    socketClient.onQuizCommand((command) => {
-      void sendCommandToActiveMachugiTab(command);
-    });
+    const tabId = await activeMachugiTabId();
+    if (!tabId) {
+      throw new Error("Open the machugi.io host tab before pairing");
+    }
+
+    const pairResult = await socketClient.connectAndPair(payload);
+    registerPairedBridge(pairResult.roomCode, tabId);
     await savePairingSettings(settings);
     return {
       ok: true,
@@ -82,11 +95,10 @@ async function pairHost(payload: PairingSettings): Promise<PairHostResponse> {
   }
 }
 
-async function sendCommandToActiveMachugiTab(command: QuizCommandPayload): Promise<void> {
-  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  if (!tab?.id || !tab.url?.includes("machugi.io")) return;
+async function sendCommandToPairedMachugiTab(command: QuizCommandPayload): Promise<void> {
+  if (!pairedTabId) return;
 
-  await chrome.tabs.sendMessage(tab.id, {
+  await chrome.tabs.sendMessage(pairedTabId, {
     type: CONTENT_COMMAND_MESSAGE,
     command: command.command,
     values: command.values
@@ -106,26 +118,19 @@ async function forwardQuizState(quiz: QuizState): Promise<void> {
   }
 }
 
-async function reconnectSavedPairing() {
-  try {
-    const savedSettings = await readPairingSettings();
-    if (!savedSettings) return;
-
-    await socketClient.connectAndPair(savedSettings);
-  } catch (error) {
-    console.error("Failed to restore saved pairing", error);
-  }
-}
-
-chrome.runtime.onMessage.addListener((message: unknown, _sender, sendResponse) => {
+chrome.runtime.onMessage.addListener((message: unknown, sender, sendResponse) => {
   if (
     typeof message === "object" &&
     message !== null &&
     "type" in message &&
     (message as { type?: unknown }).type === CONTENT_STATE_MESSAGE
   ) {
-    void forwardQuizState((message as unknown as { payload: QuizState }).payload);
-    sendResponse({ ok: true });
+    if (sender.tab?.id === pairedTabId) {
+      void forwardQuizState((message as unknown as { payload: QuizState }).payload);
+      sendResponse({ ok: true });
+    } else {
+      sendResponse({ ok: false, error: "Unpaired machugi tab" });
+    }
     return true;
   }
 
@@ -135,12 +140,4 @@ chrome.runtime.onMessage.addListener((message: unknown, _sender, sendResponse) =
 
   void pairHost(message.payload).then(sendResponse);
   return true;
-});
-
-chrome.runtime.onStartup.addListener(() => {
-  void reconnectSavedPairing();
-});
-
-chrome.runtime.onInstalled.addListener(() => {
-  void reconnectSavedPairing();
 });

@@ -276,7 +276,7 @@ export function createSocketServer(httpServer: HttpServer, { roomService }: { ro
         if (session.roomCode !== parsed.data.roomCode) {
           throw new Error("Room authorization required");
         }
-        if (session.role !== "host" && session.participantId !== parsed.data.participantId) {
+        if (session.participantId !== parsed.data.participantId) {
           throw new Error("Cannot submit for another participant");
         }
 

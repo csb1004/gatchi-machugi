@@ -62,7 +62,6 @@ function fillForm(elements: PairFormElements, stored: StoredPairingSettings | nu
 
   elements.serverUrl.value = stored.serverUrl;
   elements.roomCode.value = stored.roomCode;
-  elements.hostToken.value = stored.hostToken;
 }
 
 async function handleSubmit(elements: PairFormElements) {

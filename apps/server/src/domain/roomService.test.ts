@@ -110,6 +110,30 @@ describe("RoomService", () => {
     expect(rescoredPlayer?.score).toBe(1);
   });
 
+  it("rejects answer changes after reveal", async () => {
+    const service = new RoomService({ hostTokenPepper: "pepper" });
+    const { roomCode } = await service.createRoom({ title: "Room", visibility: "private" });
+    const host = service.joinHostPlayer({ roomCode, nickname: "Host" });
+    const player = service.joinParticipant({ roomCode, nickname: "Mina" });
+
+    service.updateQuizState({
+      roomCode,
+      quiz: {
+        ...service.getState(roomCode).quiz,
+        questionIndex: 1,
+        questionText: "Name the game",
+        answerCandidates: ["blue archive"]
+      }
+    });
+    service.submitAnswer({ roomCode, participantId: host.participant.id, rawAnswer: "blue archive" });
+    service.submitAnswer({ roomCode, participantId: player.participant.id, rawAnswer: "wrong" });
+    service.revealAnswers({ roomCode, skippedParticipantIds: [] });
+
+    expect(() => service.submitAnswer({ roomCode, participantId: player.participant.id, rawAnswer: "blue archive" })).toThrow(
+      "Submissions are closed for this question"
+    );
+  });
+
   it("adjusts scores, changes settings, kicks participants, and expires rooms", async () => {
     const service = new RoomService({ hostTokenPepper: "pepper" });
     const { roomCode } = await service.createRoom({ title: "Room", visibility: "public" });

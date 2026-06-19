@@ -390,4 +390,46 @@ describe("answer socket events", () => {
     ]);
     expect(revealedState.revealedSubmissions).toEqual(revealed);
   });
+
+  it("does not let a host socket submit for another participant", async () => {
+    const roomService = new RoomService({ hostTokenPepper: "pepper" });
+    const app = createApp({ roomService });
+    const server = createServer(app);
+    createSocketServer(server, { roomService });
+    servers.push(server);
+
+    const port = await listen(server);
+    const baseUrl = `http://127.0.0.1:${port}`;
+    const created = await createRoom(baseUrl, { roomName: "Room", public: false, nickname: "Host" });
+
+    const hostSocket = await connectClient(baseUrl);
+    const participantSocket = await connectClient(baseUrl);
+    sockets.push(hostSocket, participantSocket);
+
+    const hostAck = await emitHostPair(hostSocket, {
+      roomCode: created.data.roomCode,
+      hostToken: created.data.hostToken
+    });
+    const joinAck = await emitJoin(participantSocket, {
+      roomCode: created.data.roomCode,
+      nickname: "Mina"
+    });
+
+    expect(hostAck.ok).toBe(true);
+    expect(joinAck.ok).toBe(true);
+    if (!hostAck.ok || !joinAck.ok) {
+      throw new Error("Setup failed");
+    }
+
+    const submitAck = await emitSubmitAnswer(hostSocket, {
+      roomCode: created.data.roomCode,
+      participantId: joinAck.data.participantId,
+      rawAnswer: "host overwrite"
+    });
+
+    expect(submitAck).toEqual({
+      ok: false,
+      error: "Cannot submit for another participant"
+    });
+  });
 });

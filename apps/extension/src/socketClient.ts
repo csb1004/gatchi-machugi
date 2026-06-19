@@ -18,7 +18,7 @@ export interface PairingSettings {
   hostToken: string;
 }
 
-export interface StoredPairingSettings extends PairingSettings {}
+export type StoredPairingSettings = Omit<PairingSettings, "hostToken">;
 
 export interface PairHostRequestMessage {
   type: typeof PAIRING_REQUEST_TYPE;

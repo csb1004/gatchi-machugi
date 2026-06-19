@@ -124,6 +124,10 @@ export class RoomService {
 
   submitAnswer(input: { roomCode: string; participantId: string; rawAnswer: string }): RoomState {
     const room = this.requireRoom(input.roomCode);
+    if (room.state.phase === "revealed" || room.state.phase === "ended" || room.state.phase === "expired") {
+      throw new Error("Submissions are closed for this question");
+    }
+
     this.requireParticipant(room, input.participantId);
 
     room.rawSubmissions.set(input.participantId, {
