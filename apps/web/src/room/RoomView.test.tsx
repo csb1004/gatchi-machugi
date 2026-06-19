@@ -80,4 +80,32 @@ describe("RoomView", () => {
     expect(screen.queryByText("rawAnswer")).not.toBeInTheDocument();
     expect(screen.queryByText("blue archive")).not.toBeInTheDocument();
   });
+
+  it("shows the current participant's own result after reveal", () => {
+    render(
+      <RoomView
+        state={{
+          ...baseState,
+          phase: "revealed",
+          quiz: {
+            ...baseState.quiz,
+            resultMessage: "오답!",
+            answerCandidates: ["디안시"]
+          },
+          revealedSubmissions: [
+            { participantId: "host", submitted: true, skipped: false, rawAnswer: "디안시", correct: true },
+            { participantId: "p1", submitted: true, skipped: false, rawAnswer: "팅비드", correct: false }
+          ]
+        }}
+        currentParticipantId="p1"
+        onSubmitAnswer={() => undefined}
+        onSourceAction={() => undefined}
+      />
+    );
+
+    expect(screen.getByText("내 결과")).toBeInTheDocument();
+    expect(screen.getByText("오답")).toBeInTheDocument();
+    expect(screen.getByText("내 답: 팅비드")).toBeInTheDocument();
+    expect(screen.getByText("정답: 디안시")).toBeInTheDocument();
+  });
 });

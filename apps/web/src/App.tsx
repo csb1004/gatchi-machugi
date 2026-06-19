@@ -122,6 +122,14 @@ export function App() {
     return (
       <main className="app-shell room-app-shell">
         <div className="room-stack">
+          <RoomView
+            state={roomSocket.state}
+            currentParticipantId={roomSocket.participantId}
+            chatMessages={roomSocket.chatMessages}
+            onSubmitAnswer={roomSocket.submitAnswer}
+            onSendChat={roomSocket.sendChat}
+            onSourceAction={roomSocket.sendSourceAction}
+          />
           {currentParticipant?.role === "host" ? (
             <>
               <HostWorkspace
@@ -135,14 +143,6 @@ export function App() {
               <ExtensionSetup releaseUrl={extensionReleaseUrl} />
             </>
           ) : null}
-          <RoomView
-            state={roomSocket.state}
-            currentParticipantId={roomSocket.participantId}
-            chatMessages={roomSocket.chatMessages}
-            onSubmitAnswer={roomSocket.submitAnswer}
-            onSendChat={roomSocket.sendChat}
-            onSourceAction={roomSocket.sendSourceAction}
-          />
         </div>
       </main>
     );

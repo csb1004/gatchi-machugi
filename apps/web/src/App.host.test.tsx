@@ -89,4 +89,12 @@ describe("App host room", () => {
     expect(screen.queryByRole("region", { name: "방장 컨트롤" })).not.toBeInTheDocument();
     expect(sendHostCommand).not.toHaveBeenCalled();
   });
+
+  it("places host setup panels below the room surface", () => {
+    const { container } = render(<App />);
+    const room = screen.getByRole("region", { name: /방 ABC123/ });
+    const hostWorkspace = screen.getByRole("region", { name: "방장 진행 화면" });
+
+    expect([...container.querySelectorAll(".room-layout, .host-workspace")]).toEqual([room, hostWorkspace]);
+  });
 });

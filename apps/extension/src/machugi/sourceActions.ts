@@ -102,6 +102,14 @@ function runSelectResult(href: string | null | undefined, resultId: string, root
   return { ok: false, reason: "선택한 퀴즈를 원본 화면에서 찾을 수 없습니다." };
 }
 
+function runLoadMoreResults(root: Document): ActionResult {
+  const view = root.defaultView;
+  if (!view) return { ok: false, reason: "원본 창을 제어할 수 없습니다." };
+
+  view.scrollTo({ top: root.documentElement.scrollHeight, behavior: "auto" });
+  return { ok: true };
+}
+
 export function runSourceMirrorAction(action: SourceMirrorAction, root: Document = document): ActionResult {
   if (action.name === "focusHome") {
     return navigateCurrentTab(root, "https://machugi.io/");
@@ -109,6 +117,7 @@ export function runSourceMirrorAction(action: SourceMirrorAction, root: Document
 
   if (action.name === "search") return runSearch(action.query, root);
   if (action.name === "selectResult") return runSelectResult(action.href, action.resultId, root);
+  if (action.name === "loadMoreResults") return runLoadMoreResults(root);
   if (action.name === "setTimer") {
     return clickOptionByNumber(root, action.timerSeconds, /초|타이머|timer|second|x/i)
       ? { ok: true }

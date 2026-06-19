@@ -1,3 +1,4 @@
+import { ArrowRight, Home } from "lucide-react";
 import type { SourceMirrorAction, SourceMirrorState } from "@gatchi/shared";
 import { QuizPanel } from "../room/QuizPanel";
 import { MirrorResultsView } from "./MirrorResultsView";
@@ -23,7 +24,23 @@ export function SourceMirrorView(props: {
   }
 
   if (props.state.kind === "playing" || props.state.kind === "result") {
-    return <QuizPanel quiz={props.state.quiz} />;
+    return (
+      <section className="mirror-playable" aria-label="마추기 진행 화면">
+        {props.isHost ? (
+          <div className="mirror-host-actions" aria-label="방장 진행 조작">
+            <button type="button" onClick={() => props.onAction({ name: "focusHome" })}>
+              <Home size={17} />
+              홈 화면
+            </button>
+            <button type="button" disabled={!props.state.quiz.canGoNext} onClick={() => props.onAction({ name: "next" })}>
+              <ArrowRight size={17} />
+              다음 문제
+            </button>
+          </div>
+        ) : null}
+        <QuizPanel quiz={props.state.quiz} />
+      </section>
+    );
   }
 
   if (props.state.kind === "loading") {

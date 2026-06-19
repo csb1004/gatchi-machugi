@@ -110,6 +110,7 @@ export type SourceMirrorActionName =
   | "setTimer"
   | "setQuestionCount"
   | "startQuiz"
+  | "loadMoreResults"
   | "next"
   | "previous"
   | "skip"
@@ -123,6 +124,7 @@ export type SourceMirrorAction =
   | { name: "setTimer"; timerSeconds: number | null }
   | { name: "setQuestionCount"; questionCount: number | null }
   | { name: "startQuiz" }
+  | { name: "loadMoreResults" }
   | { name: "next" }
   | { name: "previous" }
   | { name: "skip" }

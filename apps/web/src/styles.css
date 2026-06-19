@@ -505,6 +505,36 @@ h2 {
   padding: 0 12px;
 }
 
+.personal-result {
+  display: grid;
+  gap: 8px;
+  border: 1px solid #d9e0ec;
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 16px;
+}
+
+.personal-result .section-heading strong {
+  border-radius: 999px;
+  padding: 6px 10px;
+  color: #ffffff;
+  font-size: 0.86rem;
+}
+
+.personal-result.correct .section-heading strong {
+  background: #16865d;
+}
+
+.personal-result.incorrect .section-heading strong {
+  background: #d92d45;
+}
+
+.personal-result p {
+  margin: 0;
+  color: #40516c;
+  font-weight: 800;
+}
+
 .status-list,
 .score-list {
   display: grid;
@@ -822,6 +852,13 @@ h2 {
   gap: 12px;
 }
 
+.mirror-result-scroll {
+  max-height: min(620px, 66vh);
+  overflow-y: auto;
+  padding-right: 6px;
+  overscroll-behavior: contain;
+}
+
 .mirror-result-card {
   display: grid;
   grid-template-rows: auto 1fr;
@@ -892,6 +929,36 @@ h2 {
 .mirror-setup {
   display: grid;
   gap: 14px;
+}
+
+.mirror-playable {
+  display: grid;
+  gap: 10px;
+}
+
+.mirror-host-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.mirror-host-actions button {
+  min-height: 38px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid #bfd0e5;
+  border-radius: 8px;
+  padding: 0 12px;
+  background: #ffffff;
+  color: #0b1730;
+  font-weight: 800;
+}
+
+.mirror-host-actions button:disabled {
+  color: #7b8798;
+  background: #edf1f7;
 }
 
 .mirror-setup-thumb {

@@ -46,4 +46,15 @@ describe("runSourceMirrorAction", () => {
       reason: "검색창을 찾을 수 없습니다."
     });
   });
+
+  it("loads the next batch of search results by scrolling the source page", () => {
+    const scrollTo = vi.spyOn(window, "scrollTo").mockImplementation(() => undefined);
+    Object.defineProperty(document.documentElement, "scrollHeight", {
+      configurable: true,
+      value: 2400
+    });
+
+    expect(runSourceMirrorAction({ name: "loadMoreResults" }, document)).toEqual({ ok: true });
+    expect(scrollTo).toHaveBeenCalledWith({ top: 2400, behavior: "auto" });
+  });
 });

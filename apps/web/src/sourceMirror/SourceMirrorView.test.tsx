@@ -64,6 +64,57 @@ describe("SourceMirrorView", () => {
     expect(onAction).toHaveBeenCalledWith({ name: "search", query: "anime" });
   });
 
+  it("asks the host extension for more results when the mirrored result list reaches the bottom", () => {
+    const onAction = vi.fn();
+    render(<SourceMirrorView state={results} isHost onAction={onAction} />);
+
+    const list = screen.getByRole("region", { name: "검색 결과 목록" });
+    Object.defineProperty(list, "clientHeight", { configurable: true, value: 300 });
+    Object.defineProperty(list, "scrollHeight", { configurable: true, value: 800 });
+    Object.defineProperty(list, "scrollTop", { configurable: true, value: 500 });
+    fireEvent.scroll(list);
+
+    expect(onAction).toHaveBeenCalledWith({ name: "loadMoreResults" });
+  });
+
+  it("shows host navigation controls during a mirrored quiz", () => {
+    const onAction = vi.fn();
+    render(
+      <SourceMirrorView
+        isHost
+        onAction={onAction}
+        state={{
+          kind: "result",
+          url: "https://machugi.io/quiz/123/play",
+          title: "Pokemon",
+          lastSeenAt: "2026-06-19T00:00:00.000Z",
+          quiz: {
+            quizTitle: "Pokemon",
+            questionIndex: 1,
+            totalQuestions: 10,
+            questionType: "image",
+            questionText: null,
+            imageUrl: "https://images.machugi.io/question.png",
+            audioUrl: null,
+            videoUrl: null,
+            choices: [],
+            timerSecondsRemaining: null,
+            canGoNext: true,
+            canGoPrevious: false,
+            resultMessage: "오답!",
+            answerCandidates: ["디안시"]
+          }
+        }}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "홈 화면" }));
+    fireEvent.click(screen.getByRole("button", { name: "다음 문제" }));
+
+    expect(onAction).toHaveBeenCalledWith({ name: "focusHome" });
+    expect(onAction).toHaveBeenCalledWith({ name: "next" });
+  });
+
   it("renders participant results as read-only", () => {
     render(<SourceMirrorView state={results} isHost={false} onAction={() => undefined} />);
 
