@@ -8,6 +8,7 @@ export function Scoreboard({ participants }: { participants: Participant[] }) {
       </div>
       <div className="score-list">
         {[...participants]
+          .filter((participant) => participant.connected)
           .sort((a, b) => b.score - a.score || a.nickname.localeCompare(b.nickname))
           .map((participant) => (
             <div className="score-row" key={participant.id}>

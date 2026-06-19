@@ -716,6 +716,73 @@ describe("RoomService", () => {
     ]);
   });
 
+  it("keeps first-screen submissions when the original result screen swaps the blurred image for the answer image", async () => {
+    const service = new RoomService();
+    const { roomCode, hostParticipantId } = await service.createRoom({ title: "Room", visibility: "private", hostNickname: "Host" });
+    const player = service.joinParticipant({ roomCode, nickname: "Mina" });
+
+    service.updateSourceWindow({
+      roomCode,
+      sourceWindow: {
+        status: "connected",
+        url: "https://machugi.io/quiz/123",
+        title: "Machugi",
+        lastSeenAt: "2026-06-19T00:00:00.000Z",
+        message: null
+      }
+    });
+    const playingQuiz = {
+      ...service.getState(roomCode).quiz,
+      quizTitle: "눈 맞추기",
+      questionIndex: 3,
+      totalQuestions: 10,
+      questionText: null,
+      questionType: "free-text" as const,
+      imageUrl: "https://images.machugi.io/blurred-eye.png"
+    };
+    service.updateSourceMirror({
+      roomCode,
+      sourceMirror: {
+        kind: "playing",
+        url: "https://machugi.io/quiz/123/play",
+        title: "눈 맞추기",
+        lastSeenAt: "2026-06-19T00:00:00.000Z",
+        quiz: playingQuiz
+      }
+    });
+    service.submitAnswer({ roomCode, participantId: hostParticipantId, rawAnswer: "은랑" });
+    service.submitAnswer({ roomCode, participantId: player.participant.id, rawAnswer: "은랑" });
+    service.requestOriginalSubmission({ roomCode, questionKey: service.getState(roomCode).fairPlay.questionKey ?? "" });
+
+    const revealed = service.updateSourceMirror({
+      roomCode,
+      sourceMirror: {
+        kind: "result",
+        url: "https://machugi.io/quiz/123/play",
+        title: "눈 맞추기",
+        lastSeenAt: "2026-06-19T00:00:01.000Z",
+        quiz: {
+          ...playingQuiz,
+          imageUrl: "https://images.machugi.io/revealed-eye.png",
+          resultMessage: "정답!",
+          answerCandidates: ["은랑"],
+          canGoNext: true
+        }
+      }
+    });
+
+    expect(revealed.phase).toBe("revealed");
+    expect(revealed.fairPlay.originalSubmitStatus).toBe("result-opened");
+    expect(revealed.submissions).toEqual([
+      { participantId: hostParticipantId, submitted: true, skipped: false },
+      { participantId: player.participant.id, submitted: true, skipped: false }
+    ]);
+    expect(revealed.revealedSubmissions).toEqual([
+      { participantId: hostParticipantId, submitted: true, skipped: false, rawAnswer: "은랑", correct: true },
+      { participantId: player.participant.id, submitted: true, skipped: false, rawAnswer: "은랑", correct: true }
+    ]);
+  });
+
   it("does not require late participants after original submission starts", async () => {
     const service = new RoomService();
     const { roomCode, hostParticipantId } = await service.createRoom({ title: "Room", visibility: "private", hostNickname: "Host" });

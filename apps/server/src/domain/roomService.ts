@@ -33,6 +33,17 @@ function isCorrectOriginalResult(quiz: QuizState): boolean {
   return message.includes("정답") || message.includes("correct");
 }
 
+function resultCompatibleQuestionIdentity(quiz: QuizState): string {
+  return JSON.stringify([
+    quiz.quizTitle,
+    quiz.questionIndex,
+    quiz.totalQuestions,
+    quiz.questionType,
+    quiz.questionText,
+    quiz.choices.map((choice) => [choice.id, choice.label])
+  ]);
+}
+
 interface StoredRoom {
   hostParticipantId: string;
   participantCodes: Map<string, string>;
@@ -196,7 +207,7 @@ export class RoomService {
       input.sourceMirror.kind === "result" &&
       room.state.fairPlay.originalSubmitStatus === "submitting" &&
       room.state.fairPlay.questionKey &&
-      createQuestionKey(rawQuiz) === room.state.fairPlay.questionKey &&
+      this.matchesCurrentOriginalResult(room, rawQuiz) &&
       hasOriginalResult(rawQuiz)
     ) {
       const state = this.applyOriginalResult({
@@ -288,7 +299,7 @@ export class RoomService {
       throw new Error("Original submission has not been authorized");
     }
 
-    if (createQuestionKey(input.quiz) !== input.questionKey) {
+    if (!this.matchesCurrentOriginalResult(room, input.quiz)) {
       throw new Error("Original result does not match current question");
     }
 
@@ -494,6 +505,12 @@ export class RoomService {
 
   private shouldResetRound(previousQuiz: QuizState, nextQuiz: QuizState): boolean {
     return createQuestionKey(previousQuiz) !== createQuestionKey(nextQuiz);
+  }
+
+  private matchesCurrentOriginalResult(room: StoredRoom, resultQuiz: QuizState): boolean {
+    if (!room.state.fairPlay.questionKey) return false;
+    if (createQuestionKey(room.state.quiz) !== room.state.fairPlay.questionKey) return false;
+    return resultCompatibleQuestionIdentity(room.state.quiz) === resultCompatibleQuestionIdentity(resultQuiz);
   }
 
   private resetRound(room: StoredRoom): void {

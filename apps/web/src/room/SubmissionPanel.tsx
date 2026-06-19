@@ -12,7 +12,7 @@ export function SubmissionPanel({ state }: { state: RoomState }) {
       <div className="status-list">
         {state.participants.map((participant) => {
           const submission = submissionsByParticipant.get(participant.id);
-          const status = submission?.skipped ? "건너뜀" : submission?.submitted ? "제출함" : "대기 중";
+          const status = !participant.connected ? "접속 끊김" : submission?.skipped ? "건너뜀" : submission?.submitted ? "제출함" : "대기 중";
 
           return (
             <div className="status-row" key={participant.id}>
