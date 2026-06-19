@@ -1,3 +1,5 @@
+import type { SourceMirrorState } from "./sourceMirror.js";
+
 export type RoomVisibility = "public" | "private";
 export type RoomPhase = "lobby" | "searching" | "ready" | "playing" | "revealed" | "ended" | "expired";
 export type ParticipantRole = "host" | "player";
@@ -92,6 +94,7 @@ export interface RoomState {
   revealedSubmissions: RevealedSubmission[];
   fairPlay: FairPlayState;
   sourceWindow: SourceWindowState;
+  sourceMirror: SourceMirrorState;
   hostExtensionConnected: boolean;
   chatMessageCount: number;
 }
