@@ -289,6 +289,7 @@ export function App() {
                 <li>퀴즈를 진행할 브라우저 탭에서 machugi.io를 엽니다.</li>
                 <li>GitHub Releases에서 가치 마추기 확장 프로그램 zip을 내려받아 압축을 풉니다.</li>
                 <li>chrome://extensions에서 개발자 모드를 켜고 압축해제된 확장 프로그램을 로드합니다.</li>
+                <li>확장 프로그램을 새로 설치하거나 업데이트했다면 방장 화면을 새로고침한 뒤 다시 저장합니다.</li>
                 <li>확장 popup에서 저장된 서버 URL과 방 코드를 확인하고 연결합니다.</li>
                 <li>확장이 연결된 뒤 참가자는 방 코드로 입장합니다.</li>
               </ol>

@@ -1,7 +1,9 @@
 import type { QuizCommandName } from "@gatchi/shared";
 import { runMachugiCommand } from "./machugi/commands";
 import { extractQuizState } from "./machugi/extractor";
-import { CONTENT_COMMAND_MESSAGE, CONTENT_STATE_MESSAGE } from "./messages";
+
+const CONTENT_STATE_MESSAGE = "machugi-state";
+const CONTENT_COMMAND_MESSAGE = "machugi-command";
 
 function sendState() {
   chrome.runtime.sendMessage({

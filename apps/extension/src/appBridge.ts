@@ -1,8 +1,11 @@
-import {
-  APP_PAIRING_SETTINGS_ACK_MESSAGE,
-  APP_PAIRING_SETTINGS_MESSAGE,
-  type AppPairingSettingsPayload
-} from "@gatchi/shared";
+const APP_PAIRING_SETTINGS_MESSAGE = "gatchi:extension-pairing-settings";
+const APP_PAIRING_SETTINGS_ACK_MESSAGE = "gatchi:extension-pairing-settings:ack";
+
+interface AppPairingSettingsPayload {
+  serverUrl: string;
+  roomCode: string;
+  hostCode: string;
+}
 
 function isPairingSettingsMessage(message: unknown): message is { type: typeof APP_PAIRING_SETTINGS_MESSAGE; payload: AppPairingSettingsPayload } {
   return (
