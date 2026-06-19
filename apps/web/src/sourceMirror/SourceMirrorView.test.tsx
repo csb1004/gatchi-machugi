@@ -54,6 +54,16 @@ describe("SourceMirrorView", () => {
     });
   });
 
+  it("lets the host search again from the results view", () => {
+    const onAction = vi.fn();
+    render(<SourceMirrorView state={results} isHost onAction={onAction} />);
+
+    fireEvent.change(screen.getByLabelText("검색어"), { target: { value: "anime" } });
+    fireEvent.click(screen.getByRole("button", { name: "검색" }));
+
+    expect(onAction).toHaveBeenCalledWith({ name: "search", query: "anime" });
+  });
+
   it("renders participant results as read-only", () => {
     render(<SourceMirrorView state={results} isHost={false} onAction={() => undefined} />);
 

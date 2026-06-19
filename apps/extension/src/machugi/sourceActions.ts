@@ -3,7 +3,12 @@ import { runMachugiCommand } from "./commands";
 
 type ActionResult = { ok: true } | { ok: false; reason: string };
 
-const searchInputSelector = "input[type='search'], input[aria-label*='검색'], input[name*='search' i]";
+const searchInputSelector = [
+  "input[type='search']",
+  "input[placeholder*='검색']",
+  "input[aria-label*='검색']",
+  "input[name*='search' i]"
+].join(", ");
 const startButtonPattern = /시작|풀기|start/i;
 
 function setInputValue(input: HTMLInputElement, value: string): void {
@@ -14,7 +19,7 @@ function setInputValue(input: HTMLInputElement, value: string): void {
   input.dispatchEvent(new Event("change", { bubbles: true }));
 }
 
-function absoluteUrl(value: string | null, root: Document): string | null {
+function absoluteUrl(value: string | null | undefined, root: Document): string | null {
   if (!value) return null;
 
   try {
@@ -22,6 +27,21 @@ function absoluteUrl(value: string | null, root: Document): string | null {
   } catch {
     return value;
   }
+}
+
+function navigateCurrentTab(root: Document, href: string): ActionResult {
+  const view = root.defaultView;
+  if (!view) return { ok: false, reason: "원본 창을 제어할 수 없습니다." };
+
+  view.location.assign(href);
+  return { ok: true };
+}
+
+function openAnchorInCurrentTab(anchor: HTMLAnchorElement): ActionResult {
+  anchor.removeAttribute("target");
+  anchor.rel = "";
+  anchor.click();
+  return { ok: true };
 }
 
 function clickButtonByText(root: Document, pattern: RegExp): boolean {
@@ -69,15 +89,17 @@ function runSelectResult(href: string | null | undefined, resultId: string, root
     return absolute === href || absolute === resultId || anchor.textContent?.trim() === resultId;
   });
 
-  if (!target) return { ok: false, reason: "선택한 퀴즈를 원본 화면에서 찾을 수 없습니다." };
-  target.click();
-  return { ok: true };
+  if (target) return openAnchorInCurrentTab(target);
+
+  const directUrl = absoluteUrl(href ?? resultId, root);
+  if (directUrl?.includes("/quiz/")) return navigateCurrentTab(root, directUrl);
+
+  return { ok: false, reason: "선택한 퀴즈를 원본 화면에서 찾을 수 없습니다." };
 }
 
 export function runSourceMirrorAction(action: SourceMirrorAction, root: Document = document): ActionResult {
   if (action.name === "focusHome") {
-    root.defaultView?.location.assign("https://machugi.io/");
-    return { ok: true };
+    return navigateCurrentTab(root, "https://machugi.io/");
   }
 
   if (action.name === "search") return runSearch(action.query, root);

@@ -17,15 +17,24 @@ describe("runSourceMirrorAction", () => {
     expect(submit).toHaveBeenCalledTimes(1);
   });
 
-  it("clicks a selected quiz result by href", () => {
+  it("opens a selected quiz result in the current source tab", () => {
     history.replaceState(null, "", "/search");
-    document.body.innerHTML = `<a href="/quiz/123">포켓몬 실루엣 맞추기</a>`;
+    document.body.innerHTML = `<a href="/quiz/123" target="_blank" rel="noopener noreferrer">포켓몬 이름 맞추기</a>`;
     const anchor = document.querySelector("a") as HTMLAnchorElement;
     const click = vi.spyOn(anchor, "click").mockImplementation(() => undefined);
 
     expect(
-      runSourceMirrorAction({ name: "selectResult", resultId: new URL("/quiz/123", document.location.href).toString(), href: new URL("/quiz/123", document.location.href).toString() }, document)
+      runSourceMirrorAction(
+        {
+          name: "selectResult",
+          resultId: new URL("/quiz/123", document.location.href).toString(),
+          href: new URL("/quiz/123", document.location.href).toString()
+        },
+        document
+      )
     ).toEqual({ ok: true });
+    expect(anchor.getAttribute("target")).toBeNull();
+    expect(anchor.rel).toBe("");
     expect(click).toHaveBeenCalledTimes(1);
   });
 

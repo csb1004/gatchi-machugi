@@ -18,15 +18,17 @@ describe("extractSourceMirrorState", () => {
     });
   });
 
-  it("extracts visible quiz search results", () => {
+  it("extracts visible quiz search results without mixing title, description, and stats", () => {
     const root = setDocument(
       "/search?q=pokemon",
       `
       <input type="search" value="pokemon" aria-label="검색">
-      <a class="QuizCard_root__abc" href="/quiz/123">
-        <img src="/thumb.png" alt="">
-        <strong>포켓몬 실루엣 맞추기</strong>
-        <p>20문제</p>
+      <a class="QuizMainCard_link__abc" href="/quiz/123" target="_blank">
+        <img src="/thumb.png" alt="포켓몬 이름 맞추기 썸네일">
+        <span class="QuizMainCard_title__abc">포켓몬 이름 맞추기</span>
+        <span class="QuizMainCard_description__abc">포켓몬스터 사진을 보고 맞춘다.</span>
+        <span class="QuizMainCard_hits__abc">2.1M</span>
+        <span class="QuestionTypeBadge_root__abc">주관식</span>
       </a>
     `,
       "검색 - 마추기 아이오"
@@ -38,11 +40,15 @@ describe("extractSourceMirrorState", () => {
     expect(state.query).toBe("pokemon");
     expect(state.results).toEqual([
       expect.objectContaining({
-        title: "포켓몬 실루엣 맞추기",
+        title: "포켓몬 이름 맞추기",
+        description: "포켓몬스터 사진을 보고 맞춘다.",
+        meta: ["2.1M", "주관식"],
         href: new URL("/quiz/123", document.location.href).toString(),
         thumbnailUrl: new URL("/thumb.png", document.location.href).toString()
       })
     ]);
+    expect(state.results[0]?.title).not.toContain("2.1M");
+    expect(state.results[0]?.title).not.toContain("포켓몬스터 사진");
   });
 
   it("delegates active question pages to QuizState", () => {

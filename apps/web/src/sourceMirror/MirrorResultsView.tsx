@@ -1,4 +1,5 @@
 import type { MirrorQuizResult, SourceMirrorAction } from "@gatchi/shared";
+import { MirrorSearchBox } from "./MirrorSearchBox";
 
 export function MirrorResultsView(props: {
   query: string;
@@ -8,17 +9,27 @@ export function MirrorResultsView(props: {
 }) {
   return (
     <section className="mirror-results" aria-label="검색 결과">
-      <div className="section-heading">
+      <MirrorSearchBox initialQuery={props.query} isHost={props.isHost} onAction={props.onAction} />
+      <div className="section-heading mirror-results-heading">
         <h2>검색 결과</h2>
-        <span>{props.query}</span>
+        <span>{props.results.length}개</span>
       </div>
       <div className="mirror-result-grid">
         {props.results.map((result) => {
           const card = (
             <>
               {result.thumbnailUrl ? <img src={result.thumbnailUrl} alt="" /> : <div className="mirror-thumb-empty" />}
-              <strong>{result.title}</strong>
-              {result.description ? <small>{result.description}</small> : null}
+              <span className="mirror-result-text">
+                <strong>{result.title}</strong>
+                {result.description ? <small>{result.description}</small> : null}
+                {result.meta.length > 0 ? (
+                  <span className="mirror-result-meta">
+                    {result.meta.map((meta) => (
+                      <em key={meta}>{meta}</em>
+                    ))}
+                  </span>
+                ) : null}
+              </span>
             </>
           );
 

@@ -344,8 +344,9 @@ h2 {
 .room-layout {
   width: min(1180px, 100%);
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 320px;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 320px);
   gap: 16px;
+  align-items: start;
 }
 
 .room-main,
@@ -405,6 +406,7 @@ h2 {
 }
 
 .question-stage {
+  min-width: 0;
   min-height: 280px;
   display: grid;
   place-items: center;
@@ -413,13 +415,18 @@ h2 {
   padding: 18px;
   background: #fbfcff;
   text-align: center;
+  overflow: hidden;
 }
 
 .question-stage img,
 .question-stage video {
-  max-width: 100%;
-  max-height: 420px;
+  display: block;
+  width: auto;
+  max-width: min(100%, 760px);
+  height: auto;
+  max-height: min(420px, 62vh);
   border-radius: 6px;
+  object-fit: contain;
 }
 
 .question-stage audio {
@@ -728,7 +735,7 @@ h2 {
   font-weight: 800;
 }
 
-@media (max-width: 900px) {
+@media (max-width: 1024px) {
   .room-layout {
     grid-template-columns: 1fr;
   }
@@ -750,6 +757,15 @@ h2 {
   border-radius: 8px;
   background: #ffffff;
   padding: 18px;
+}
+
+.mirror-results {
+  display: grid;
+  gap: 16px;
+}
+
+.mirror-results-heading {
+  margin-top: 2px;
 }
 
 .mirror-search-bar {
@@ -802,24 +818,28 @@ h2 {
 
 .mirror-result-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 12px;
 }
 
 .mirror-result-card {
   display: grid;
+  grid-template-rows: auto 1fr;
   gap: 8px;
-  min-height: 176px;
+  min-width: 0;
+  min-height: 246px;
   border: 1px solid #d7e2f2;
   border-radius: 8px;
   background: #ffffff;
   padding: 10px;
+  overflow: hidden;
   text-align: left;
   color: #0b1730;
 }
 
 .mirror-result-card img,
 .mirror-thumb-empty {
+  display: block;
   width: 100%;
   aspect-ratio: 16 / 9;
   border-radius: 6px;
@@ -827,12 +847,46 @@ h2 {
   background: linear-gradient(135deg, #e8f1ff, #edf8f2);
 }
 
+.mirror-result-text {
+  min-width: 0;
+  display: grid;
+  gap: 5px;
+  align-content: start;
+}
+
 .mirror-result-card strong {
+  display: -webkit-box;
+  overflow: hidden;
   font-size: 15px;
+  line-height: 1.35;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .mirror-result-card small {
+  display: -webkit-box;
+  overflow: hidden;
   color: #607089;
+  font-size: 12px;
+  line-height: 1.45;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.mirror-result-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.mirror-result-meta em {
+  border-radius: 999px;
+  padding: 3px 7px;
+  background: #edf4ff;
+  color: #29527c;
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 800;
 }
 
 .mirror-setup {
