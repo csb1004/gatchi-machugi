@@ -159,11 +159,13 @@ describe("SourceMirrorView", () => {
 
   it("shows a host home button on the mirrored quiz setup screen", () => {
     const onAction = vi.fn();
-    render(<SourceMirrorView state={quizDetail} isHost onAction={onAction} />);
+    const { rerender } = render(<SourceMirrorView state={results} isHost onAction={onAction} />);
+
+    rerender(<SourceMirrorView state={quizDetail} isHost onAction={onAction} />);
 
     fireEvent.click(screen.getByRole("button", { name: "홈 화면" }));
 
-    expect(onAction).toHaveBeenCalledWith({ name: "focusHome" });
+    expect(onAction).toHaveBeenCalledWith({ name: "focusHome", query: "pokemon" });
   });
 
   it("shows host navigation controls during a mirrored quiz", () => {

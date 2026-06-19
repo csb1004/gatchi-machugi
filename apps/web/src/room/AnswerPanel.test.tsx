@@ -45,4 +45,16 @@ describe("AnswerPanel", () => {
     expect(editButton).toHaveClass("is-editing");
     expect(onSubmitAnswer).toHaveBeenCalledWith("미샤");
   });
+
+  it("focuses the answer input when a new enabled question arrives", () => {
+    const { rerender } = render(
+      <AnswerPanel disabled={false} quiz={quiz} resetKey="q1" onSubmitAnswer={() => undefined} />
+    );
+    const input = screen.getByRole("textbox", { name: "답변" });
+    input.blur();
+
+    rerender(<AnswerPanel disabled={false} quiz={quiz} resetKey="q2" onSubmitAnswer={() => undefined} />);
+
+    expect(input).toHaveFocus();
+  });
 });

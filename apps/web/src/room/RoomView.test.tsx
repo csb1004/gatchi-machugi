@@ -229,4 +229,81 @@ describe("RoomView", () => {
 
     expect(onLeaveRoom).toHaveBeenCalledTimes(1);
   });
+
+  it("lets the host advance a revealed question with Enter", () => {
+    const onSourceAction = vi.fn();
+    render(
+      <RoomView
+        state={{
+          ...baseState,
+          phase: "revealed",
+          quiz: {
+            ...baseState.quiz,
+            canGoNext: true,
+            resultMessage: "정답!",
+            answerCandidates: ["디안시"]
+          },
+          sourceMirror: {
+            kind: "result",
+            url: "https://machugi.io/quiz/123/play",
+            title: "Pokemon",
+            lastSeenAt: "2026-06-19T00:00:00.000Z",
+            quiz: {
+              ...baseState.quiz,
+              canGoNext: true,
+              resultMessage: "정답!",
+              answerCandidates: ["디안시"]
+            }
+          },
+          revealedSubmissions: [{ participantId: "host", submitted: true, skipped: false, rawAnswer: "디안시", correct: true }]
+        }}
+        currentParticipantId="host"
+        onSubmitAnswer={() => undefined}
+        onSourceAction={onSourceAction}
+      />
+    );
+
+    fireEvent.keyDown(document, { key: "Enter" });
+
+    expect(onSourceAction).toHaveBeenCalledWith({ name: "next" });
+  });
+
+  it("does not advance with Enter while the host is typing an extra accepted answer", () => {
+    const onSourceAction = vi.fn();
+    render(
+      <RoomView
+        state={{
+          ...baseState,
+          phase: "revealed",
+          quiz: {
+            ...baseState.quiz,
+            canGoNext: true,
+            resultMessage: "정답!",
+            answerCandidates: ["디안시"]
+          },
+          sourceMirror: {
+            kind: "result",
+            url: "https://machugi.io/quiz/123/play",
+            title: "Pokemon",
+            lastSeenAt: "2026-06-19T00:00:00.000Z",
+            quiz: {
+              ...baseState.quiz,
+              canGoNext: true,
+              resultMessage: "정답!",
+              answerCandidates: ["디안시"]
+            }
+          },
+          revealedSubmissions: [{ participantId: "host", submitted: true, skipped: false, rawAnswer: "디안시", correct: true }]
+        }}
+        currentParticipantId="host"
+        onSubmitAnswer={() => undefined}
+        onSourceAction={onSourceAction}
+        onAddAlias={() => undefined}
+      />
+    );
+
+    fireEvent.keyDown(screen.getByLabelText("추가 정답"), { key: "Enter" });
+
+    expect(onSourceAction).not.toHaveBeenCalledWith({ name: "next" });
+  });
 });

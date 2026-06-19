@@ -1,11 +1,16 @@
 import { LogOut, Plus } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { ChatMessagePayload, RoomState, SourceMirrorAction } from "@gatchi/shared";
 import { AnswerPanel } from "./AnswerPanel";
 import { ChatPanel } from "./ChatPanel";
 import { Scoreboard } from "./Scoreboard";
 import { SubmissionPanel } from "./SubmissionPanel";
 import { SourceMirrorView } from "../sourceMirror/SourceMirrorView";
+
+function isKeyboardCommandTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  return Boolean(target.closest("input, textarea, select, button, a, [contenteditable='true']"));
+}
 
 function PersonalResultPanel({
   state,
@@ -89,6 +94,19 @@ export function RoomView(props: {
     props.state.fairPlay.allRequiredSubmitted ||
     props.state.fairPlay.originalSubmitStatus === "ready" ||
     props.state.fairPlay.originalSubmitStatus === "submitting";
+
+  useEffect(() => {
+    if (!isHost || props.state.phase !== "revealed" || !props.state.quiz.canGoNext) return;
+
+    function handleHostEnter(event: KeyboardEvent) {
+      if (event.key !== "Enter" || event.defaultPrevented || isKeyboardCommandTarget(event.target)) return;
+      event.preventDefault();
+      props.onSourceAction({ name: "next" });
+    }
+
+    document.addEventListener("keydown", handleHostEnter);
+    return () => document.removeEventListener("keydown", handleHostEnter);
+  }, [isHost, props.onSourceAction, props.state.phase, props.state.quiz.canGoNext]);
 
   return (
     <section className="room-layout" aria-label={`방 ${props.state.roomCode}`}>

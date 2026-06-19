@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { runSourceMirrorAction } from "./sourceActions";
+import { createHomeUrl, runSourceMirrorAction } from "./sourceActions";
 
 describe("runSourceMirrorAction", () => {
   it("fills and submits the search input", () => {
@@ -91,5 +91,10 @@ describe("runSourceMirrorAction", () => {
     ).toEqual({ ok: true });
     expect(bypassed).toBe(true);
     expect(click).toHaveBeenCalledTimes(1);
+  });
+
+  it("builds a home URL that restores the last search query", () => {
+    expect(createHomeUrl("pokemon")).toBe("https://machugi.io/?keyword=pokemon");
+    expect(createHomeUrl("")).toBe("https://machugi.io/");
   });
 });

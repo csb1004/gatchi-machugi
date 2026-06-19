@@ -118,7 +118,7 @@ export type SourceMirrorActionName =
   | "focusOriginalTab";
 
 export type SourceMirrorAction =
-  | { name: "focusHome" }
+  | { name: "focusHome"; query?: string }
   | { name: "search"; query: string }
   | { name: "selectResult"; resultId: string; href?: string | null }
   | { name: "setTimer"; timerSeconds: number | null }

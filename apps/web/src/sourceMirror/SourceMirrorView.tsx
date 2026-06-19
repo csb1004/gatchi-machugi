@@ -1,4 +1,5 @@
 import { ArrowRight, Home, SkipForward } from "lucide-react";
+import { useRef } from "react";
 import type { SourceMirrorAction, SourceMirrorState } from "@gatchi/shared";
 import { QuizPanel } from "../room/QuizPanel";
 import { MirrorResultsView } from "./MirrorResultsView";
@@ -11,16 +12,40 @@ export function SourceMirrorView(props: {
   isHost: boolean;
   onAction: (action: SourceMirrorAction) => void;
 }) {
+  const lastSearchQuery = useRef("");
+  if (props.state.kind === "home" || props.state.kind === "searchResults") {
+    lastSearchQuery.current = props.state.query.trim();
+  }
+
+  function sendAction(action: SourceMirrorAction) {
+    if (action.name === "search") lastSearchQuery.current = action.query.trim();
+    props.onAction(action);
+  }
+
+  function focusHome() {
+    const query = lastSearchQuery.current.trim();
+    sendAction(query ? { name: "focusHome", query } : { name: "focusHome" });
+  }
+
+  function sendSetupAction(action: SourceMirrorAction) {
+    if (action.name === "focusHome") {
+      focusHome();
+      return;
+    }
+
+    sendAction(action);
+  }
+
   if (props.state.kind === "home") {
-    return <MirrorSearchView initialQuery={props.state.query} isHost={props.isHost} onAction={props.onAction} />;
+    return <MirrorSearchView initialQuery={props.state.query} isHost={props.isHost} onAction={sendAction} />;
   }
 
   if (props.state.kind === "searchResults") {
-    return <MirrorResultsView query={props.state.query} results={props.state.results} isHost={props.isHost} onAction={props.onAction} />;
+    return <MirrorResultsView query={props.state.query} results={props.state.results} isHost={props.isHost} onAction={sendAction} />;
   }
 
   if (props.state.kind === "quizDetail") {
-    return <MirrorSetupView quiz={props.state.quiz} settings={props.state.settings} isHost={props.isHost} onAction={props.onAction} />;
+    return <MirrorSetupView quiz={props.state.quiz} settings={props.state.settings} isHost={props.isHost} onAction={sendSetupAction} />;
   }
 
   if (props.state.kind === "playing" || props.state.kind === "result") {
@@ -28,15 +53,15 @@ export function SourceMirrorView(props: {
       <section className="mirror-playable" aria-label="마추기 진행 화면">
         {props.isHost ? (
           <div className="mirror-host-actions" aria-label="방장 진행 조작">
-            <button type="button" onClick={() => props.onAction({ name: "focusHome" })}>
+            <button type="button" onClick={focusHome}>
               <Home size={17} />
               홈 화면
             </button>
-            <button type="button" onClick={() => props.onAction({ name: "skip" })}>
+            <button type="button" onClick={() => sendAction({ name: "skip" })}>
               <SkipForward size={17} />
               건너뛰기
             </button>
-            <button type="button" disabled={!props.state.quiz.canGoNext} onClick={() => props.onAction({ name: "next" })}>
+            <button type="button" disabled={!props.state.quiz.canGoNext} onClick={() => sendAction({ name: "next" })}>
               <ArrowRight size={17} />
               다음 문제
             </button>

@@ -1,5 +1,5 @@
 import { Send } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { QuizState } from "@gatchi/shared";
 
 export function AnswerPanel({
@@ -16,6 +16,7 @@ export function AnswerPanel({
   onSubmitAnswer: (rawAnswer: string) => void;
 }) {
   const [answer, setAnswer] = useState("");
+  const inputRef = useRef<HTMLInputElement | null>(null);
   const canSubmit = !disabled && answer.trim().length > 0;
   const submitLabel = submitted ? (disabled ? "제출 완료" : "수정") : "제출";
   const submittedAnswer = submitted ? answer.trim() : "";
@@ -23,6 +24,10 @@ export function AnswerPanel({
   useEffect(() => {
     setAnswer("");
   }, [resetKey]);
+
+  useEffect(() => {
+    if (!disabled) inputRef.current?.focus();
+  }, [disabled, resetKey]);
 
   function submitAnswer() {
     if (!canSubmit) return;
@@ -41,6 +46,7 @@ export function AnswerPanel({
       <label>
         답변
         <input
+          ref={inputRef}
           value={answer}
           onChange={(event) => setAnswer(event.target.value)}
           disabled={disabled}

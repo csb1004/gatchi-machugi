@@ -40,6 +40,15 @@ function navigateCurrentTab(root: Document, href: string): ActionResult {
   return { ok: true };
 }
 
+export function createHomeUrl(query?: string): string {
+  const normalizedQuery = query?.trim();
+  if (!normalizedQuery) return "https://machugi.io/";
+
+  const url = new URL("https://machugi.io/");
+  url.searchParams.set("keyword", normalizedQuery);
+  return url.toString();
+}
+
 function openAnchorInCurrentTab(anchor: HTMLAnchorElement): ActionResult {
   anchor.removeAttribute("target");
   anchor.rel = "";
@@ -145,7 +154,7 @@ function runNavigationSourceCommand(command: "next" | "skip", root: Document, op
 
 export function runSourceMirrorAction(action: SourceMirrorAction, root: Document = document, options?: SourceMirrorActionOptions): ActionResult {
   if (action.name === "focusHome") {
-    return navigateCurrentTab(root, "https://machugi.io/");
+    return navigateCurrentTab(root, createHomeUrl(action.query));
   }
 
   if (action.name === "search") return runSearch(action.query, root);
