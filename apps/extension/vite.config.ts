@@ -7,6 +7,7 @@ export default defineConfig({
     outDir: "dist",
     rollupOptions: {
       input: {
+        appBridge: resolve(__dirname, "src/appBridge.ts"),
         background: resolve(__dirname, "src/background.ts"),
         contentScript: resolve(__dirname, "src/contentScript.ts"),
         popup: resolve(__dirname, "src/popup.ts")

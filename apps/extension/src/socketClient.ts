@@ -18,7 +18,7 @@ export interface PairingSettings {
   hostCode: string;
 }
 
-export type StoredPairingSettings = Omit<PairingSettings, "hostCode">;
+export type StoredPairingSettings = PairingSettings;
 
 export interface PairHostRequestMessage {
   type: typeof PAIRING_REQUEST_TYPE;
@@ -51,10 +51,15 @@ export function normalizeServerUrl(serverUrl: string) {
   return url.toString().replace(/\/$/, "");
 }
 
+function normalizeHostCode(hostCode: string): string {
+  const normalized = hostCode.trim().toUpperCase();
+  return normalized.startsWith("#") ? normalized : `#${normalized}`;
+}
+
 export function buildPairPayload({ roomCode, hostCode }: Pick<PairingSettings, "roomCode" | "hostCode">): HostPairPayload {
   return {
     roomCode: roomCode.trim().toUpperCase(),
-    hostCode: hostCode.trim().toUpperCase()
+    hostCode: normalizeHostCode(hostCode)
   };
 }
 

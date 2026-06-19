@@ -1,12 +1,16 @@
 import type { PairHostRequestMessage, PairHostResponse, PairingSettings, StoredPairingSettings } from "./socketClient.js";
-import type { QuizCommandPayload, QuizState } from "@gatchi/shared";
+import {
+  APP_PAIRING_SETTINGS_MESSAGE,
+  type AppPairingSettingsPayload,
+  type QuizCommandPayload,
+  type QuizState
+} from "@gatchi/shared";
 import { CONTENT_COMMAND_MESSAGE, CONTENT_STATE_MESSAGE } from "./messages.js";
+import { normalizePairingSettingsForStorage } from "./pairingSettings.js";
 import {
   MachugiSocketClient,
   PAIRING_REQUEST_TYPE,
   PAIRING_STORAGE_KEY,
-  buildPairPayload,
-  normalizeServerUrl
 } from "./socketClient.js";
 
 const socketClient = new MachugiSocketClient();
@@ -23,13 +27,14 @@ function isPairHostRequestMessage(message: unknown): message is PairHostRequestM
   );
 }
 
-function toStoredPairingSettings(payload: PairingSettings): StoredPairingSettings {
-  const pairPayload = buildPairPayload(payload);
-
-  return {
-    serverUrl: normalizeServerUrl(payload.serverUrl),
-    roomCode: pairPayload.roomCode
-  };
+function isAppPairingSettingsMessage(message: unknown): message is { type: typeof APP_PAIRING_SETTINGS_MESSAGE; payload: AppPairingSettingsPayload } {
+  return (
+    typeof message === "object" &&
+    message !== null &&
+    "type" in message &&
+    (message as { type?: unknown }).type === APP_PAIRING_SETTINGS_MESSAGE &&
+    "payload" in message
+  );
 }
 
 async function savePairingSettings(settings: StoredPairingSettings): Promise<void> {
@@ -70,7 +75,7 @@ function registerPairedBridge(roomCode: string, tabId: number) {
 }
 
 async function pairHost(payload: PairingSettings): Promise<PairHostResponse> {
-  const settings = toStoredPairingSettings(payload);
+  const settings = normalizePairingSettingsForStorage(payload);
 
   try {
     const tabId = await activeMachugiTabId();
@@ -135,6 +140,14 @@ chrome.runtime.onMessage.addListener((message: unknown, sender, sendResponse) =>
   }
 
   if (!isPairHostRequestMessage(message)) {
+    if (isAppPairingSettingsMessage(message)) {
+      void savePairingSettings(normalizePairingSettingsForStorage(message.payload)).then(
+        () => sendResponse({ ok: true }),
+        (error) => sendResponse({ ok: false, error: error instanceof Error ? error.message : "연결 정보 저장에 실패했습니다." })
+      );
+      return true;
+    }
+
     return false;
   }
 

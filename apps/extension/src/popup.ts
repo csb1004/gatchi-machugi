@@ -5,7 +5,6 @@ type PairFormElements = {
   form: HTMLFormElement;
   serverUrl: HTMLInputElement;
   roomCode: HTMLInputElement;
-  hostCode: HTMLInputElement;
   submitButton: HTMLButtonElement;
   status: HTMLOutputElement;
 };
@@ -46,7 +45,6 @@ function getElements(): PairFormElements {
     form: document.querySelector("#pair-form") as HTMLFormElement,
     serverUrl: document.querySelector("#server-url") as HTMLInputElement,
     roomCode: document.querySelector("#room-code") as HTMLInputElement,
-    hostCode: document.querySelector("#host-code") as HTMLInputElement,
     submitButton: document.querySelector("#pair-button") as HTMLButtonElement,
     status: document.querySelector("#status") as HTMLOutputElement
   };
@@ -70,17 +68,29 @@ function localizeError(message: string) {
 }
 
 function fillForm(elements: PairFormElements, stored: StoredPairingSettings | null) {
-  if (!stored) return;
+  if (!stored) {
+    elements.submitButton.disabled = true;
+    setStatus(elements, "가치 마추기 방장 화면에서 연결 정보를 먼저 저장해주세요.", "error");
+    return;
+  }
 
   elements.serverUrl.value = stored.serverUrl;
   elements.roomCode.value = stored.roomCode;
+  elements.serverUrl.readOnly = true;
+  elements.roomCode.readOnly = true;
+  setStatus(elements, `${stored.roomCode} 방 연결 정보를 불러왔습니다.`, "success");
 }
 
-async function handleSubmit(elements: PairFormElements) {
+async function handleSubmit(elements: PairFormElements, stored: StoredPairingSettings | null) {
+  if (!stored?.hostCode) {
+    setStatus(elements, "가치 마추기 방장 화면에서 연결 정보를 먼저 저장해주세요.", "error");
+    return;
+  }
+
   const payload: PairingSettings = {
     serverUrl: elements.serverUrl.value,
     roomCode: elements.roomCode.value,
-    hostCode: elements.hostCode.value
+    hostCode: stored.hostCode
   };
 
   elements.submitButton.disabled = true;
@@ -104,18 +114,16 @@ async function handleSubmit(elements: PairFormElements) {
 
 async function init() {
   const elements = getElements();
-  fillForm(elements, await readStoredPairing());
+  const stored = await readStoredPairing();
+  fillForm(elements, stored);
 
   elements.roomCode.addEventListener("input", () => {
     elements.roomCode.value = elements.roomCode.value.toUpperCase();
   });
-  elements.hostCode.addEventListener("input", () => {
-    elements.hostCode.value = elements.hostCode.value.toUpperCase();
-  });
 
   elements.form.addEventListener("submit", (event) => {
     event.preventDefault();
-    void handleSubmit(elements);
+    void handleSubmit(elements, stored);
   });
 }
 

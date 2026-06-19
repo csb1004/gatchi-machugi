@@ -69,6 +69,10 @@
         cursor: progress;
       }
 
+      .hint {
+        margin-top: -4px;
+      }
+
       #status {
         min-height: 18px;
         font-size: 12px;
@@ -87,7 +91,7 @@
   <body>
     <main>
       <h1>방장 연결</h1>
-      <p>마추기아이오 탭을 열어둔 뒤, 확장 프로그램을 방장으로 연결합니다.</p>
+      <p>방장 화면에서 자동 저장된 연결 정보로 마추기아이오 탭을 연결합니다.</p>
       <form id="pair-form">
         <label for="server-url">
           서버 URL
@@ -97,10 +101,7 @@
           방 코드
           <input id="room-code" name="roomCode" type="text" maxlength="12" autocapitalize="characters" required />
         </label>
-        <label for="host-code">
-          방장 코드
-          <input id="host-code" name="hostCode" type="text" maxlength="5" autocapitalize="characters" spellcheck="false" required />
-        </label>
+        <p class="hint">방장 코드는 방장 화면에서 확장 프로그램으로 자동 전달됩니다.</p>
         <button id="pair-button" type="submit">확장 프로그램 연결</button>
       </form>
       <output id="status" aria-live="polite"></output>

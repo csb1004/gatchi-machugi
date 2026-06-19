@@ -15,7 +15,7 @@ export function ExtensionSetup({ releaseUrl }: { releaseUrl: string }) {
         <li>zip 파일을 원하는 폴더에 압축 해제합니다.</li>
         <li>chrome://extensions를 열고 개발자 모드를 켭니다.</li>
         <li>압축해제된 확장 프로그램 로드를 누르고 압축을 푼 폴더를 선택합니다.</li>
-        <li>확장 popup에 서버 URL, 방 코드, 방장 코드를 입력합니다.</li>
+        <li>방장 화면의 확장 프로그램에 저장 버튼을 누른 뒤 machugi.io 탭에서 확장 popup을 연결합니다.</li>
       </ol>
     </section>
   );

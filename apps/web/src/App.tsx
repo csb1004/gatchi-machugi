@@ -1,6 +1,10 @@
 import { Copy, DoorOpen, Plus, RefreshCw, Users } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import type { PublicRoomSummary } from "@gatchi/shared";
+import {
+  APP_PAIRING_SETTINGS_ACK_MESSAGE,
+  APP_PAIRING_SETTINGS_MESSAGE,
+  type PublicRoomSummary
+} from "@gatchi/shared";
 import { createRoom, fetchPublicRooms, type CreatedRoom } from "./api";
 import { HostControls } from "./host/HostControls";
 import { ExtensionSetup } from "./host/ExtensionSetup";
@@ -16,18 +20,63 @@ export function App() {
   const [createStatus, setCreateStatus] = useState<"idle" | "creating" | "failed">("idle");
   const [publicRooms, setPublicRooms] = useState<PublicRoomSummary[]>([]);
   const [roomsStatus, setRoomsStatus] = useState<"idle" | "loading" | "failed">("idle");
+  const [extensionSyncStatus, setExtensionSyncStatus] = useState<"idle" | "waiting" | "saved" | "failed">("idle");
   const roomSocket = useRoomSocket();
   const canJoin = useMemo(() => nickname.trim().length > 0 && roomCode.trim().length > 0, [nickname, roomCode]);
   const serverUrl = window.location.origin;
   const extensionReleaseUrl = import.meta.env.VITE_GITHUB_EXTENSION_RELEASE_URL ?? "https://github.com/csb1004/gatchi-machugi/releases";
 
-  function buildPairingText(room: CreatedRoom) {
-    return [`서버 URL: ${serverUrl}`, `방 코드: ${room.roomCode}`, `방장 코드: ${room.hostCode}`].join("\n");
+  function sendPairingSettingsToExtension(room: CreatedRoom) {
+    setExtensionSyncStatus("waiting");
+    window.postMessage(
+      {
+        type: APP_PAIRING_SETTINGS_MESSAGE,
+        payload: {
+          serverUrl,
+          roomCode: room.roomCode,
+          hostCode: room.hostCode
+        }
+      },
+      window.location.origin
+    );
+    window.setTimeout(() => {
+      setExtensionSyncStatus((status) => (status === "waiting" ? "failed" : status));
+    }, 1000);
+  }
+
+  function extensionSyncLabel() {
+    if (extensionSyncStatus === "saved") return "확장 프로그램에 저장됨";
+    if (extensionSyncStatus === "failed") return "확장 설치 후 다시 저장하세요";
+    return "자동 저장 대기 중";
   }
 
   useEffect(() => {
     void loadPublicRooms();
   }, []);
+
+  useEffect(() => {
+    function handlePairingAck(event: MessageEvent) {
+      if (event.source !== window || event.origin !== window.location.origin) return;
+      if (
+        typeof event.data !== "object" ||
+        event.data === null ||
+        (event.data as { type?: unknown }).type !== APP_PAIRING_SETTINGS_ACK_MESSAGE
+      ) {
+        return;
+      }
+
+      setExtensionSyncStatus((event.data as { ok?: boolean }).ok ? "saved" : "failed");
+    }
+
+    window.addEventListener("message", handlePairingAck);
+    return () => window.removeEventListener("message", handlePairingAck);
+  }, []);
+
+  useEffect(() => {
+    if (createdRoom) {
+      sendPairingSettingsToExtension(createdRoom);
+    }
+  }, [createdRoom]);
 
   async function loadPublicRooms() {
     setRoomsStatus("loading");
@@ -80,16 +129,16 @@ export function App() {
                   <code>{serverUrl}</code>
                   <span>방 코드</span>
                   <strong>{createdRoom.roomCode}</strong>
-                  <span>방장 코드</span>
-                  <code>{createdRoom.hostCode}</code>
+                  <span>확장 연결 정보</span>
+                  <strong>{extensionSyncLabel()}</strong>
                   <button
                     type="button"
                     onClick={() => {
-                      void navigator.clipboard?.writeText(buildPairingText(createdRoom));
+                      sendPairingSettingsToExtension(createdRoom);
                     }}
                   >
                     <Copy size={16} />
-                    연결 정보 복사
+                    확장 프로그램에 저장
                   </button>
                 </div>
               ) : null}
@@ -211,16 +260,16 @@ export function App() {
                 <code>{serverUrl}</code>
                 <span>방 코드</span>
                 <strong>{createdRoom.roomCode}</strong>
-                <span>방장 코드</span>
-                <code>{createdRoom.hostCode}</code>
+                <span>확장 연결 정보</span>
+                <strong>{extensionSyncLabel()}</strong>
                 <button
                   type="button"
                   onClick={() => {
-                    void navigator.clipboard?.writeText(buildPairingText(createdRoom));
+                    sendPairingSettingsToExtension(createdRoom);
                   }}
                 >
                   <Copy size={16} />
-                  연결 정보 복사
+                  확장 프로그램에 저장
                 </button>
               </div>
             ) : null}
@@ -231,11 +280,11 @@ export function App() {
                 GitHub Releases에서 확장 프로그램 받기
               </a>
               <ol>
-                <li>방을 만들고 표시된 방장 코드를 다른 사람에게 공유하지 마세요.</li>
+                <li>방을 만들면 확장 프로그램 연결 정보가 자동 저장됩니다.</li>
                 <li>퀴즈를 진행할 브라우저 탭에서 machugi.io를 엽니다.</li>
                 <li>GitHub Releases에서 가치 마추기 확장 프로그램 zip을 내려받아 압축을 풉니다.</li>
                 <li>chrome://extensions에서 개발자 모드를 켜고 압축해제된 확장 프로그램을 로드합니다.</li>
-                <li>확장 popup에 서버 URL, 방 코드, 방장 코드를 입력합니다.</li>
+                <li>확장 popup에서 저장된 서버 URL과 방 코드를 확인한 뒤 연결합니다.</li>
                 <li>확장이 연결된 뒤 참가자는 방 코드로 입장합니다.</li>
               </ol>
             </div>

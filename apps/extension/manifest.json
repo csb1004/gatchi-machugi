@@ -4,7 +4,14 @@
   "description": "방장 브라우저를 가치 마추기 방과 연결합니다.",
   "version": "0.0.0",
   "permissions": ["storage", "tabs", "scripting"],
-  "host_permissions": ["https://machugi.io/*", "https://*.machugi.io/*"],
+  "host_permissions": [
+    "https://machugi.io/*",
+    "https://*.machugi.io/*",
+    "https://*.up.railway.app/*",
+    "https://*.railway.app/*",
+    "http://localhost/*",
+    "http://127.0.0.1/*"
+  ],
   "background": {
     "service_worker": "background.js",
     "type": "module"
@@ -13,6 +20,11 @@
     {
       "matches": ["https://machugi.io/*", "https://*.machugi.io/*"],
       "js": ["contentScript.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://*.up.railway.app/*", "https://*.railway.app/*", "http://localhost/*", "http://127.0.0.1/*"],
+      "js": ["appBridge.js"],
       "run_at": "document_idle"
     }
   ],
