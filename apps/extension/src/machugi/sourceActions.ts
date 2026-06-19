@@ -53,15 +53,20 @@ function clickButtonByText(root: Document, pattern: RegExp): boolean {
   return true;
 }
 
+function clickElement(element: HTMLElement): void {
+  const clickable = element.closest<HTMLElement>("[class*='Slider_mark'], button, [role='button']") ?? element;
+  clickable.click();
+}
+
 function clickOptionByNumber(root: Document, value: number | null, nounPattern: RegExp): boolean {
-  const expected = value === null ? /없음|무제한|none|off/i : new RegExp(String(value));
-  const buttons = Array.from(root.querySelectorAll<HTMLButtonElement>("button, [role='button']"));
-  const button = buttons.find((element) => {
+  const expected = value === null ? /타이머\s*X|없음|무제한|none|off/i : new RegExp(`(^|\\D)${value}(\\D|$)`);
+  const elements = Array.from(root.querySelectorAll<HTMLElement>("button, [role='button'], [class*='Slider_mark'], [class*='Slider_markLabel']"));
+  const element = elements.find((element) => {
     const label = `${element.textContent ?? ""} ${element.getAttribute("aria-label") ?? ""}`.trim();
     return expected.test(label) && nounPattern.test(label);
   });
-  if (!button) return false;
-  button.click();
+  if (!element) return false;
+  clickElement(element);
   return true;
 }
 
@@ -105,7 +110,7 @@ export function runSourceMirrorAction(action: SourceMirrorAction, root: Document
   if (action.name === "search") return runSearch(action.query, root);
   if (action.name === "selectResult") return runSelectResult(action.href, action.resultId, root);
   if (action.name === "setTimer") {
-    return clickOptionByNumber(root, action.timerSeconds, /초|타이머|timer|second/i)
+    return clickOptionByNumber(root, action.timerSeconds, /초|타이머|timer|second|x/i)
       ? { ok: true }
       : { ok: false, reason: "타이머 설정을 원본 화면에서 찾을 수 없습니다." };
   }

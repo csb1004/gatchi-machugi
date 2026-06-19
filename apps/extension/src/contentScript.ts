@@ -1,8 +1,15 @@
-import type { OriginalSubmitAllowedPayload, QuizCommandName, QuizState, RoomState, SourceMirrorActionPayload } from "@gatchi/shared";
+import type {
+  OriginalSubmitAllowedPayload,
+  QuizCommandName,
+  QuizState,
+  RoomState,
+  SourceMirrorActionPayload,
+  SourceMirrorState
+} from "@gatchi/shared";
 import { runMachugiCommand, submitOriginalAnswer } from "./machugi/commands";
 import { extractQuizState } from "./machugi/extractor";
 import { runSourceMirrorAction } from "./machugi/sourceActions";
-import { extractSourceMirrorState } from "./machugi/sourceMirror";
+import { countSourceMirrorResults, extractSourceMirrorState } from "./machugi/sourceMirror";
 import { createOriginalSubmissionLock, type OriginalSubmissionLockController } from "./machugi/lock";
 
 const CONTENT_STATE_MESSAGE = "machugi-state";
@@ -21,6 +28,9 @@ const CONTENT_SOURCE_ACTION_FAILURE_MESSAGE = "machugi-source-action-failure";
 const contentWindow = window as Window & { __gatchiMachugiContentScriptInstalled?: boolean };
 
 let originalSubmissionLock: OriginalSubmissionLockController | null = null;
+let resultExpansionTimer: number | null = null;
+let expandingResults = false;
+const expandedResultKeys = new Set<string>();
 
 function sendState() {
   chrome.runtime.sendMessage({
@@ -32,13 +42,30 @@ function sendState() {
   sendSourceMirrorState();
 }
 
-function sendSourceMirrorState() {
+function sourceMirrorExpansionKey(state: SourceMirrorState): string | null {
+  if (state.kind !== "searchResults") return null;
+  return `${state.url}::${state.query}`;
+}
+
+function scheduleResultExpansion(state: SourceMirrorState) {
+  const key = sourceMirrorExpansionKey(state);
+  if (!key || expandingResults || expandedResultKeys.has(key) || resultExpansionTimer !== null) return;
+
+  resultExpansionTimer = window.setTimeout(() => {
+    resultExpansionTimer = null;
+    void expandSearchResults(key);
+  }, 250);
+}
+
+function sendSourceMirrorState(options: { allowResultExpansion?: boolean } = {}) {
+  const state = extractSourceMirrorState(document);
   chrome.runtime.sendMessage({
     type: CONTENT_SOURCE_MIRROR_MESSAGE,
     href: window.location.href,
     title: document.title,
-    payload: extractSourceMirrorState(document)
+    payload: state
   });
+  if (options.allowResultExpansion ?? true) scheduleResultExpansion(state);
 }
 
 function sendOriginalSubmitRequest(payload: { roomCode: string; questionKey: string }) {
@@ -74,6 +101,45 @@ function sendSourceActionFailure(payload: SourceMirrorActionPayload, reason: str
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
+
+async function expandSearchResults(key: string) {
+  if (expandingResults) return;
+
+  expandingResults = true;
+  const originalScrollY = window.scrollY;
+
+  try {
+    let stablePasses = 0;
+    let previousCount = countSourceMirrorResults(document);
+    let previousHeight = document.documentElement.scrollHeight;
+
+    for (let pass = 0; pass < 24; pass += 1) {
+      window.scrollTo({ top: document.documentElement.scrollHeight, behavior: "auto" });
+      await delay(650);
+
+      const nextCount = countSourceMirrorResults(document);
+      const nextHeight = document.documentElement.scrollHeight;
+      sendSourceMirrorState({ allowResultExpansion: false });
+
+      if (nextCount <= previousCount && nextHeight <= previousHeight) {
+        stablePasses += 1;
+      } else {
+        stablePasses = 0;
+      }
+
+      previousCount = nextCount;
+      previousHeight = nextHeight;
+
+      if (stablePasses >= 2) break;
+    }
+
+    expandedResultKeys.add(key);
+    window.scrollTo({ top: Math.min(originalScrollY, document.documentElement.scrollHeight), behavior: "auto" });
+    sendSourceMirrorState({ allowResultExpansion: false });
+  } finally {
+    expandingResults = false;
+  }
 }
 
 function hasOriginalResult(quiz: QuizState): boolean {

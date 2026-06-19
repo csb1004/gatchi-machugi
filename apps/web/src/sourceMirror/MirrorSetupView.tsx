@@ -14,9 +14,18 @@ export function MirrorSetupView(props: {
         <span>문제 설정</span>
       </div>
       {props.quiz.thumbnailUrl ? <img className="mirror-setup-thumb" src={props.quiz.thumbnailUrl} alt="" /> : null}
+      {props.quiz.description ? <p className="mirror-setup-description">{props.quiz.description}</p> : null}
       <div className="mirror-setting-row">
         <span>타이머</span>
         <div className="mirror-segmented">
+          <button
+            type="button"
+            disabled={!props.isHost}
+            className={props.settings.timerSeconds === null ? "active" : ""}
+            onClick={() => props.onAction({ name: "setTimer", timerSeconds: null })}
+          >
+            타이머 X
+          </button>
           {props.settings.availableTimers.map((seconds) => (
             <button
               type="button"
@@ -31,7 +40,7 @@ export function MirrorSetupView(props: {
         </div>
       </div>
       <div className="mirror-setting-row">
-        <span>문항 수</span>
+        <span>문제 시작</span>
         <div className="mirror-segmented">
           {props.settings.availableQuestionCounts.map((count) => (
             <button
@@ -41,15 +50,17 @@ export function MirrorSetupView(props: {
               className={props.settings.questionCount === count ? "active" : ""}
               onClick={() => props.onAction({ name: "setQuestionCount", questionCount: count })}
             >
-              {count}
+              {count}개 풀기
             </button>
           ))}
         </div>
       </div>
-      <button className="primary-button" type="button" disabled={!props.isHost} onClick={() => props.onAction({ name: "startQuiz" })}>
-        <Play size={18} />
-        문제 시작
-      </button>
+      {props.settings.availableQuestionCounts.length === 0 ? (
+        <button className="primary-button" type="button" disabled={!props.isHost} onClick={() => props.onAction({ name: "startQuiz" })}>
+          <Play size={18} />
+          문제 시작
+        </button>
+      ) : null}
     </section>
   );
 }

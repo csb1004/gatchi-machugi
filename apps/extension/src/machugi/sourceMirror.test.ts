@@ -51,6 +51,59 @@ describe("extractSourceMirrorState", () => {
     expect(state.results[0]?.title).not.toContain("포켓몬스터 사진");
   });
 
+  it("keeps all loaded search results instead of capping at the first page", () => {
+    const cards = Array.from(
+      { length: 75 },
+      (_, index) => `
+        <a class="QuizMainCard_link__abc" href="/quiz/${index}">
+          <span class="QuizMainCard_title__abc">퀴즈 ${index}</span>
+          <span class="QuizMainCard_description__abc">설명 ${index}</span>
+        </a>
+      `
+    ).join("");
+    const root = setDocument("/search?keyword=quiz", `<input type="search" value="quiz">${cards}`);
+
+    const state = extractSourceMirrorState(root);
+    expect(state.kind).toBe("searchResults");
+    if (state.kind !== "searchResults") throw new Error("expected searchResults");
+    expect(state.query).toBe("quiz");
+    expect(state.results).toHaveLength(75);
+  });
+
+  it("extracts quiz detail setup pages", () => {
+    const root = setDocument(
+      "/quiz/ZPWUlOLUrTfyY4FyZcVL",
+      `
+      <div class="QuizDetailReady_mainContainer__abc">
+        <div class="QuizDetailReady_thumbnailContainer__abc">
+          <img src="/pokemon.png" alt="포켓몬 이름 맞추기 (1~9세대) 썸네일">
+        </div>
+        <article class="QuizDetailReady_title__abc">포켓몬 이름 맞추기 (1~9세대)</article>
+        <article class="QuizDetailReady_description__abc">포켓몬스터 사진을 보고 맞춘다.</article>
+        <div class="Slider_mark__abc Slider_markActive__abc"><div class="Slider_markLabel__abc">타이머 X</div></div>
+        <div class="Slider_mark__abc"><div class="Slider_markLabel__abc">3초</div></div>
+        <div class="Slider_mark__abc"><div class="Slider_markLabel__abc">5초</div></div>
+        <div class="Slider_mark__abc"><div class="Slider_markLabel__abc">10초</div></div>
+        <button>10개 풀기</button>
+        <button>20개 풀기</button>
+        <button>30개 풀기</button>
+        <button>50개 풀기</button>
+      </div>
+    `,
+      "포켓몬 이름 맞추기 (1~9세대) - 마추기 아이오"
+    );
+
+    const state = extractSourceMirrorState(root);
+    expect(state.kind).toBe("quizDetail");
+    if (state.kind !== "quizDetail") throw new Error("expected quizDetail");
+    expect(state.quiz.title).toBe("포켓몬 이름 맞추기 (1~9세대)");
+    expect(state.quiz.description).toBe("포켓몬스터 사진을 보고 맞춘다.");
+    expect(state.quiz.thumbnailUrl).toBe(new URL("/pokemon.png", document.location.href).toString());
+    expect(state.settings.timerSeconds).toBeNull();
+    expect(state.settings.availableTimers).toEqual([3, 5, 10]);
+    expect(state.settings.availableQuestionCounts).toEqual([10, 20, 30, 50]);
+  });
+
   it("delegates active question pages to QuizState", () => {
     const root = setDocument(
       "/quiz/123/play",

@@ -1,4 +1,4 @@
-import type { MirrorQuizResult, SourceMirrorState } from "@gatchi/shared";
+import type { MirrorQuizResult, MirrorQuizSettings, MirrorQuizSummary, SourceMirrorState } from "@gatchi/shared";
 import { extractQuizState } from "./extractor";
 
 const searchInputSelector = [
@@ -15,6 +15,7 @@ const resultSelector = [
 ].join(", ");
 const playingSelector = "[class*='QuizDetailPlaying'], [data-question-text], [data-question-image], audio, video";
 const resultFeedbackSelector = "[class*='QuizDetailAnswerResult'], [role='alert'], [data-result-message]";
+const detailReadySelector = "[class*='QuizDetailReady_mainContainer'], [class*='QuizDetailReady_title'], [class*='QuizDetailReadyButtonGroup']";
 
 function now(): string {
   return new Date().toISOString();
@@ -35,7 +36,8 @@ function currentQuery(root: Document): string {
   if (input?.value) return input.value.trim();
 
   try {
-    return new URL(root.location.href).searchParams.get("q")?.trim() ?? "";
+    const params = new URL(root.location.href).searchParams;
+    return (params.get("keyword") ?? params.get("q") ?? "").trim();
   } catch {
     return "";
   }
@@ -121,7 +123,92 @@ function extractResults(root: Document): MirrorQuizResult[] {
     });
   }
 
-  return results.slice(0, 60);
+  return results;
+}
+
+export function countSourceMirrorResults(root: Document = document): number {
+  return extractResults(root).length;
+}
+
+function isQuizDetailRoute(root: Document): boolean {
+  try {
+    return /^\/quiz\/[^/]+\/?$/.test(new URL(root.location.href).pathname);
+  } catch {
+    return false;
+  }
+}
+
+function detailRoot(root: Document): Element {
+  return (
+    root.querySelector("[class*='QuizDetailReady_mainContainer']") ??
+    root.querySelector("[class*='QuizDetailReady_topContainer']") ??
+    root.body
+  );
+}
+
+function titleFromDocumentTitle(title: string | null | undefined): string {
+  return compactText(title).replace(/\s*-\s*마추기\s*아이오\s*$/i, "");
+}
+
+function extractNumberOptions(root: Element, pattern: RegExp): number[] {
+  const values = new Set<number>();
+  const elements = Array.from(root.querySelectorAll("button, [role='button'], [class*='Slider_markLabel'], [class*='Slider_mark']"));
+
+  for (const element of elements) {
+    const text = compactText(element.textContent);
+    const match = text.match(pattern);
+    if (!match?.[1]) continue;
+    values.add(Number(match[1]));
+  }
+
+  return Array.from(values).filter(Number.isFinite);
+}
+
+function extractSelectedTimerSeconds(root: Element): number | null {
+  const active = root.querySelector("[class*='Slider_markActive']");
+  const label = compactText(active?.textContent);
+  const match = label.match(/(\d+)\s*초/);
+  if (match?.[1]) return Number(match[1]);
+  return null;
+}
+
+function extractQuizDetail(root: Document): Extract<SourceMirrorState, { kind: "quizDetail" }> | null {
+  if (!isQuizDetailRoute(root) || !root.querySelector(detailReadySelector)) return null;
+
+  const container = detailRoot(root);
+  const thumbnail = container.querySelector<HTMLImageElement>(
+    "[class*='QuizDetailReady_thumbnail'] img, img[alt*='썸네일'], img"
+  );
+  const title =
+    firstText(container, ["[class*='QuizDetailReady_title']", "h1", "h2", "strong"]) ||
+    titleFromImage((thumbnail?.closest("a") as HTMLAnchorElement | null) ?? root.createElement("a")) ||
+    titleFromDocumentTitle(root.title) ||
+    "마추기 퀴즈";
+  const description = firstText(container, ["[class*='QuizDetailReady_description']", "p"]);
+  const timerOptions = extractNumberOptions(container, /(\d+)\s*초/);
+  const questionCounts = extractNumberOptions(container, /(\d+)\s*개\s*풀기/);
+  const settings: MirrorQuizSettings = {
+    timerSeconds: extractSelectedTimerSeconds(container),
+    questionCount: null,
+    availableTimers: timerOptions,
+    availableQuestionCounts: questionCounts
+  };
+  const quiz: MirrorQuizSummary = {
+    title,
+    href: root.location.href,
+    thumbnailUrl: absoluteUrl(thumbnail?.currentSrc || thumbnail?.getAttribute("src"), root),
+    description: description || null,
+    meta: []
+  };
+
+  return {
+    kind: "quizDetail",
+    url: root.location.href,
+    title: root.title || null,
+    lastSeenAt: now(),
+    quiz,
+    settings
+  };
 }
 
 function hasPlayableEvidence(root: Document): boolean {
@@ -147,6 +234,9 @@ export function extractSourceMirrorState(root: Document = document): SourceMirro
       quiz
     };
   }
+
+  const quizDetail = extractQuizDetail(root);
+  if (quizDetail) return quizDetail;
 
   const query = currentQuery(root);
   const results = extractResults(root);
