@@ -212,6 +212,98 @@ describe("RoomService", () => {
     expect(service.getState(roomCode).fairPlay.originalSubmitStatus).toBe("submitting");
   });
 
+  it("locks answer changes after original submission authorization", async () => {
+    const service = new RoomService();
+    const { roomCode, hostParticipantId } = await service.createRoom({ title: "Room", visibility: "private", hostNickname: "Host" });
+    const player = service.joinParticipant({ roomCode, nickname: "Mina" });
+
+    service.updateQuizState({
+      roomCode,
+      quiz: {
+        ...service.getState(roomCode).quiz,
+        questionIndex: 1,
+        questionText: "Name the game",
+        questionType: "free-text"
+      }
+    });
+    service.submitAnswer({ roomCode, participantId: hostParticipantId, rawAnswer: "blue archive" });
+    service.submitAnswer({ roomCode, participantId: player.participant.id, rawAnswer: "wrong" });
+    service.requestOriginalSubmission({ roomCode, questionKey: service.getState(roomCode).fairPlay.questionKey ?? "" });
+
+    expect(() => service.submitAnswer({ roomCode, participantId: player.participant.id, rawAnswer: "blue archive" })).toThrow(
+      "Submissions are locked for original submission"
+    );
+  });
+
+  it("resets the round when only multiple-choice choices change", async () => {
+    const service = new RoomService();
+    const { roomCode, hostParticipantId } = await service.createRoom({ title: "Room", visibility: "private", hostNickname: "Host" });
+    const player = service.joinParticipant({ roomCode, nickname: "Mina" });
+
+    service.updateQuizState({
+      roomCode,
+      quiz: {
+        ...service.getState(roomCode).quiz,
+        questionIndex: 1,
+        questionText: "Pick the game",
+        questionType: "multiple-choice",
+        choices: [
+          { id: "a", label: "Blue Archive" },
+          { id: "b", label: "Arknights" }
+        ]
+      }
+    });
+    const firstQuestionKey = service.getState(roomCode).fairPlay.questionKey;
+    service.submitAnswer({ roomCode, participantId: hostParticipantId, rawAnswer: "a" });
+    service.submitAnswer({ roomCode, participantId: player.participant.id, rawAnswer: "b" });
+
+    const reset = service.updateQuizState({
+      roomCode,
+      quiz: {
+        ...service.getState(roomCode).quiz,
+        choices: [
+          { id: "c", label: "Nikke" },
+          { id: "d", label: "Uma Musume" }
+        ]
+      }
+    });
+
+    expect(reset.submissions).toEqual([]);
+    expect(reset.fairPlay.questionKey).not.toBe(firstQuestionKey);
+    expect(reset.fairPlay).toMatchObject({
+      requiredParticipantIds: [hostParticipantId, player.participant.id],
+      submittedParticipantIds: [],
+      allRequiredSubmitted: false,
+      originalSubmitStatus: "locked"
+    });
+  });
+
+  it("refreshes fair play readiness when a required participant disconnects", async () => {
+    const service = new RoomService();
+    const { roomCode, hostParticipantId } = await service.createRoom({ title: "Room", visibility: "private", hostNickname: "Host" });
+    const player = service.joinParticipant({ roomCode, nickname: "Mina" });
+
+    service.updateQuizState({
+      roomCode,
+      quiz: {
+        ...service.getState(roomCode).quiz,
+        questionIndex: 1,
+        questionText: "Name the game",
+        questionType: "free-text"
+      }
+    });
+    service.submitAnswer({ roomCode, participantId: hostParticipantId, rawAnswer: "blue archive" });
+
+    const refreshed = service.kickParticipant({ roomCode, participantId: player.participant.id });
+
+    expect(refreshed.fairPlay).toMatchObject({
+      requiredParticipantIds: [hostParticipantId],
+      submittedParticipantIds: [hostParticipantId],
+      allRequiredSubmitted: true,
+      originalSubmitStatus: "ready"
+    });
+  });
+
   it("applies original result, reveals answers, and unlocks next after original submission", async () => {
     const service = new RoomService();
     const { roomCode, hostParticipantId } = await service.createRoom({ title: "Room", visibility: "private", hostNickname: "Host" });
@@ -279,6 +371,40 @@ describe("RoomService", () => {
         }
       })
     ).toThrow("Original submission has not been authorized");
+  });
+
+  it("rejects original results for a changed quiz identity", async () => {
+    const service = new RoomService();
+    const { roomCode, hostParticipantId } = await service.createRoom({ title: "Room", visibility: "private", hostNickname: "Host" });
+    const player = service.joinParticipant({ roomCode, nickname: "Mina" });
+
+    service.updateQuizState({
+      roomCode,
+      quiz: {
+        ...service.getState(roomCode).quiz,
+        questionIndex: 1,
+        questionText: "Name the game",
+        questionType: "free-text"
+      }
+    });
+    service.submitAnswer({ roomCode, participantId: hostParticipantId, rawAnswer: "blue archive" });
+    service.submitAnswer({ roomCode, participantId: player.participant.id, rawAnswer: "wrong" });
+    const questionKey = service.getState(roomCode).fairPlay.questionKey ?? "";
+    service.requestOriginalSubmission({ roomCode, questionKey });
+
+    expect(() =>
+      service.applyOriginalResult({
+        roomCode,
+        questionKey,
+        quiz: {
+          ...service.getState(roomCode).quiz,
+          questionText: "Changed question",
+          resultMessage: "correct",
+          answerCandidates: ["blue archive"],
+          canGoNext: true
+        }
+      })
+    ).toThrow("Original result does not match current question");
   });
 
   it("adjusts scores, changes settings, kicks participants, and expires rooms", async () => {

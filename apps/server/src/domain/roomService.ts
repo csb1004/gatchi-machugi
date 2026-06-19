@@ -166,6 +166,9 @@ export class RoomService {
     if (room.state.phase === "revealed" || room.state.phase === "ended" || room.state.phase === "expired") {
       throw new Error("Submissions are closed for this question");
     }
+    if (room.state.fairPlay.originalSubmitStatus === "submitting") {
+      throw new Error("Submissions are locked for original submission");
+    }
 
     this.requireParticipant(room, input.participantId);
 
@@ -213,6 +216,10 @@ export class RoomService {
 
     if (room.state.fairPlay.originalSubmitStatus !== "submitting") {
       throw new Error("Original submission has not been authorized");
+    }
+
+    if (createQuestionKey(input.quiz) !== input.questionKey) {
+      throw new Error("Original result does not match current question");
     }
 
     room.state.quiz = input.quiz;
@@ -311,6 +318,7 @@ export class RoomService {
     const room = this.requireRoom(input.roomCode);
     const participant = this.requireParticipant(room, input.participantId);
     participant.connected = false;
+    this.refreshFairPlayRequiredParticipants(room);
     return room.state;
   }
 
@@ -389,14 +397,7 @@ export class RoomService {
   }
 
   private shouldResetRound(previousQuiz: QuizState, nextQuiz: QuizState): boolean {
-    return (
-      previousQuiz.questionIndex !== nextQuiz.questionIndex ||
-      previousQuiz.questionText !== nextQuiz.questionText ||
-      previousQuiz.questionType !== nextQuiz.questionType ||
-      previousQuiz.imageUrl !== nextQuiz.imageUrl ||
-      previousQuiz.audioUrl !== nextQuiz.audioUrl ||
-      previousQuiz.videoUrl !== nextQuiz.videoUrl
-    );
+    return createQuestionKey(previousQuiz) !== createQuestionKey(nextQuiz);
   }
 
   private resetRound(room: StoredRoom): void {
@@ -426,6 +427,15 @@ export class RoomService {
       room.state.fairPlay.originalSubmitStatus = "ready";
       room.state.fairPlay.lockReason = null;
     }
+  }
+
+  private refreshFairPlayRequiredParticipants(room: StoredRoom): void {
+    if (!room.state.fairPlay.questionKey || room.state.fairPlay.originalSubmitStatus === "result-opened") {
+      return;
+    }
+
+    room.state.fairPlay.requiredParticipantIds = requiredParticipantIds(room.state.participants);
+    this.refreshFairPlaySubmissionState(room);
   }
 
   private publicSubmissionStatuses(room: StoredRoom) {
