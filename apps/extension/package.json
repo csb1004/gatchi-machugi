@@ -6,7 +6,7 @@
     "build": "vite build && node scripts/copy-manifest.mjs",
     "test": "vitest run",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "zip": "pnpm build && node scripts/zip-release.mjs"
+    "zip": "pnpm --filter @gatchi/shared build && pnpm build && node scripts/zip-release.mjs"
   },
   "dependencies": {
     "@gatchi/shared": "workspace:*",
