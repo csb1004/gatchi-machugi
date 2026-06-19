@@ -215,8 +215,8 @@ function hasPlayableEvidence(root: Document): boolean {
   return Boolean(root.querySelector(playingSelector));
 }
 
-function hasResultEvidence(root: Document): boolean {
-  return Boolean(root.querySelector(resultFeedbackSelector));
+function hasResultEvidence(root: Document, quiz: ReturnType<typeof extractQuizState>): boolean {
+  return Boolean(root.querySelector(resultFeedbackSelector) || quiz.resultMessage || quiz.answerCandidates.length > 0);
 }
 
 export function extractSourceMirrorState(root: Document = document): SourceMirrorState {
@@ -227,7 +227,7 @@ export function extractSourceMirrorState(root: Document = document): SourceMirro
   if (hasPlayableEvidence(root)) {
     const quiz = extractQuizState(root);
     return {
-      kind: hasResultEvidence(root) ? "result" : "playing",
+      kind: hasResultEvidence(root, quiz) ? "result" : "playing",
       url,
       title,
       lastSeenAt,

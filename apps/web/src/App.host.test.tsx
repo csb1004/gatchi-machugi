@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const sendHostCommand = vi.hoisted(() => vi.fn());
 const sendSourceAction = vi.hoisted(() => vi.fn());
+const socketError = vi.hoisted(() => ({ value: null as string | null }));
 
 const hostState = vi.hoisted<() => RoomState>(() => () => ({
   roomCode: "ABC123",
@@ -65,7 +66,7 @@ vi.mock("./socket/useRoomSocket", () => ({
     state: hostState(),
     participantId: "host",
     chatMessages: [],
-    error: null,
+    error: socketError.value,
     joinRoom: vi.fn(),
     submitAnswer: vi.fn(),
     sendChat: vi.fn(),
@@ -80,6 +81,7 @@ describe("App host room", () => {
   beforeEach(() => {
     sendHostCommand.mockClear();
     sendSourceAction.mockClear();
+    socketError.value = null;
   });
 
   it("shows the source mirror surface instead of the old host control panel", () => {
@@ -96,5 +98,13 @@ describe("App host room", () => {
     const hostWorkspace = screen.getByRole("region", { name: "방장 진행 화면" });
 
     expect([...container.querySelectorAll(".room-layout, .host-workspace")]).toEqual([room, hostWorkspace]);
+  });
+
+  it("shows source action errors while already inside a room", () => {
+    socketError.value = "다음 버튼을 찾을 수 없습니다.";
+
+    render(<App />);
+
+    expect(screen.getByText("다음 버튼을 찾을 수 없습니다.")).toBeInTheDocument();
   });
 });

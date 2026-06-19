@@ -57,4 +57,21 @@ describe("runSourceMirrorAction", () => {
     expect(runSourceMirrorAction({ name: "loadMoreResults" }, document)).toEqual({ ok: true });
     expect(scrollTo).toHaveBeenCalledWith({ top: 2400, behavior: "auto" });
   });
+
+  it("also scrolls the largest scrollable source container when loading more results", () => {
+    const scrollTo = vi.spyOn(window, "scrollTo").mockImplementation(() => undefined);
+    document.body.innerHTML = `
+      <main data-testid="scroll-root">
+        <section style="height: 1200px"></section>
+      </main>
+    `;
+    const scrollRoot = document.querySelector("[data-testid='scroll-root']") as HTMLElement;
+    Object.defineProperty(scrollRoot, "clientHeight", { configurable: true, value: 400 });
+    Object.defineProperty(scrollRoot, "scrollHeight", { configurable: true, value: 1600 });
+    Object.defineProperty(scrollRoot, "scrollTop", { configurable: true, writable: true, value: 0 });
+
+    expect(runSourceMirrorAction({ name: "loadMoreResults" }, document)).toEqual({ ok: true });
+    expect(scrollTo).toHaveBeenCalled();
+    expect(scrollRoot.scrollTop).toBe(1600);
+  });
 });

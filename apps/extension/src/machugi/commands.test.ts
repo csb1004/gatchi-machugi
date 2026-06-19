@@ -27,6 +27,15 @@ describe("runMachugiCommand", () => {
     expect(click).toHaveBeenCalledTimes(1);
   });
 
+  it("advances by clicking a generic arrow-only next button", () => {
+    document.body.innerHTML = `<button type="button">›</button>`;
+    const button = document.querySelector("button") as HTMLButtonElement;
+    const click = vi.spyOn(button, "click");
+
+    expect(runMachugiCommand("next", document)).toBe(true);
+    expect(click).toHaveBeenCalledTimes(1);
+  });
+
   it("focuses the search box when configuring from the main page", () => {
     document.body.innerHTML = `<input aria-label="검색창" type="search">`;
     const input = document.querySelector("input") as HTMLInputElement;

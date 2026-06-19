@@ -130,6 +130,7 @@ export function App() {
             onSendChat={roomSocket.sendChat}
             onSourceAction={roomSocket.sendSourceAction}
           />
+          {roomSocket.error ? <p className="status-text">{roomSocket.error}</p> : null}
           {currentParticipant?.role === "host" ? (
             <>
               <HostWorkspace

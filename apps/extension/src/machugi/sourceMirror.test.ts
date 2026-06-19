@@ -121,4 +121,28 @@ describe("extractSourceMirrorState", () => {
     if (state.kind !== "playing") throw new Error("expected playing");
     expect(state.quiz.questionText).toBe("Who is this?");
   });
+
+  it("treats generic visible feedback screens as result pages", () => {
+    const root = setDocument(
+      "/quiz/123/play",
+      `
+      <div class="QuizDetailPlaying_root__abc">
+        <img class="ImageQuizDisplay_root__YvVai" src="/question.png" alt="">
+        <section>
+          <p>오답!</p>
+          <strong>디안시</strong>
+          <button type="button">›</button>
+        </section>
+      </div>
+    `,
+      "Pokemon - 마추기 아이오"
+    );
+
+    const state = extractSourceMirrorState(root);
+    expect(state.kind).toBe("result");
+    if (state.kind !== "result") throw new Error("expected result");
+    expect(state.quiz.resultMessage).toBe("오답!");
+    expect(state.quiz.answerCandidates).toEqual(["디안시"]);
+    expect(state.quiz.canGoNext).toBe(true);
+  });
 });

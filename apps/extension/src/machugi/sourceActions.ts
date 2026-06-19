@@ -102,11 +102,35 @@ function runSelectResult(href: string | null | undefined, resultId: string, root
   return { ok: false, reason: "선택한 퀴즈를 원본 화면에서 찾을 수 없습니다." };
 }
 
+function dispatchScroll(target: EventTarget): void {
+  target.dispatchEvent(new Event("scroll", { bubbles: true }));
+}
+
+function scrollElementToBottom(element: HTMLElement): boolean {
+  if (element.scrollHeight <= element.clientHeight + 8) return false;
+
+  element.scrollTo?.({ top: element.scrollHeight, behavior: "auto" });
+  element.scrollTop = element.scrollHeight;
+  dispatchScroll(element);
+  return true;
+}
+
 function runLoadMoreResults(root: Document): ActionResult {
   const view = root.defaultView;
   if (!view) return { ok: false, reason: "원본 창을 제어할 수 없습니다." };
 
-  view.scrollTo({ top: root.documentElement.scrollHeight, behavior: "auto" });
+  const pageBottom = Math.max(root.documentElement.scrollHeight, root.body?.scrollHeight ?? 0);
+  view.scrollTo({ top: pageBottom, behavior: "auto" });
+  root.documentElement.scrollTop = pageBottom;
+  if (root.body) root.body.scrollTop = pageBottom;
+  dispatchScroll(view);
+
+  const scrollTargets = Array.from(root.querySelectorAll<HTMLElement>("main, [class*='scroll'], [style*='overflow'], section, div, ul, ol"))
+    .filter((element) => element.scrollHeight > element.clientHeight + 8)
+    .sort((left, right) => right.scrollHeight - right.clientHeight - (left.scrollHeight - left.clientHeight))
+    .slice(0, 5);
+  scrollTargets.forEach(scrollElementToBottom);
+
   return { ok: true };
 }
 

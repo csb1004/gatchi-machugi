@@ -12,6 +12,7 @@ const commandSelectors: Partial<Record<QuizCommandName, string[]>> = {
 const searchInputSelector = "input[aria-label='검색창'], input[type='search'], input[placeholder*='검색']";
 const textAnswerSelector = "textarea, input:not([type]), input[type='text'], input[type='search']";
 const submitTextPattern = /제출|확인|정답|입력|submit|answer/i;
+const nextButtonPattern = /^(›|>|→|다음)$/i;
 
 function clickElement(element: HTMLElement): true {
   element.click();
@@ -23,7 +24,9 @@ function normalizedAnswer(value: string): string {
 }
 
 function clickButtonByText(root: Document | ParentNode, pattern: RegExp): boolean {
-  const button = Array.from(root.querySelectorAll<HTMLButtonElement>("button")).find((element) => pattern.test(element.textContent?.trim() ?? ""));
+  const button = Array.from(root.querySelectorAll<HTMLButtonElement>("button")).find((element) =>
+    pattern.test(`${element.textContent ?? ""} ${element.getAttribute("aria-label") ?? ""}`.trim())
+  );
   return button ? clickElement(button) : false;
 }
 
@@ -141,6 +144,10 @@ export function runMachugiCommand(command: QuizCommandName, root: Document = doc
     if (element) {
       return clickElement(element);
     }
+  }
+
+  if ((command === "next" || command === "skip") && clickButtonByText(activeQuizRoot(root), nextButtonPattern)) {
+    return true;
   }
 
   return false;
