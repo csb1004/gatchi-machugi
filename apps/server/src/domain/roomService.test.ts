@@ -300,6 +300,57 @@ describe("RoomService", () => {
     expect(state.fairPlay.questionKey).toBe(questionKey);
   });
 
+  it("starts rooms with a disconnected source mirror", async () => {
+    const service = new RoomService();
+    const created = await service.createRoom({
+      title: "마추기 방",
+      hostNickname: "Host",
+      visibility: "public"
+    });
+
+    expect(created.state.sourceMirror).toEqual({
+      kind: "disconnected",
+      url: null,
+      title: null,
+      lastSeenAt: null,
+      message: "원본 탭을 연결해 주세요."
+    });
+  });
+
+  it("updates quiz and phase when mirror state becomes playable", async () => {
+    const service = new RoomService();
+    const created = await service.createRoom({
+      title: "마추기 방",
+      hostNickname: "Host",
+      visibility: "public"
+    });
+
+    const quiz = {
+      ...created.state.quiz,
+      quizTitle: "Pokemon",
+      questionIndex: 1,
+      totalQuestions: 10,
+      questionType: "free-text" as const,
+      questionText: "Who is this?"
+    };
+
+    const state = service.updateSourceMirror({
+      roomCode: created.roomCode,
+      sourceMirror: {
+        kind: "playing",
+        url: "https://machugi.io/quiz/1",
+        title: "Pokemon",
+        lastSeenAt: "2026-06-19T00:00:00.000Z",
+        quiz
+      }
+    });
+
+    expect(state.sourceMirror.kind).toBe("playing");
+    expect(state.quiz.questionText).toBe("Who is this?");
+    expect(state.phase).toBe("playing");
+    expect(state.fairPlay.originalSubmitStatus).toBe("locked");
+  });
+
   it("resets the round when only multiple-choice choices change", async () => {
     const service = new RoomService();
     const { roomCode, hostParticipantId } = await service.createRoom({ title: "Room", visibility: "private", hostNickname: "Host" });

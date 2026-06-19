@@ -19,6 +19,9 @@ import type {
   RoomSettings,
   RoomState,
   SendChatPayload,
+  SourceMirrorActionFailurePayload,
+  SourceMirrorActionPayload,
+  SourceMirrorPayload,
   SubmitAnswerPayload
 } from "@gatchi/shared";
 import { Server } from "socket.io";
@@ -60,6 +63,24 @@ const extensionSourceSchema = z.object({
     lastSeenAt: z.string().nullable(),
     message: z.string().nullable()
   })
+});
+
+const sourceMirrorActionSchema = z.object({
+  roomCode: z.string().trim().min(1).transform((value) => value.toUpperCase()),
+  actionId: z.string().trim().min(1).max(80),
+  action: z.custom<SourceMirrorActionPayload["action"]>((value) => typeof value === "object" && value !== null)
+});
+
+const sourceMirrorSchema = z.object({
+  roomCode: z.string().trim().min(1).transform((value) => value.toUpperCase()),
+  sourceMirror: z.custom<SourceMirrorPayload["sourceMirror"]>((value) => typeof value === "object" && value !== null)
+});
+
+const sourceMirrorFailureSchema = z.object({
+  roomCode: z.string().trim().min(1).transform((value) => value.toUpperCase()),
+  actionId: z.string().trim().min(1).max(80),
+  action: z.custom<SourceMirrorActionFailurePayload["action"]>((value) => typeof value === "object" && value !== null),
+  reason: z.string().trim().min(1).max(500)
 });
 
 const originalSubmitRequestSchema = z.object({
@@ -361,6 +382,61 @@ export function createSocketServer(httpServer: HttpServer, { roomService }: { ro
         emitOriginalSubmitIfReady(parsed.data.roomCode, state);
       } catch (error) {
         ackError(ack, error instanceof Error ? error.message : "Source update failed");
+      }
+    });
+
+    socket.on("source:mirror", (payload: SourceMirrorPayload, ack: Ack<void>) => {
+      const parsed = sourceMirrorSchema.safeParse(payload);
+      if (!parsed.success) {
+        ackError(ack, "Invalid source mirror payload");
+        return;
+      }
+
+      try {
+        requireCurrentHostExtensionSession(session, socket.id, parsed.data.roomCode, hostExtensionSocketIds);
+        const state = roomService.updateSourceMirror(parsed.data);
+        io.to(parsed.data.roomCode).emit("room:state", state);
+        ack({ ok: true, data: undefined });
+        emitOriginalSubmitIfReady(parsed.data.roomCode, state);
+      } catch (error) {
+        ackError(ack, error instanceof Error ? error.message : "Source mirror update failed");
+      }
+    });
+
+    socket.on("source:action", (payload: SourceMirrorActionPayload, ack: Ack<void>) => {
+      const parsed = sourceMirrorActionSchema.safeParse(payload);
+      if (!parsed.success) {
+        ackError(ack, "Invalid source action payload");
+        return;
+      }
+
+      try {
+        requireHostSession(session, parsed.data.roomCode);
+        const extensionSocketId = hostExtensionSocketIds.get(parsed.data.roomCode);
+        if (!extensionSocketId) {
+          throw new Error("Host extension is not connected");
+        }
+
+        io.to(extensionSocketId).emit("source:action", parsed.data);
+        ack({ ok: true, data: undefined });
+      } catch (error) {
+        ackError(ack, error instanceof Error ? error.message : "Source action failed");
+      }
+    });
+
+    socket.on("source:action-failure", (payload: SourceMirrorActionFailurePayload, ack: Ack<void>) => {
+      const parsed = sourceMirrorFailureSchema.safeParse(payload);
+      if (!parsed.success) {
+        ackError(ack, "Invalid source action failure payload");
+        return;
+      }
+
+      try {
+        requireCurrentHostExtensionSession(session, socket.id, parsed.data.roomCode, hostExtensionSocketIds);
+        io.to(parsed.data.roomCode).emit("source:action-failure", parsed.data);
+        ack({ ok: true, data: undefined });
+      } catch (error) {
+        ackError(ack, error instanceof Error ? error.message : "Source action failure failed");
       }
     });
 

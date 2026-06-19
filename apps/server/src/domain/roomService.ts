@@ -12,7 +12,10 @@ import {
   type RoomSettings,
   type RoomState,
   type RoomVisibility,
-  type SourceWindowState
+  type SourceMirrorState,
+  type SourceWindowState,
+  createDisconnectedSourceMirror,
+  quizFromSourceMirror
 } from "@gatchi/shared";
 import { customAlphabet, nanoid } from "nanoid";
 
@@ -171,6 +174,31 @@ export class RoomService {
   updateSourceWindow(input: { roomCode: string; sourceWindow: SourceWindowState }): RoomState {
     const room = this.requireRoom(input.roomCode);
     room.state.sourceWindow = input.sourceWindow;
+    return room.state;
+  }
+
+  updateSourceMirror(input: { roomCode: string; sourceMirror: SourceMirrorState }): RoomState {
+    const room = this.requireRoom(input.roomCode);
+    const sourceMirror = this.publicSourceMirror(room, input.sourceMirror);
+    room.state.sourceMirror = sourceMirror;
+
+    const quiz = quizFromSourceMirror(sourceMirror);
+    if (quiz && sourceMirror.kind === "playing") {
+      return this.updateQuizState({
+        roomCode: input.roomCode,
+        quiz
+      });
+    }
+
+    if (quiz && sourceMirror.kind === "result" && room.state.fairPlay.originalSubmitStatus === "result-opened") {
+      room.state.quiz = quiz;
+      return room.state;
+    }
+
+    if (sourceMirror.kind === "home" || sourceMirror.kind === "searchResults" || sourceMirror.kind === "quizDetail") {
+      room.state.phase = "searching";
+    }
+
     return room.state;
   }
 
@@ -594,8 +622,25 @@ export class RoomService {
         lastSeenAt: null,
         message: null
       },
+      sourceMirror: createDisconnectedSourceMirror("원본 탭을 연결해 주세요."),
       hostExtensionConnected: false,
       chatMessageCount: 0
+    };
+  }
+
+  private publicSourceMirror(room: StoredRoom, sourceMirror: SourceMirrorState): SourceMirrorState {
+    if (sourceMirror.kind !== "result" || room.state.fairPlay.originalSubmitStatus === "result-opened") {
+      return sourceMirror;
+    }
+
+    return {
+      ...sourceMirror,
+      kind: "playing",
+      quiz: {
+        ...sourceMirror.quiz,
+        resultMessage: null,
+        answerCandidates: []
+      }
     };
   }
 }
