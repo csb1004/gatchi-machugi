@@ -1,7 +1,7 @@
 import "@testing-library/jest-dom/vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
 import type { SourceMirrorState } from "@gatchi/shared";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { SourceMirrorView } from "./SourceMirrorView";
 
 const home: SourceMirrorState = {
@@ -29,6 +29,30 @@ const results: SourceMirrorState = {
     }
   ]
 };
+
+const quizDetail: SourceMirrorState = {
+  kind: "quizDetail",
+  url: "https://machugi.io/quiz/123",
+  title: "포켓몬 실루엣 맞추기",
+  lastSeenAt: "2026-06-19T00:00:00.000Z",
+  quiz: {
+    title: "포켓몬 실루엣 맞추기",
+    href: "https://machugi.io/quiz/123",
+    thumbnailUrl: null,
+    description: "포켓몬 이름을 맞춥니다.",
+    meta: []
+  },
+  settings: {
+    timerSeconds: null,
+    questionCount: 10,
+    availableTimers: [3, 5, 10],
+    availableQuestionCounts: [10, 20]
+  }
+};
+
+afterEach(() => {
+  vi.useRealTimers();
+});
 
 describe("SourceMirrorView", () => {
   it("lets the host search from the mirrored home view", () => {
@@ -77,6 +101,18 @@ describe("SourceMirrorView", () => {
     expect(onAction).toHaveBeenCalledWith({ name: "loadMoreResults" });
   });
 
+  it("asks the host extension for more results when the page reaches the bottom", () => {
+    const onAction = vi.fn();
+    render(<SourceMirrorView state={results} isHost onAction={onAction} />);
+
+    Object.defineProperty(document.documentElement, "scrollHeight", { configurable: true, value: 1200 });
+    Object.defineProperty(window, "innerHeight", { configurable: true, value: 800 });
+    Object.defineProperty(window, "scrollY", { configurable: true, value: 400 });
+    fireEvent.scroll(window);
+
+    expect(onAction).toHaveBeenCalledWith({ name: "loadMoreResults" });
+  });
+
   it("allows another bottom-scroll load request after the search query changes", () => {
     const onAction = vi.fn();
     const { rerender } = render(<SourceMirrorView state={results} isHost onAction={onAction} />);
@@ -96,6 +132,38 @@ describe("SourceMirrorView", () => {
     expect(onAction).toHaveBeenCalledTimes(2);
     expect(onAction).toHaveBeenNthCalledWith(1, { name: "loadMoreResults" });
     expect(onAction).toHaveBeenNthCalledWith(2, { name: "loadMoreResults" });
+  });
+
+  it("allows retrying a bottom-scroll load request after the previous request has time to settle", () => {
+    vi.useFakeTimers();
+    const onAction = vi.fn();
+    render(<SourceMirrorView state={results} isHost onAction={onAction} />);
+
+    const scrollToBottom = () => {
+      const list = screen.getByRole("region", { name: "검색 결과 목록" });
+      Object.defineProperty(list, "clientHeight", { configurable: true, value: 300 });
+      Object.defineProperty(list, "scrollHeight", { configurable: true, value: 800 });
+      Object.defineProperty(list, "scrollTop", { configurable: true, value: 500 });
+      fireEvent.scroll(list);
+    };
+
+    scrollToBottom();
+    scrollToBottom();
+    expect(onAction).toHaveBeenCalledTimes(1);
+
+    vi.advanceTimersByTime(1500);
+    scrollToBottom();
+
+    expect(onAction).toHaveBeenCalledTimes(2);
+  });
+
+  it("shows a host home button on the mirrored quiz setup screen", () => {
+    const onAction = vi.fn();
+    render(<SourceMirrorView state={quizDetail} isHost onAction={onAction} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "홈 화면" }));
+
+    expect(onAction).toHaveBeenCalledWith({ name: "focusHome" });
   });
 
   it("shows host navigation controls during a mirrored quiz", () => {

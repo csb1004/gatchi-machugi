@@ -1,4 +1,4 @@
-import { Play } from "lucide-react";
+import { Home, Play } from "lucide-react";
 import type { MirrorQuizSettings, MirrorQuizSummary, SourceMirrorAction } from "@gatchi/shared";
 
 export function MirrorSetupView(props: {
@@ -9,6 +9,14 @@ export function MirrorSetupView(props: {
 }) {
   return (
     <section className="mirror-setup" aria-label="문제 설정">
+      {props.isHost ? (
+        <div className="mirror-host-actions" aria-label="방장 진행 조작">
+          <button type="button" onClick={() => props.onAction({ name: "focusHome" })}>
+            <Home size={17} />
+            홈 화면
+          </button>
+        </div>
+      ) : null}
       <div className="section-heading">
         <h2>{props.quiz.title}</h2>
         <span>문제 설정</span>

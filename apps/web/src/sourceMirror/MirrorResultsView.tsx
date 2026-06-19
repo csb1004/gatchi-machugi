@@ -1,6 +1,8 @@
 import type { MirrorQuizResult, SourceMirrorAction } from "@gatchi/shared";
-import { useEffect, useRef, type UIEvent } from "react";
+import { useCallback, useEffect, useRef, type UIEvent } from "react";
 import { MirrorSearchBox } from "./MirrorSearchBox";
+
+const LOAD_MORE_RETRY_DELAY_MS = 1200;
 
 export function MirrorResultsView(props: {
   query: string;
@@ -9,26 +11,70 @@ export function MirrorResultsView(props: {
   onAction: (action: SourceMirrorAction) => void;
 }) {
   const requestedAtCount = useRef<number | null>(null);
+  const retryTimer = useRef<number | null>(null);
+
+  const clearRetryTimer = useCallback(() => {
+    if (retryTimer.current === null) return;
+    window.clearTimeout(retryTimer.current);
+    retryTimer.current = null;
+  }, []);
 
   useEffect(() => {
     if (requestedAtCount.current !== null && props.results.length > requestedAtCount.current) {
       requestedAtCount.current = null;
+      clearRetryTimer();
     }
-  }, [props.results.length]);
+  }, [clearRetryTimer, props.results.length]);
 
   useEffect(() => {
     requestedAtCount.current = null;
-  }, [props.query]);
+    clearRetryTimer();
+  }, [clearRetryTimer, props.query]);
+
+  useEffect(() => clearRetryTimer, [clearRetryTimer]);
+
+  const requestMoreResults = useCallback(() => {
+    if (!props.isHost || requestedAtCount.current === props.results.length) return;
+
+    const requestedCount = props.results.length;
+    requestedAtCount.current = requestedCount;
+    clearRetryTimer();
+    retryTimer.current = window.setTimeout(() => {
+      if (requestedAtCount.current === requestedCount) {
+        requestedAtCount.current = null;
+      }
+      retryTimer.current = null;
+    }, LOAD_MORE_RETRY_DELAY_MS);
+    props.onAction({ name: "loadMoreResults" });
+  }, [clearRetryTimer, props.isHost, props.onAction, props.results.length]);
+
+  useEffect(() => {
+    if (!props.isHost) return undefined;
+
+    function handlePageScroll() {
+      const documentElement = document.documentElement;
+      const scrollTop = window.scrollY || documentElement.scrollTop || document.body.scrollTop || 0;
+      const viewportHeight = window.innerHeight || documentElement.clientHeight;
+      const reachedBottom = scrollTop + viewportHeight >= documentElement.scrollHeight - 32;
+      if (reachedBottom) requestMoreResults();
+    }
+
+    window.addEventListener("scroll", handlePageScroll, { passive: true });
+    window.addEventListener("resize", handlePageScroll);
+    return () => {
+      window.removeEventListener("scroll", handlePageScroll);
+      window.removeEventListener("resize", handlePageScroll);
+    };
+  }, [props.isHost, requestMoreResults]);
 
   function handleResultScroll(event: UIEvent<HTMLDivElement>) {
     if (!props.isHost) return;
 
     const list = event.currentTarget;
     const reachedBottom = list.scrollTop + list.clientHeight >= list.scrollHeight - 24;
-    if (!reachedBottom || requestedAtCount.current === props.results.length) return;
+    if (!reachedBottom) return;
 
-    requestedAtCount.current = props.results.length;
-    props.onAction({ name: "loadMoreResults" });
+    requestMoreResults();
   }
 
   return (
