@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="en">
+<html lang="ko">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Gatchi Machugi Pairing</title>
+    <title>가치 마추기 방장 연결</title>
     <style>
       :root {
         color-scheme: light dark;
@@ -86,22 +86,22 @@
   </head>
   <body>
     <main>
-      <h1>Pair host room</h1>
-      <p>Open the machugi.io host tab, then connect the extension as the room host.</p>
+      <h1>방장 연결</h1>
+      <p>마추기아이오 탭을 열어둔 뒤, 확장 프로그램을 방장으로 연결합니다.</p>
       <form id="pair-form">
         <label for="server-url">
-          Server URL
+          서버 URL
           <input id="server-url" name="serverUrl" type="url" placeholder="https://api.machugi.io" required />
         </label>
         <label for="room-code">
-          Room code
+          방 코드
           <input id="room-code" name="roomCode" type="text" maxlength="12" autocapitalize="characters" required />
         </label>
         <label for="host-token">
-          Host token
+          방장 토큰
           <input id="host-token" name="hostToken" type="password" spellcheck="false" required />
         </label>
-        <button id="pair-button" type="submit">Pair extension</button>
+        <button id="pair-button" type="submit">확장 프로그램 연결</button>
       </form>
       <output id="status" aria-live="polite"></output>
     </main>

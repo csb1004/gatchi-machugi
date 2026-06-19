@@ -34,13 +34,13 @@ export function normalizeServerUrl(serverUrl: string) {
   const normalized = serverUrl.trim().replace(/\/+$/, "");
 
   if (!normalized) {
-    throw new Error("Server URL is required");
+    throw new Error("서버 URL을 입력해주세요.");
   }
 
   try {
     return new URL(normalized).toString().replace(/\/$/, "");
   } catch {
-    throw new Error("Server URL must be a valid URL");
+    throw new Error("올바른 서버 URL을 입력해주세요.");
   }
 }
 
@@ -96,7 +96,7 @@ export class MachugiSocketClient {
 
   async pair(payload: Pick<PairingSettings, "roomCode" | "hostToken">): Promise<HostPairGatewayAck> {
     if (!this.socket) {
-      throw new Error("Socket client is not connected");
+      throw new Error("소켓 클라이언트가 연결되지 않았습니다.");
     }
 
     const pairPayload = buildPairPayload(payload);
@@ -120,7 +120,7 @@ export class MachugiSocketClient {
 
   sendExtensionState(payload: ExtensionStatePayload): Promise<void> {
     if (!this.socket) {
-      throw new Error("Socket client is not connected");
+      throw new Error("소켓 클라이언트가 연결되지 않았습니다.");
     }
 
     return new Promise((resolve, reject) => {
@@ -137,7 +137,7 @@ export class MachugiSocketClient {
 
   onQuizCommand(handler: (payload: QuizCommandPayload) => void) {
     if (!this.socket) {
-      throw new Error("Socket client is not connected");
+      throw new Error("소켓 클라이언트가 연결되지 않았습니다.");
     }
 
     this.socket.on("quiz:command" as never, handler as never);

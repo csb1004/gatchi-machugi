@@ -2,9 +2,9 @@ import type { QuizState } from "@gatchi/shared";
 
 export function QuizPanel({ quiz }: { quiz: QuizState }) {
   return (
-    <section className="quiz-panel" aria-label="Quiz">
+    <section className="quiz-panel" aria-label="퀴즈">
       <div className="section-heading">
-        <h2>{quiz.quizTitle ?? "Waiting for quiz"}</h2>
+        <h2>{quiz.quizTitle ?? "퀴즈 대기 중"}</h2>
         <span>{quiz.questionIndex && quiz.totalQuestions ? `${quiz.questionIndex} / ${quiz.totalQuestions}` : quiz.questionType}</span>
       </div>
 
@@ -12,7 +12,7 @@ export function QuizPanel({ quiz }: { quiz: QuizState }) {
         {quiz.imageUrl ? <img src={quiz.imageUrl} alt="" /> : null}
         {quiz.audioUrl ? <audio src={quiz.audioUrl} controls /> : null}
         {quiz.videoUrl ? <video src={quiz.videoUrl} controls /> : null}
-        <p>{quiz.questionText ?? "The host extension has not sent a question yet."}</p>
+        <p>{quiz.questionText ?? "아직 방장 확장 프로그램에서 문제를 보내지 않았습니다."}</p>
       </div>
 
       {quiz.choices.length > 0 ? (

@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
-  "name": "Gatchi Machugi Pairing",
-  "description": "Pairs the host extension with a Gatchi Machugi room.",
+  "name": "가치 마추기 방장 연결",
+  "description": "방장 브라우저를 가치 마추기 방과 연결합니다.",
   "version": "0.0.0",
   "permissions": ["storage", "tabs", "scripting"],
   "host_permissions": ["https://machugi.io/*", "https://*.machugi.io/*"],
@@ -17,7 +17,7 @@
     }
   ],
   "action": {
-    "default_title": "Pair host room",
+    "default_title": "방장 연결",
     "default_popup": "popup.html"
   }
 }

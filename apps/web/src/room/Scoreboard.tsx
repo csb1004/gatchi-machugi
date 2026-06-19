@@ -2,9 +2,9 @@ import type { Participant } from "@gatchi/shared";
 
 export function Scoreboard({ participants }: { participants: Participant[] }) {
   return (
-    <section className="side-panel" aria-label="Scoreboard">
+    <section className="side-panel" aria-label="점수판">
       <div className="section-heading">
-        <h2>Scoreboard</h2>
+        <h2>점수판</h2>
       </div>
       <div className="score-list">
         {[...participants]

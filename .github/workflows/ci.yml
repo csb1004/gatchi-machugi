@@ -4,6 +4,10 @@ on:
   pull_request:
   push:
     branches: [main]
+    tags: ["v*"]
+
+permissions:
+  contents: write
 
 jobs:
   test:
@@ -26,3 +30,26 @@ jobs:
         with:
           name: gatchi-machugi-extension
           path: apps/extension/release/gatchi-machugi-extension.zip
+  release-extension:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @gatchi/extension zip
+      - name: Upload extension zip to GitHub Release
+        run: >
+          gh release create "$GITHUB_REF_NAME"
+          apps/extension/release/gatchi-machugi-extension.zip
+          --title "$GITHUB_REF_NAME"
+          --notes "가치 마추기 방장 확장 프로그램 릴리스입니다. zip을 내려받아 압축을 푼 뒤 Chrome의 압축해제된 확장 프로그램 로드로 설치하세요."
+        env:
+          GH_TOKEN: ${{ github.token }}

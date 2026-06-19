@@ -18,14 +18,18 @@ describe("App", () => {
   it("shows public rooms, room code entry, and nickname gate", () => {
     render(<App />);
 
-    expect(screen.getByRole("heading", { name: "Gatchi Machugi" })).toBeInTheDocument();
-    expect(screen.getByRole("complementary", { name: "Create room" })).toBeInTheDocument();
-    expect(screen.getByLabelText("Room name")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Create room" })).toBeDisabled();
-    expect(screen.getByText("Open machugi.io in the browser tab that will run the quiz.")).toBeInTheDocument();
-    expect(screen.getByLabelText("Nickname")).toBeInTheDocument();
-    expect(screen.getByLabelText("Room code")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Join room" })).toBeDisabled();
-    expect(screen.getByRole("region", { name: "Public rooms" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "가치 마추기" })).toBeInTheDocument();
+    expect(screen.getByRole("complementary", { name: "방 만들기" })).toBeInTheDocument();
+    expect(screen.getByLabelText("방 이름")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "방 만들기" })).toBeDisabled();
+    expect(screen.getByText("퀴즈를 진행할 브라우저 탭에서 machugi.io를 엽니다.")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "GitHub Releases에서 확장 프로그램 받기" })).toHaveAttribute(
+      "href",
+      "https://github.com/OWNER/REPO/releases"
+    );
+    expect(screen.getByLabelText("닉네임")).toBeInTheDocument();
+    expect(screen.getByLabelText("방 코드")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "방 입장" })).toBeDisabled();
+    expect(screen.getByRole("region", { name: "공개방" })).toBeInTheDocument();
   });
 });

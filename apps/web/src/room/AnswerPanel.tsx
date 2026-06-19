@@ -15,9 +15,9 @@ export function AnswerPanel({
   const canSubmit = !disabled && answer.trim().length > 0;
 
   return (
-    <section className="answer-panel" aria-label="Answer">
+    <section className="answer-panel" aria-label="답변">
       <label>
-        Answer
+        답변
         <input
           value={answer}
           onChange={(event) => setAnswer(event.target.value)}
@@ -35,7 +35,7 @@ export function AnswerPanel({
         }}
       >
         <Send size={18} />
-        Submit
+        제출
       </button>
     </section>
   );

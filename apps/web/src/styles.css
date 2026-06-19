@@ -213,6 +213,14 @@ h2 {
   font-size: 0.98rem;
 }
 
+.host-setup-card .setup-link {
+  display: inline-flex;
+  margin-bottom: 10px;
+  color: #235797;
+  font-size: 0.88rem;
+  font-weight: 800;
+}
+
 .host-setup-card ol {
   margin: 0;
   padding-left: 20px;

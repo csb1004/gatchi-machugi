@@ -8,16 +8,16 @@ describe("HostControls", () => {
   it("disables quiz commands until the extension is connected", () => {
     render(<HostControls extensionConnected={false} onCommand={() => undefined} />);
 
-    expect(screen.getByRole("button", { name: /Search/ })).toBeDisabled();
-    expect(screen.getByRole("button", { name: /Next/ })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /검색/ })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /다음/ })).toBeDisabled();
   });
 
   it("shows GitHub release and load unpacked instructions", () => {
     render(<ExtensionSetup releaseUrl="https://github.com/OWNER/REPO/releases" />);
 
-    expect(screen.getByText("Download the extension zip from GitHub Releases.")).toBeInTheDocument();
-    expect(screen.getByText("Open chrome://extensions and enable Developer Mode.")).toBeInTheDocument();
-    expect(screen.getByText("Click Load unpacked and choose the extracted folder.")).toBeInTheDocument();
+    expect(screen.getByText("GitHub Releases에서 확장 프로그램 zip을 내려받습니다.")).toBeInTheDocument();
+    expect(screen.getByText("chrome://extensions를 열고 개발자 모드를 켭니다.")).toBeInTheDocument();
+    expect(screen.getByText("압축해제된 확장 프로그램 로드를 누르고 압축을 푼 폴더를 선택합니다.")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /GitHub Releases/ })).toHaveAttribute("href", "https://github.com/OWNER/REPO/releases");
   });
 });

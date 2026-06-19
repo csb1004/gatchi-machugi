@@ -75,7 +75,7 @@ async function pairHost(payload: PairingSettings): Promise<PairHostResponse> {
   try {
     const tabId = await activeMachugiTabId();
     if (!tabId) {
-      throw new Error("Open the machugi.io host tab before pairing");
+      throw new Error("연결 전에 마추기아이오 방장 탭을 열어주세요.");
     }
 
     const pairResult = await socketClient.connectAndPair(payload);
@@ -90,7 +90,7 @@ async function pairHost(payload: PairingSettings): Promise<PairHostResponse> {
   } catch (error) {
     return {
       ok: false,
-      error: error instanceof Error ? error.message : "Failed to pair host extension"
+      error: error instanceof Error ? error.message : "방장 확장 프로그램 연결에 실패했습니다."
     };
   }
 }
@@ -114,7 +114,7 @@ async function forwardQuizState(quiz: QuizState): Promise<void> {
       quiz
     });
   } catch (error) {
-    console.error("Failed to forward machugi state", error);
+    console.error("마추기 상태 전달에 실패했습니다.", error);
   }
 }
 
@@ -129,7 +129,7 @@ chrome.runtime.onMessage.addListener((message: unknown, sender, sendResponse) =>
       void forwardQuizState((message as unknown as { payload: QuizState }).payload);
       sendResponse({ ok: true });
     } else {
-      sendResponse({ ok: false, error: "Unpaired machugi tab" });
+      sendResponse({ ok: false, error: "연결되지 않은 마추기아이오 탭입니다." });
     }
     return true;
   }

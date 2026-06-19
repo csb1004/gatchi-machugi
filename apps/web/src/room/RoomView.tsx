@@ -16,7 +16,7 @@ export function RoomView(props: {
   const currentParticipant = props.state.participants.find((participant) => participant.id === props.currentParticipantId);
 
   return (
-    <section className="room-layout" aria-label={`Room ${props.state.roomCode}`}>
+    <section className="room-layout" aria-label={`방 ${props.state.roomCode}`}>
       <div className="room-main">
         <header className="room-titlebar">
           <div>
@@ -24,7 +24,7 @@ export function RoomView(props: {
             <h1>{props.state.settings.title}</h1>
           </div>
           <span className={props.state.hostExtensionConnected ? "host-badge online" : "host-badge"}>
-            Host {props.state.hostExtensionConnected ? "connected" : "offline"}
+            방장 확장 {props.state.hostExtensionConnected ? "연결됨" : "연결 안 됨"}
           </span>
         </header>
         <QuizPanel quiz={props.state.quiz} />
@@ -34,7 +34,7 @@ export function RoomView(props: {
           onSubmitAnswer={props.onSubmitAnswer}
         />
       </div>
-      <aside className="room-side" aria-label="Room activity">
+      <aside className="room-side" aria-label="방 활동">
         <SubmissionPanel state={props.state} />
         <Scoreboard participants={props.state.participants} />
         <ChatPanel

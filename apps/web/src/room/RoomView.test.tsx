@@ -7,7 +7,7 @@ import { RoomView } from "./RoomView";
 const baseState: RoomState = {
   roomCode: "ABC123",
   phase: "playing",
-  settings: { title: "Room", visibility: "public", submissionVisibility: "status-only", timerSeconds: null },
+  settings: { title: "마추기 방", visibility: "public", submissionVisibility: "status-only", timerSeconds: null },
   participants: [
     { id: "host", nickname: "Host", role: "host", connected: true, score: 0 },
     { id: "p1", nickname: "Mina", role: "player", connected: true, score: 0 }
@@ -38,7 +38,7 @@ describe("RoomView", () => {
   it("shows submission status without raw answer before reveal", () => {
     render(<RoomView state={baseState} currentParticipantId="host" onSubmitAnswer={() => undefined} />);
 
-    expect(screen.getByText("Mina submitted")).toBeInTheDocument();
+    expect(screen.getByText("Mina 제출함")).toBeInTheDocument();
     expect(screen.queryByText("rawAnswer")).not.toBeInTheDocument();
     expect(screen.queryByText("blue archive")).not.toBeInTheDocument();
   });

@@ -32,7 +32,7 @@ async function sendPairRequest(payload: PairingSettings): Promise<PairHostRespon
       }
 
       if (!response) {
-        reject(new Error("No response from background service worker"));
+        reject(new Error("백그라운드 서비스 워커가 응답하지 않았습니다."));
         return;
       }
 
@@ -57,6 +57,18 @@ function setStatus(elements: PairFormElements, message: string, state: "idle" | 
   elements.status.dataset.state = state;
 }
 
+function localizeError(message: string) {
+  const translations: Record<string, string> = {
+    "Invalid host token": "방장 토큰이 올바르지 않습니다.",
+    "Invalid host pair payload": "방장 연결 정보가 올바르지 않습니다.",
+    "Failed to pair host": "방장 연결에 실패했습니다.",
+    "Room not found": "방을 찾을 수 없습니다.",
+    "Host authorization required": "방장 권한이 필요합니다."
+  };
+
+  return translations[message] ?? message;
+}
+
 function fillForm(elements: PairFormElements, stored: StoredPairingSettings | null) {
   if (!stored) return;
 
@@ -72,19 +84,19 @@ async function handleSubmit(elements: PairFormElements) {
   };
 
   elements.submitButton.disabled = true;
-  setStatus(elements, "Pairing with host room...");
+  setStatus(elements, "방장 권한으로 연결하는 중...");
 
   try {
     const response = await sendPairRequest(payload);
     if (!response.ok) {
-      setStatus(elements, response.error, "error");
+      setStatus(elements, localizeError(response.error), "error");
       return;
     }
 
     elements.roomCode.value = response.data.roomCode;
-    setStatus(elements, `Paired room ${response.data.roomCode}.`, "success");
+    setStatus(elements, `${response.data.roomCode} 방에 연결되었습니다.`, "success");
   } catch (error) {
-    setStatus(elements, error instanceof Error ? error.message : "Pairing failed", "error");
+    setStatus(elements, localizeError(error instanceof Error ? error.message : "연결에 실패했습니다."), "error");
   } finally {
     elements.submitButton.disabled = false;
   }

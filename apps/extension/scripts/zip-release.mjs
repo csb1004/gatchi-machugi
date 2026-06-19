@@ -15,11 +15,15 @@ const zipPath = resolve(releaseDirectory, "gatchi-machugi-extension.zip");
 await mkdir(releaseDirectory, { recursive: true });
 await rm(zipPath, { force: true });
 
-await execFileAsync("powershell", [
-  "-NoLogo",
-  "-NoProfile",
-  "-Command",
-  `$ErrorActionPreference = 'Stop'; Compress-Archive -Path (Join-Path '${distDirectory}' '*') -DestinationPath '${zipPath}' -Force`
-]);
+if (process.platform === "win32") {
+  await execFileAsync("powershell", [
+    "-NoLogo",
+    "-NoProfile",
+    "-Command",
+    `$ErrorActionPreference = 'Stop'; Compress-Archive -Path (Join-Path '${distDirectory}' '*') -DestinationPath '${zipPath}' -Force`
+  ]);
+} else {
+  await execFileAsync("zip", ["-r", zipPath, "."], { cwd: distDirectory });
+}
 
 await access(zipPath);
