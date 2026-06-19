@@ -185,28 +185,34 @@ export class MachugiSocketClient {
     });
   }
 
-  onQuizCommand(handler: (payload: QuizCommandPayload) => void) {
+  onQuizCommand(handler: (payload: QuizCommandPayload) => void): () => void {
     if (!this.socket) {
       throw new Error(NOT_CONNECTED_MESSAGE);
     }
 
-    this.socket.on("quiz:command" as never, handler as never);
+    const socket = this.socket;
+    socket.on("quiz:command" as never, handler as never);
+    return () => socket.off("quiz:command" as never, handler as never);
   }
 
-  onOriginalSubmitAllowed(handler: (payload: OriginalSubmitAllowedPayload) => void) {
+  onOriginalSubmitAllowed(handler: (payload: OriginalSubmitAllowedPayload) => void): () => void {
     if (!this.socket) {
       throw new Error(NOT_CONNECTED_MESSAGE);
     }
 
-    this.socket.on("original:submit-allowed" as never, handler as never);
+    const socket = this.socket;
+    socket.on("original:submit-allowed" as never, handler as never);
+    return () => socket.off("original:submit-allowed" as never, handler as never);
   }
 
-  onRoomState(handler: (state: RoomState) => void) {
+  onRoomState(handler: (state: RoomState) => void): () => void {
     if (!this.socket) {
       throw new Error(NOT_CONNECTED_MESSAGE);
     }
 
-    this.socket.on("room:state" as never, handler as never);
+    const socket = this.socket;
+    socket.on("room:state" as never, handler as never);
+    return () => socket.off("room:state" as never, handler as never);
   }
 
   disconnect() {

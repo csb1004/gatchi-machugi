@@ -35,6 +35,7 @@ let pairedRoomCode: string | null = null;
 let pairedAppTabId: number | null = null;
 let pairedMachugiFrame: MachugiFrameTarget | null = null;
 let latestRoomState: RoomState | null = null;
+let unregisterBridgeHandlers: Array<() => void> = [];
 
 function isPairHostRequestMessage(message: unknown): message is PairHostRequestMessage {
   return (
@@ -78,15 +79,18 @@ function rememberRoomState(state: RoomState | undefined): void {
 function registerPairedBridge(roomCode: string, appTabId: number | null) {
   pairedRoomCode = roomCode;
   pairedAppTabId = appTabId;
-  socketClient.onQuizCommand((command) => {
-    void sendCommandToPairedMachugiFrame(command);
-  });
-  socketClient.onOriginalSubmitAllowed((payload) => {
-    void sendOriginalSubmitToPairedMachugiFrame(payload);
-  });
-  socketClient.onRoomState((state) => {
-    rememberRoomState(state);
-  });
+  unregisterBridgeHandlers.forEach((unregister) => unregister());
+  unregisterBridgeHandlers = [
+    socketClient.onQuizCommand((command) => {
+      void sendCommandToPairedMachugiFrame(command);
+    }),
+    socketClient.onOriginalSubmitAllowed((payload) => {
+      void sendOriginalSubmitToPairedMachugiFrame(payload);
+    }),
+    socketClient.onRoomState((state) => {
+      rememberRoomState(state);
+    })
+  ];
 }
 
 async function pairHost(payload: PairingSettings, appTabId: number | null): Promise<PairHostResponse> {
