@@ -43,6 +43,13 @@ const hostState = vi.hoisted<() => RoomState>(() => () => ({
     lastSeenAt: "2026-06-19T00:00:00.000Z",
     message: null
   },
+  sourceMirror: {
+    kind: "disconnected",
+    url: null,
+    title: null,
+    lastSeenAt: null,
+    message: "원본 탭을 연결해 주세요."
+  },
   hostExtensionConnected: true,
   chatMessageCount: 0
 }));

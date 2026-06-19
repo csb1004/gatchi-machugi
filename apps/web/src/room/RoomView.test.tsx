@@ -45,6 +45,28 @@ const baseState: RoomState = {
     lastSeenAt: "2026-06-19T00:00:00.000Z",
     message: null
   },
+  sourceMirror: {
+    kind: "playing",
+    url: "https://machugi.io/quiz/123/play",
+    title: "Pokemon",
+    lastSeenAt: "2026-06-19T00:00:00.000Z",
+    quiz: {
+      quizTitle: "Pokemon",
+      questionIndex: 1,
+      totalQuestions: 10,
+      questionType: "free-text",
+      questionText: "Who is this?",
+      imageUrl: null,
+      audioUrl: null,
+      videoUrl: null,
+      choices: [],
+      timerSecondsRemaining: null,
+      canGoNext: true,
+      canGoPrevious: false,
+      resultMessage: null,
+      answerCandidates: []
+    }
+  },
   hostExtensionConnected: true,
   chatMessageCount: 0
 };
