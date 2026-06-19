@@ -248,6 +248,39 @@ describe("RoomService", () => {
     expect(revealed.revealedSubmissions.find((submission) => submission.participantId === player.participant.id)?.correct).toBe(false);
   });
 
+  it("rejects original result before original submission authorization", async () => {
+    const service = new RoomService();
+    const { roomCode, hostParticipantId } = await service.createRoom({ title: "Room", visibility: "private", hostNickname: "Host" });
+    const player = service.joinParticipant({ roomCode, nickname: "Mina" });
+
+    service.updateQuizState({
+      roomCode,
+      quiz: {
+        ...service.getState(roomCode).quiz,
+        questionIndex: 1,
+        questionText: "Name the game",
+        questionType: "free-text"
+      }
+    });
+    service.submitAnswer({ roomCode, participantId: hostParticipantId, rawAnswer: "blue archive" });
+    service.submitAnswer({ roomCode, participantId: player.participant.id, rawAnswer: "wrong" });
+    const questionKey = service.getState(roomCode).fairPlay.questionKey ?? "";
+
+    expect(service.getState(roomCode).fairPlay.originalSubmitStatus).toBe("ready");
+    expect(() =>
+      service.applyOriginalResult({
+        roomCode,
+        questionKey,
+        quiz: {
+          ...service.getState(roomCode).quiz,
+          resultMessage: "correct",
+          answerCandidates: ["blue archive"],
+          canGoNext: true
+        }
+      })
+    ).toThrow("Original submission has not been authorized");
+  });
+
   it("adjusts scores, changes settings, kicks participants, and expires rooms", async () => {
     const service = new RoomService();
     const { roomCode } = await service.createRoom({ title: "Room", visibility: "public", hostNickname: "Host" });

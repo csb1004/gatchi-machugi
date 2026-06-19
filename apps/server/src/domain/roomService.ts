@@ -211,7 +211,7 @@ export class RoomService {
       throw new Error("Question changed before original result");
     }
 
-    if (room.state.fairPlay.originalSubmitStatus !== "submitting" && room.state.fairPlay.originalSubmitStatus !== "ready") {
+    if (room.state.fairPlay.originalSubmitStatus !== "submitting") {
       throw new Error("Original submission has not been authorized");
     }
 
