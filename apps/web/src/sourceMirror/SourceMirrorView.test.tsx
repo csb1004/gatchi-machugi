@@ -101,7 +101,7 @@ describe("SourceMirrorView", () => {
     expect(onAction).toHaveBeenCalledWith({ name: "loadMoreResults" });
   });
 
-  it("asks the host extension for more results when the page reaches the bottom", () => {
+  it("does not ask for more results when only the surrounding page reaches the bottom", () => {
     const onAction = vi.fn();
     render(<SourceMirrorView state={results} isHost onAction={onAction} />);
 
@@ -110,7 +110,7 @@ describe("SourceMirrorView", () => {
     Object.defineProperty(window, "scrollY", { configurable: true, value: 400 });
     fireEvent.scroll(window);
 
-    expect(onAction).toHaveBeenCalledWith({ name: "loadMoreResults" });
+    expect(onAction).not.toHaveBeenCalledWith({ name: "loadMoreResults" });
   });
 
   it("allows another bottom-scroll load request after the search query changes", () => {

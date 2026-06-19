@@ -41,6 +41,60 @@ function unique(values: Array<string | null>): string[] {
   return Array.from(new Set(values.map((value) => value?.trim()).filter((value): value is string => Boolean(value))));
 }
 
+const resultMessagePattern = /^(정답|오답)\s*!?$/;
+const nextButtonPattern = /^(›|>|→|다음)$/i;
+
+function directText(element: Element): string {
+  return Array.from(element.childNodes)
+    .filter((node) => node.nodeType === Node.TEXT_NODE)
+    .map((node) => node.textContent?.trim() ?? "")
+    .join(" ")
+    .trim();
+}
+
+function findResultMessageElement(root: ParentNode): Element | null {
+  const stable = root.querySelector("[data-result-message], [role='alert'], [class*='QuizDetailAnswerResult_questionResultCorrectLabel']");
+  if (stable) return stable;
+
+  return (
+    Array.from(root.querySelectorAll("*")).find((element) => {
+      const value = (directText(element) || element.textContent?.trim() || "").trim();
+      return resultMessagePattern.test(value);
+    }) ?? null
+  );
+}
+
+function answerAfterResultMessage(element: Element | null): string | null {
+  if (!element) return null;
+
+  let candidate = element.nextElementSibling;
+  while (candidate) {
+    const value = candidate.textContent?.trim() ?? "";
+    if (
+      value &&
+      !resultMessagePattern.test(value) &&
+      !(candidate instanceof HTMLButtonElement) &&
+      candidate.getAttribute("role") !== "button"
+    ) {
+      return value;
+    }
+    candidate = candidate.nextElementSibling;
+  }
+
+  return null;
+}
+
+function hasNextButton(root: ParentNode): boolean {
+  if (root.querySelector("[data-command='next'], button[aria-label*='next' i], button[class*='NextButton_root']")) {
+    return true;
+  }
+
+  return Array.from(root.querySelectorAll<HTMLButtonElement>("button")).some((button) => {
+    const label = `${button.textContent ?? ""} ${button.getAttribute("aria-label") ?? ""}`.trim();
+    return nextButtonPattern.test(label);
+  });
+}
+
 export function extractQuizState(root: Document): QuizState {
   const quizRoot = activeQuizRoot(root);
   const choices = Array.from(quizRoot.querySelectorAll("[data-choice], button[role='option'], .choice, .answer-choice, [class*='Choice'] button"))
@@ -53,9 +107,11 @@ export function extractQuizState(root: Document): QuizState {
   const imageUrl = absoluteUrl(attr("[data-question-image], img[data-question], img[class*='ImageQuizDisplay_root']", "src", quizRoot), root);
   const audioUrl = absoluteUrl(attr("[data-question-audio], audio, [class*='AudioQuizDisplay'] audio", "src", quizRoot), root);
   const videoUrl = absoluteUrl(attr("[data-question-video], video, [class*='VideoQuizDisplay'] video", "src", quizRoot), root);
-  const resultMessage = text("[data-result-message], [role='alert'], [class*='QuizDetailAnswerResult_questionResultCorrectLabel']", quizRoot);
+  const resultMessageElement = findResultMessageElement(quizRoot);
+  const resultMessage = resultMessageElement?.textContent?.trim() || null;
   const answerCandidates = unique([
     text("[class*='QuizDetailAnswerResult_questionResultAnswer']", quizRoot),
+    answerAfterResultMessage(resultMessageElement),
     ...Array.from(quizRoot.querySelectorAll("[data-answer-candidate]")).map((element) => element.textContent?.trim() ?? null)
   ]);
 
@@ -70,7 +126,7 @@ export function extractQuizState(root: Document): QuizState {
     videoUrl,
     choices,
     timerSecondsRemaining: numberText("[data-timer], [aria-label*='timer' i]", quizRoot),
-    canGoNext: quizRoot.querySelector("[data-command='next'], button[aria-label*='next' i], button[class*='NextButton_root']") !== null,
+    canGoNext: hasNextButton(quizRoot),
     canGoPrevious: quizRoot.querySelector("[data-command='previous'], button[aria-label*='previous' i]") !== null,
     resultMessage,
     answerCandidates

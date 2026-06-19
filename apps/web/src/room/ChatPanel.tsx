@@ -4,12 +4,10 @@ import type { ChatMessagePayload } from "@gatchi/shared";
 
 export function ChatPanel({
   messages,
-  onSendMessage,
-  roomCode
+  onSendMessage
 }: {
   messages: ChatMessagePayload[];
   onSendMessage: (text: string) => void;
-  roomCode: string;
 }) {
   const [text, setText] = useState("");
 
@@ -21,7 +19,7 @@ export function ChatPanel({
       </div>
       <div className="chat-list">
         {messages.length === 0 ? (
-          <div className="chat-empty">{roomCode}</div>
+          <div className="chat-empty">아직 채팅 메시지가 없습니다.</div>
         ) : (
           messages.map((message) => (
             <p key={message.id}>

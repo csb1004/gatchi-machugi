@@ -61,4 +61,22 @@ describe("extractQuizState", () => {
     expect(state.resultMessage).toBe("오답!");
     expect(state.answerCandidates).toEqual(["배바닐라"]);
   });
+
+  it("extracts result feedback and answer from generic visible result markup", () => {
+    document.body.innerHTML = `
+      <div class="QuizDetailPlaying_root__k7OA0">
+        <img class="ImageQuizDisplay_root__YvVai" src="https://images.machugi.io/question-image" alt="">
+        <section>
+          <p>오답!</p>
+          <strong>디안시</strong>
+          <button type="button">›</button>
+        </section>
+      </div>
+    `;
+
+    const state = extractQuizState(document);
+    expect(state.resultMessage).toBe("오답!");
+    expect(state.answerCandidates).toEqual(["디안시"]);
+    expect(state.canGoNext).toBe(true);
+  });
 });

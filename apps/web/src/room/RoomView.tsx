@@ -73,7 +73,6 @@ export function RoomView(props: {
         <SubmissionPanel state={props.state} />
         <Scoreboard participants={props.state.participants} />
         <ChatPanel
-          roomCode={props.state.roomCode}
           messages={props.chatMessages ?? []}
           onSendMessage={props.onSendChat ?? (() => undefined)}
         />

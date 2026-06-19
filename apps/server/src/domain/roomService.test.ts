@@ -590,6 +590,64 @@ describe("RoomService", () => {
     expect(revealed.revealedSubmissions.find((submission) => submission.participantId === player.participant.id)?.correct).toBe(false);
   });
 
+  it("applies a source mirror result as the original result while original submission is pending", async () => {
+    const service = new RoomService();
+    const { roomCode, hostParticipantId } = await service.createRoom({ title: "Room", visibility: "private", hostNickname: "Host" });
+
+    service.updateSourceWindow({
+      roomCode,
+      sourceWindow: {
+        status: "connected",
+        url: "https://machugi.io/quiz/123",
+        title: "Machugi",
+        lastSeenAt: "2026-06-19T00:00:00.000Z",
+        message: null
+      }
+    });
+    const playingQuiz = {
+      ...service.getState(roomCode).quiz,
+      quizTitle: "Pokemon",
+      questionIndex: 1,
+      totalQuestions: 10,
+      questionText: "Who is this?",
+      questionType: "free-text" as const
+    };
+    service.updateSourceMirror({
+      roomCode,
+      sourceMirror: {
+        kind: "playing",
+        url: "https://machugi.io/quiz/123/play",
+        title: "Pokemon",
+        lastSeenAt: "2026-06-19T00:00:00.000Z",
+        quiz: playingQuiz
+      }
+    });
+    service.submitAnswer({ roomCode, participantId: hostParticipantId, rawAnswer: "diancie" });
+    service.requestOriginalSubmission({ roomCode, questionKey: service.getState(roomCode).fairPlay.questionKey ?? "" });
+
+    const revealed = service.updateSourceMirror({
+      roomCode,
+      sourceMirror: {
+        kind: "result",
+        url: "https://machugi.io/quiz/123/play",
+        title: "Pokemon",
+        lastSeenAt: "2026-06-19T00:00:01.000Z",
+        quiz: {
+          ...playingQuiz,
+          resultMessage: "정답!",
+          answerCandidates: ["디안시", "diancie"],
+          canGoNext: true
+        }
+      }
+    });
+
+    expect(revealed.phase).toBe("revealed");
+    expect(revealed.fairPlay.originalSubmitStatus).toBe("result-opened");
+    expect(revealed.revealedSubmissions).toEqual([
+      { participantId: hostParticipantId, submitted: true, skipped: false, rawAnswer: "diancie", correct: true }
+    ]);
+  });
+
   it("does not require late participants after original submission starts", async () => {
     const service = new RoomService();
     const { roomCode, hostParticipantId } = await service.createRoom({ title: "Room", visibility: "private", hostNickname: "Host" });

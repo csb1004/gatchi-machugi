@@ -48,25 +48,6 @@ export function MirrorResultsView(props: {
     props.onAction({ name: "loadMoreResults" });
   }, [clearRetryTimer, props.isHost, props.onAction, props.results.length]);
 
-  useEffect(() => {
-    if (!props.isHost) return undefined;
-
-    function handlePageScroll() {
-      const documentElement = document.documentElement;
-      const scrollTop = window.scrollY || documentElement.scrollTop || document.body.scrollTop || 0;
-      const viewportHeight = window.innerHeight || documentElement.clientHeight;
-      const reachedBottom = scrollTop + viewportHeight >= documentElement.scrollHeight - 32;
-      if (reachedBottom) requestMoreResults();
-    }
-
-    window.addEventListener("scroll", handlePageScroll, { passive: true });
-    window.addEventListener("resize", handlePageScroll);
-    return () => {
-      window.removeEventListener("scroll", handlePageScroll);
-      window.removeEventListener("resize", handlePageScroll);
-    };
-  }, [props.isHost, requestMoreResults]);
-
   function handleResultScroll(event: UIEvent<HTMLDivElement>) {
     if (!props.isHost) return;
 

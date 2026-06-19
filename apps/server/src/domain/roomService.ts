@@ -23,6 +23,10 @@ const createRoomCode = customAlphabet("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ", 6)
 const createParticipantCodeValue = customAlphabet("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ", 4);
 const originalSubmissionLockReason = "모든 참가자가 제출해야 원본 정답 제출이 가능합니다.";
 
+function hasOriginalResult(quiz: QuizState): boolean {
+  return quiz.resultMessage !== null || quiz.answerCandidates.length > 0;
+}
+
 interface StoredRoom {
   hostParticipantId: string;
   participantCodes: Map<string, string>;
@@ -179,6 +183,25 @@ export class RoomService {
 
   updateSourceMirror(input: { roomCode: string; sourceMirror: SourceMirrorState }): RoomState {
     const room = this.requireRoom(input.roomCode);
+    const rawQuiz = quizFromSourceMirror(input.sourceMirror);
+
+    if (
+      rawQuiz &&
+      input.sourceMirror.kind === "result" &&
+      room.state.fairPlay.originalSubmitStatus === "submitting" &&
+      room.state.fairPlay.questionKey &&
+      createQuestionKey(rawQuiz) === room.state.fairPlay.questionKey &&
+      hasOriginalResult(rawQuiz)
+    ) {
+      const state = this.applyOriginalResult({
+        roomCode: input.roomCode,
+        questionKey: room.state.fairPlay.questionKey,
+        quiz: rawQuiz
+      });
+      state.sourceMirror = input.sourceMirror;
+      return state;
+    }
+
     const sourceMirror = this.publicSourceMirror(room, input.sourceMirror);
     room.state.sourceMirror = sourceMirror;
 

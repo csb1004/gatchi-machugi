@@ -1,5 +1,5 @@
 import "@testing-library/jest-dom/vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import type { RoomState } from "@gatchi/shared";
 import { describe, expect, it } from "vitest";
 import { RoomView } from "./RoomView";
@@ -107,5 +107,21 @@ describe("RoomView", () => {
     expect(screen.getByText("오답")).toBeInTheDocument();
     expect(screen.getByText("내 답: 팅비드")).toBeInTheDocument();
     expect(screen.getByText("정답: 디안시")).toBeInTheDocument();
+  });
+
+  it("does not show the room code as the empty chat placeholder", () => {
+    render(
+      <RoomView
+        state={{ ...baseState, roomCode: "FY3D3R" }}
+        currentParticipantId="host"
+        chatMessages={[]}
+        onSubmitAnswer={() => undefined}
+        onSourceAction={() => undefined}
+      />
+    );
+
+    const chat = screen.getByRole("region", { name: "채팅" });
+    expect(within(chat).queryByText("FY3D3R")).not.toBeInTheDocument();
+    expect(within(chat).getByText("아직 채팅 메시지가 없습니다.")).toBeInTheDocument();
   });
 });
