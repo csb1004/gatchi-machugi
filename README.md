@@ -29,9 +29,13 @@ Copy `.env.example` to `.env` and set:
 4. Enable Developer Mode.
 5. Click Load unpacked.
 6. Select the extracted extension folder.
-7. Create a room in the web app.
-8. Open the extension popup.
-9. Enter the server URL, room code, and one-time host token.
+7. Open the Railway app and enter a host nickname.
+8. Create a room from the right-side Create room panel.
+9. Keep the shown host token private. It is only shown immediately after room creation.
+10. Open machugi.io in the tab that will run the quiz.
+11. Open the extension popup.
+12. Enter the server URL, room code, and one-time host token.
+13. Participants can join with the room code after the extension shows connected.
 
 ## Railway
 

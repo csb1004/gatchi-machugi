@@ -19,9 +19,10 @@ describe("App", () => {
     render(<App />);
 
     expect(screen.getByRole("heading", { name: "Gatchi Machugi" })).toBeInTheDocument();
-    expect(screen.getByRole("region", { name: "Create room" })).toBeInTheDocument();
+    expect(screen.getByRole("complementary", { name: "Create room" })).toBeInTheDocument();
     expect(screen.getByLabelText("Room name")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Create room" })).toBeDisabled();
+    expect(screen.getByText("Open machugi.io in the browser tab that will run the quiz.")).toBeInTheDocument();
     expect(screen.getByLabelText("Nickname")).toBeInTheDocument();
     expect(screen.getByLabelText("Room code")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Join room" })).toBeDisabled();

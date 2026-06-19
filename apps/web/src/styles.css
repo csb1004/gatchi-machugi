@@ -47,7 +47,7 @@ button:disabled {
 }
 
 .lobby-panel {
-  width: min(760px, 100%);
+  width: min(1080px, 100%);
   border: 1px solid #d9e0ec;
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.96);
@@ -99,26 +99,38 @@ h2 {
   color: #26364d;
 }
 
+.lobby-columns {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 360px;
+  gap: 18px;
+  margin-top: 24px;
+  align-items: start;
+}
+
+.join-column {
+  min-width: 0;
+}
+
 .join-form {
   display: grid;
   grid-template-columns: 1fr 0.7fr auto;
   gap: 12px;
-  margin: 28px 0;
+  margin: 0 0 22px;
   align-items: end;
 }
 
 .create-room {
-  border-top: 1px solid #e3e8f1;
-  margin-top: 20px;
-  padding-top: 18px;
+  border: 1px solid #d9e0ec;
+  border-radius: 8px;
+  padding: 16px;
+  background: #fbfcff;
 }
 
 .create-form {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
+  grid-template-columns: 1fr;
   gap: 12px;
   margin-top: 12px;
-  align-items: end;
 }
 
 .create-form label {
@@ -190,6 +202,28 @@ h2 {
   font-weight: 800;
 }
 
+.host-setup-card {
+  margin-top: 14px;
+  border-top: 1px solid #e3e8f1;
+  padding-top: 14px;
+}
+
+.host-setup-card h3 {
+  margin: 0 0 8px;
+  font-size: 0.98rem;
+}
+
+.host-setup-card ol {
+  margin: 0;
+  padding-left: 20px;
+  color: #34435a;
+  font-size: 0.88rem;
+}
+
+.host-setup-card li + li {
+  margin-top: 6px;
+}
+
 .join-form label {
   display: grid;
   gap: 7px;
@@ -227,7 +261,6 @@ h2 {
 }
 
 .public-rooms {
-  border-top: 1px solid #e3e8f1;
   padding-top: 18px;
 }
 
@@ -285,11 +318,11 @@ h2 {
     place-items: stretch;
   }
 
-  .join-form {
+  .lobby-columns {
     grid-template-columns: 1fr;
   }
 
-  .create-form {
+  .join-form {
     grid-template-columns: 1fr;
   }
 }
