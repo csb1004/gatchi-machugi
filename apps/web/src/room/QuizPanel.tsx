@@ -5,7 +5,9 @@ export function QuizPanel({ quiz }: { quiz: QuizState }) {
   const hasQuestionText = Boolean(quiz.questionText);
   const progress =
     quiz.questionIndex !== null && quiz.totalQuestions !== null ? `${quiz.questionIndex} / ${quiz.totalQuestions}` : quiz.questionType;
-  const fallback = quiz.quizTitle ? "문제를 불러오는 중입니다." : "아직 원본 창에서 문제를 읽어오지 않았습니다.";
+  const fallback = quiz.quizTitle
+    ? "원본 창에서 검색하거나 문제를 선택해 주세요."
+    : "아직 원본 창에서 문제를 읽어오지 않았습니다.";
 
   return (
     <section className="quiz-panel" aria-label="퀴즈">
