@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { buildPairPayload, normalizeServerUrl } from "./socketClient.js";
+import { describe, expect, it, vi } from "vitest";
+import { buildPairPayload, MachugiSocketClient, normalizeServerUrl, NOT_CONNECTED_MESSAGE } from "./socketClient.js";
 
 describe("buildPairPayload", () => {
   it("trims and uppercases the room code and host code", () => {
@@ -22,5 +22,37 @@ describe("normalizeServerUrl", () => {
 
   it("normalizes the app server URL", () => {
     expect(normalizeServerUrl(" https://gatchi-machugi.up.railway.app/ ")).toBe("https://gatchi-machugi.up.railway.app");
+  });
+});
+
+describe("MachugiSocketClient", () => {
+  it("exposes original submission methods that require a connected socket", () => {
+    const client = new MachugiSocketClient();
+
+    expect(() => client.onOriginalSubmitAllowed(vi.fn())).toThrow(NOT_CONNECTED_MESSAGE);
+    expect(() => client.onRoomState(vi.fn())).toThrow(NOT_CONNECTED_MESSAGE);
+    expect(() => client.requestOriginalSubmit({ roomCode: "ABC123", questionKey: "q1" })).toThrow(NOT_CONNECTED_MESSAGE);
+    expect(() =>
+      client.sendOriginalResult({
+        roomCode: "ABC123",
+        questionKey: "q1",
+        quiz: {
+          quizTitle: "Quiz",
+          questionIndex: 1,
+          totalQuestions: 10,
+          questionType: "free-text",
+          questionText: "Name the game",
+          imageUrl: null,
+          audioUrl: null,
+          videoUrl: null,
+          choices: [],
+          timerSecondsRemaining: null,
+          canGoNext: true,
+          canGoPrevious: false,
+          resultMessage: "correct",
+          answerCandidates: ["blue archive"]
+        }
+      })
+    ).toThrow(NOT_CONNECTED_MESSAGE);
   });
 });

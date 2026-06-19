@@ -1,22 +1,33 @@
-import type { PairHostRequestMessage, PairHostResponse, PairingSettings, StoredPairingSettings } from "./socketClient.js";
-import {
-  APP_PAIRING_SETTINGS_MESSAGE,
-  type AppPairingSettingsPayload,
-  type QuizCommandPayload,
-  type QuizState
+import type {
+  AppPairingSettingsPayload,
+  OriginalSubmitAllowedPayload,
+  QuizCommandPayload,
+  QuizState
 } from "@gatchi/shared";
-import { CONTENT_COMMAND_MESSAGE, CONTENT_STATE_MESSAGE } from "./messages.js";
-import { CONTENT_REQUEST_STATE_MESSAGE } from "./messages.js";
+import { APP_PAIRING_SETTINGS_MESSAGE } from "@gatchi/shared";
+import {
+  CONTENT_COMMAND_MESSAGE,
+  CONTENT_FRAME_READY_MESSAGE,
+  CONTENT_ORIGINAL_SUBMIT_MESSAGE,
+  CONTENT_STATE_MESSAGE
+} from "./messages.js";
 import { normalizePairingSettingsForStorage } from "./pairingSettings.js";
+import type { PairHostRequestMessage, PairHostResponse, PairingSettings, StoredPairingSettings } from "./socketClient.js";
 import {
   MachugiSocketClient,
   PAIRING_REQUEST_TYPE,
-  PAIRING_STORAGE_KEY,
+  PAIRING_STORAGE_KEY
 } from "./socketClient.js";
+
+interface MachugiFrameTarget {
+  tabId: number;
+  frameId: number;
+}
 
 const socketClient = new MachugiSocketClient();
 let pairedRoomCode: string | null = null;
-let pairedTabId: number | null = null;
+let pairedAppTabId: number | null = null;
+let pairedMachugiFrame: MachugiFrameTarget | null = null;
 
 function isPairHostRequestMessage(message: unknown): message is PairHostRequestMessage {
   return (
@@ -51,63 +62,23 @@ async function savePairingSettings(settings: StoredPairingSettings): Promise<voi
   });
 }
 
-function isMachugiUrl(url: string | undefined): boolean {
-  if (!url) return false;
-
-  try {
-    const hostname = new URL(url).hostname;
-    return hostname === "machugi.io" || hostname.endsWith(".machugi.io");
-  } catch {
-    return false;
-  }
-}
-
-async function activeMachugiTabId(): Promise<number | null> {
-  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  return tab?.id && isMachugiUrl(tab.url) ? tab.id : null;
-}
-
-function registerPairedBridge(roomCode: string, tabId: number) {
+function registerPairedBridge(roomCode: string, appTabId: number | null) {
   pairedRoomCode = roomCode;
-  pairedTabId = tabId;
+  pairedAppTabId = appTabId;
   socketClient.onQuizCommand((command) => {
-    void sendCommandToPairedMachugiTab(command);
+    void sendCommandToPairedMachugiFrame(command);
+  });
+  socketClient.onOriginalSubmitAllowed((payload) => {
+    void sendOriginalSubmitToPairedMachugiFrame(payload);
   });
 }
 
-async function ensureMachugiContentScript(tabId: number): Promise<void> {
-  await chrome.scripting.executeScript({
-    target: { tabId },
-    files: ["contentScript.js"]
-  });
-}
-
-async function requestStateFromPairedMachugiTab(tabId: number): Promise<void> {
-  await new Promise<void>((resolve, reject) => {
-    chrome.tabs.sendMessage(tabId, { type: CONTENT_REQUEST_STATE_MESSAGE }, () => {
-      if (chrome.runtime.lastError) {
-        reject(new Error(chrome.runtime.lastError.message));
-        return;
-      }
-
-      resolve();
-    });
-  });
-}
-
-async function pairHost(payload: PairingSettings): Promise<PairHostResponse> {
+async function pairHost(payload: PairingSettings, appTabId: number | null): Promise<PairHostResponse> {
   const settings = normalizePairingSettingsForStorage(payload);
 
   try {
-    const tabId = await activeMachugiTabId();
-    if (!tabId) {
-      throw new Error("연결 전에 마추기아이오 방장 탭을 열어주세요.");
-    }
-
     const pairResult = await socketClient.connectAndPair(payload);
-    registerPairedBridge(pairResult.roomCode, tabId);
-    await ensureMachugiContentScript(tabId);
-    await requestStateFromPairedMachugiTab(tabId);
+    registerPairedBridge(pairResult.roomCode, appTabId);
     await savePairingSettings(settings);
     return {
       ok: true,
@@ -123,13 +94,45 @@ async function pairHost(payload: PairingSettings): Promise<PairHostResponse> {
   }
 }
 
-async function sendCommandToPairedMachugiTab(command: QuizCommandPayload): Promise<void> {
-  if (!pairedTabId) return;
+function bindMachugiFrame(sender: chrome.runtime.MessageSender): boolean {
+  if (!sender.tab?.id || sender.frameId === undefined) return false;
+  if (pairedAppTabId !== null && sender.tab.id !== pairedAppTabId) return false;
 
-  await chrome.tabs.sendMessage(pairedTabId, {
+  pairedMachugiFrame = {
+    tabId: sender.tab.id,
+    frameId: sender.frameId
+  };
+  return true;
+}
+
+async function sendMessageToPairedMachugiFrame(message: unknown): Promise<void> {
+  const target = pairedMachugiFrame;
+  if (!target) return;
+
+  await new Promise<void>((resolve, reject) => {
+    chrome.tabs.sendMessage(target.tabId, message, { frameId: target.frameId }, () => {
+      if (chrome.runtime.lastError) {
+        reject(new Error(chrome.runtime.lastError.message));
+        return;
+      }
+
+      resolve();
+    });
+  });
+}
+
+async function sendCommandToPairedMachugiFrame(command: QuizCommandPayload): Promise<void> {
+  await sendMessageToPairedMachugiFrame({
     type: CONTENT_COMMAND_MESSAGE,
     command: command.command,
     values: command.values
+  });
+}
+
+async function sendOriginalSubmitToPairedMachugiFrame(payload: OriginalSubmitAllowedPayload): Promise<void> {
+  await sendMessageToPairedMachugiFrame({
+    type: CONTENT_ORIGINAL_SUBMIT_MESSAGE,
+    payload
   });
 }
 
@@ -147,33 +150,34 @@ async function forwardQuizState(quiz: QuizState): Promise<void> {
 }
 
 chrome.runtime.onMessage.addListener((message: unknown, sender, sendResponse) => {
-  if (
-    typeof message === "object" &&
-    message !== null &&
-    "type" in message &&
-    (message as { type?: unknown }).type === CONTENT_STATE_MESSAGE
-  ) {
-    if (sender.tab?.id === pairedTabId) {
-      void forwardQuizState((message as unknown as { payload: QuizState }).payload);
-      sendResponse({ ok: true });
-    } else {
-      sendResponse({ ok: false, error: "연결되지 않은 마추기아이오 탭입니다." });
+  if (typeof message === "object" && message !== null && "type" in message) {
+    const messageType = (message as { type?: unknown }).type;
+
+    if (messageType === CONTENT_FRAME_READY_MESSAGE) {
+      sendResponse({ ok: bindMachugiFrame(sender) });
+      return true;
     }
-    return true;
+
+    if (messageType === CONTENT_STATE_MESSAGE) {
+      if (bindMachugiFrame(sender)) {
+        void forwardQuizState((message as unknown as { payload: QuizState }).payload);
+        sendResponse({ ok: true });
+      } else {
+        sendResponse({ ok: false, error: "연결되지 않은 마추기아이오 화면입니다." });
+      }
+      return true;
+    }
   }
 
   if (!isPairHostRequestMessage(message)) {
     if (isAppPairingSettingsMessage(message)) {
-      void savePairingSettings(normalizePairingSettingsForStorage(message.payload)).then(
-        () => sendResponse({ ok: true }),
-        (error) => sendResponse({ ok: false, error: error instanceof Error ? error.message : "연결 정보 저장에 실패했습니다." })
-      );
+      void pairHost(message.payload, sender.tab?.id ?? null).then(sendResponse);
       return true;
     }
 
     return false;
   }
 
-  void pairHost(message.payload).then(sendResponse);
+  void pairHost(message.payload, sender.tab?.id ?? null).then(sendResponse);
   return true;
 });

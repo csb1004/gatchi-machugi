@@ -3,6 +3,9 @@ import type {
   ExtensionStatePayload,
   HostPairAck,
   HostPairPayload,
+  OriginalResultPayload,
+  OriginalSubmitAllowedPayload,
+  OriginalSubmitRequestPayload,
   QuizCommandPayload,
   RoomState,
   ServerToClientEvents
@@ -11,6 +14,7 @@ import { io, type Socket } from "socket.io-client";
 
 export const PAIRING_STORAGE_KEY = "pairingSettings";
 export const PAIRING_REQUEST_TYPE = "pair-host";
+export const NOT_CONNECTED_MESSAGE = "소켓 클라이언트가 연결되지 않았습니다.";
 
 export interface PairingSettings {
   serverUrl: string;
@@ -108,7 +112,7 @@ export class MachugiSocketClient {
 
   async pair(payload: Pick<PairingSettings, "roomCode" | "hostCode">): Promise<HostPairGatewayAck> {
     if (!this.socket) {
-      throw new Error("소켓 클라이언트가 연결되지 않았습니다.");
+      throw new Error(NOT_CONNECTED_MESSAGE);
     }
 
     const pairPayload = buildPairPayload(payload);
@@ -132,7 +136,7 @@ export class MachugiSocketClient {
 
   sendExtensionState(payload: ExtensionStatePayload): Promise<void> {
     if (!this.socket) {
-      throw new Error("소켓 클라이언트가 연결되지 않았습니다.");
+      throw new Error(NOT_CONNECTED_MESSAGE);
     }
 
     return new Promise((resolve, reject) => {
@@ -147,12 +151,62 @@ export class MachugiSocketClient {
     });
   }
 
+  requestOriginalSubmit(payload: OriginalSubmitRequestPayload): Promise<void> {
+    if (!this.socket) {
+      throw new Error(NOT_CONNECTED_MESSAGE);
+    }
+
+    return new Promise((resolve, reject) => {
+      this.socket?.emit("original:request-submit", payload, (response) => {
+        if (response.ok) {
+          resolve();
+          return;
+        }
+
+        reject(new Error(response.error));
+      });
+    });
+  }
+
+  sendOriginalResult(payload: OriginalResultPayload): Promise<void> {
+    if (!this.socket) {
+      throw new Error(NOT_CONNECTED_MESSAGE);
+    }
+
+    return new Promise((resolve, reject) => {
+      this.socket?.emit("original:result", payload, (response) => {
+        if (response.ok) {
+          resolve();
+          return;
+        }
+
+        reject(new Error(response.error));
+      });
+    });
+  }
+
   onQuizCommand(handler: (payload: QuizCommandPayload) => void) {
     if (!this.socket) {
-      throw new Error("소켓 클라이언트가 연결되지 않았습니다.");
+      throw new Error(NOT_CONNECTED_MESSAGE);
     }
 
     this.socket.on("quiz:command" as never, handler as never);
+  }
+
+  onOriginalSubmitAllowed(handler: (payload: OriginalSubmitAllowedPayload) => void) {
+    if (!this.socket) {
+      throw new Error(NOT_CONNECTED_MESSAGE);
+    }
+
+    this.socket.on("original:submit-allowed" as never, handler as never);
+  }
+
+  onRoomState(handler: (state: RoomState) => void) {
+    if (!this.socket) {
+      throw new Error(NOT_CONNECTED_MESSAGE);
+    }
+
+    this.socket.on("room:state" as never, handler as never);
   }
 
   disconnect() {

@@ -5,6 +5,7 @@ import { extractQuizState } from "./machugi/extractor";
 const CONTENT_STATE_MESSAGE = "machugi-state";
 const CONTENT_COMMAND_MESSAGE = "machugi-command";
 const CONTENT_REQUEST_STATE_MESSAGE = "machugi-request-state";
+const CONTENT_FRAME_READY_MESSAGE = "machugi-frame-ready";
 
 const contentWindow = window as Window & { __gatchiMachugiContentScriptInstalled?: boolean };
 
@@ -17,6 +18,8 @@ function sendState() {
 
 if (!contentWindow.__gatchiMachugiContentScriptInstalled) {
   contentWindow.__gatchiMachugiContentScriptInstalled = true;
+
+  chrome.runtime.sendMessage({ type: CONTENT_FRAME_READY_MESSAGE, href: window.location.href });
 
   chrome.runtime.onMessage.addListener((message: unknown, _sender, sendResponse) => {
     if (typeof message !== "object" || message === null || !("type" in message)) {
