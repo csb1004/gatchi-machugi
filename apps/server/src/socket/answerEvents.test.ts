@@ -10,6 +10,7 @@ import type {
   OriginalFailurePayload,
   OriginalResultPayload,
   OriginalSubmitRequestPayload,
+  QuizCommandPayload,
   RevealAnswerPayload,
   ServerToClientEvents,
   SubmitAnswerPayload
@@ -117,6 +118,28 @@ function emitSubmitAnswer(
 ): Promise<{ ok: true; data: void } | { ok: false; error: string }> {
   return new Promise((resolve) => {
     socket.emit("answer:submit", payload, resolve);
+  });
+}
+
+function emitQuizCommand(
+  socket: Socket<ServerToClientEvents, ClientToServerEvents>,
+  payload: QuizCommandPayload
+): Promise<{ ok: true; data: void } | { ok: false; error: string }> {
+  return new Promise((resolve) => {
+    socket.emit("quiz:command", payload, resolve);
+  });
+}
+
+function emitConnectedSource(socket: Socket<ServerToClientEvents, ClientToServerEvents>, roomCode: string) {
+  return emitExtensionSource(socket, {
+    roomCode,
+    sourceWindow: {
+      status: "connected",
+      url: "https://machugi.io/quiz/current",
+      title: "Current source",
+      lastSeenAt: "2026-06-19T00:00:00.000Z",
+      message: null
+    }
   });
 }
 
@@ -553,6 +576,7 @@ describe("answer socket events", () => {
       }
     });
     expect(stateAck).toEqual({ ok: true, data: undefined });
+    await expect(emitConnectedSource(extensionSocket, created.data.roomCode)).resolves.toEqual({ ok: true, data: undefined });
 
     const hostSubmitAck = await emitSubmitAnswer(hostWebSocket, {
       roomCode: created.data.roomCode,
@@ -630,6 +654,7 @@ describe("answer socket events", () => {
       }
     });
     expect(stateAck).toEqual({ ok: true, data: undefined });
+    await expect(emitConnectedSource(extensionSocket, created.data.roomCode)).resolves.toEqual({ ok: true, data: undefined });
 
     const originalSubmitPromise = waitForEvent(extensionSocket, "original:submit-allowed");
     const hostSubmitAck = await emitSubmitAnswer(hostWebSocket, {
@@ -659,6 +684,100 @@ describe("answer socket events", () => {
         originalSubmitStatus: "ready",
         lockReason: "원본 사이트에 답을 자동 제출하지 못했습니다."
       }
+    });
+  });
+
+  it("waits for the source window before auto-submitting the host answer", async () => {
+    const roomService = new RoomService();
+    const app = createApp({ roomService });
+    const server = createServer(app);
+    createSocketServer(server, { roomService });
+    servers.push(server);
+
+    const port = await listen(server);
+    const baseUrl = `http://127.0.0.1:${port}`;
+    const created = await createRoom(baseUrl, { roomName: "Room", public: false, nickname: "Host" });
+
+    const hostWebSocket = await connectClient(baseUrl);
+    const participantSocket = await connectClient(baseUrl);
+    const extensionSocket = await connectClient(baseUrl);
+    sockets.push(hostWebSocket, participantSocket, extensionSocket);
+
+    const hostWebJoin = await emitJoin(hostWebSocket, {
+      roomCode: created.data.roomCode,
+      nickname: "Host",
+      participantId: created.data.hostParticipantId,
+      participantCode: created.data.hostCode
+    });
+    const participantJoin = await emitJoin(participantSocket, {
+      roomCode: created.data.roomCode,
+      nickname: "Mina"
+    });
+    const extensionPair = await emitHostPair(extensionSocket, {
+      roomCode: created.data.roomCode,
+      hostCode: created.data.hostCode
+    });
+
+    expect(hostWebJoin.ok).toBe(true);
+    expect(participantJoin.ok).toBe(true);
+    expect(extensionPair.ok).toBe(true);
+    if (!hostWebJoin.ok || !participantJoin.ok || !extensionPair.ok) throw new Error("setup failed");
+
+    const stateAck = await emitExtensionState(extensionSocket, {
+      roomCode: created.data.roomCode,
+      quiz: {
+        quizTitle: "Quiz",
+        questionIndex: 1,
+        totalQuestions: 10,
+        questionType: "free-text",
+        questionText: "Name the game",
+        imageUrl: null,
+        audioUrl: null,
+        videoUrl: null,
+        choices: [],
+        timerSecondsRemaining: null,
+        canGoNext: false,
+        canGoPrevious: false,
+        resultMessage: null,
+        answerCandidates: []
+      }
+    });
+    expect(stateAck).toEqual({ ok: true, data: undefined });
+    await expect(
+      emitExtensionSource(extensionSocket, {
+        roomCode: created.data.roomCode,
+        sourceWindow: {
+          status: "disconnected",
+          url: null,
+          title: null,
+          lastSeenAt: "2026-06-19T00:00:00.000Z",
+          message: "source closed"
+        }
+      })
+    ).resolves.toEqual({ ok: true, data: undefined });
+
+    const leakedWhileDisconnected = eventReceivedWithin(extensionSocket, "original:submit-allowed");
+    const hostSubmitAck = await emitSubmitAnswer(hostWebSocket, {
+      roomCode: created.data.roomCode,
+      participantId: created.data.hostParticipantId,
+      rawAnswer: "blue archive"
+    });
+    const playerSubmitAck = await emitSubmitAnswer(participantSocket, {
+      roomCode: created.data.roomCode,
+      participantId: participantJoin.data.participantId,
+      rawAnswer: "wrong"
+    });
+
+    expect(hostSubmitAck).toEqual({ ok: true, data: undefined });
+    expect(playerSubmitAck).toEqual({ ok: true, data: undefined });
+    await expect(leakedWhileDisconnected).resolves.toBe(false);
+    expect(roomService.getState(created.data.roomCode).fairPlay.originalSubmitStatus).toBe("ready");
+
+    const originalSubmitPromise = waitForEvent(extensionSocket, "original:submit-allowed");
+    await expect(emitConnectedSource(extensionSocket, created.data.roomCode)).resolves.toEqual({ ok: true, data: undefined });
+    await expect(originalSubmitPromise).resolves.toMatchObject({
+      roomCode: created.data.roomCode,
+      hostRawAnswer: "blue archive"
     });
   });
 
@@ -745,6 +864,7 @@ describe("answer socket events", () => {
       }
     });
     expect(currentStateAck).toEqual({ ok: true, data: undefined });
+    await expect(emitConnectedSource(secondExtensionSocket, created.data.roomCode)).resolves.toEqual({ ok: true, data: undefined });
 
     const originalSubmitPromise = waitForEvent(secondExtensionSocket, "original:submit-allowed");
     await emitSubmitAnswer(hostWebSocket, {
@@ -835,6 +955,57 @@ describe("answer socket events", () => {
       url: "https://machugi.io/current",
       title: "Current source"
     });
+  });
+
+  it("sends quiz commands only to the current paired extension socket", async () => {
+    const roomService = new RoomService();
+    const app = createApp({ roomService });
+    const server = createServer(app);
+    createSocketServer(server, { roomService });
+    servers.push(server);
+
+    const port = await listen(server);
+    const baseUrl = `http://127.0.0.1:${port}`;
+    const created = await createRoom(baseUrl, { roomName: "Room", public: false, nickname: "Host" });
+
+    const hostWebSocket = await connectClient(baseUrl);
+    const firstExtensionSocket = await connectClient(baseUrl);
+    const secondExtensionSocket = await connectClient(baseUrl);
+    sockets.push(hostWebSocket, firstExtensionSocket, secondExtensionSocket);
+
+    const hostWebJoin = await emitJoin(hostWebSocket, {
+      roomCode: created.data.roomCode,
+      nickname: "Host",
+      participantId: created.data.hostParticipantId,
+      participantCode: created.data.hostCode
+    });
+    const firstPair = await emitHostPair(firstExtensionSocket, {
+      roomCode: created.data.roomCode,
+      hostCode: created.data.hostCode
+    });
+    const secondPair = await emitHostPair(secondExtensionSocket, {
+      roomCode: created.data.roomCode,
+      hostCode: created.data.hostCode
+    });
+
+    expect(hostWebJoin.ok).toBe(true);
+    expect(firstPair.ok).toBe(true);
+    expect(secondPair.ok).toBe(true);
+    if (!hostWebJoin.ok || !firstPair.ok || !secondPair.ok) throw new Error("setup failed");
+
+    const staleCommandReceived = eventReceivedWithin(firstExtensionSocket, "quiz:command");
+    const currentCommandPromise = waitForEvent(secondExtensionSocket, "quiz:command");
+    const commandAck = await emitQuizCommand(hostWebSocket, {
+      roomCode: created.data.roomCode,
+      command: "next"
+    });
+
+    expect(commandAck).toEqual({ ok: true, data: undefined });
+    await expect(currentCommandPromise).resolves.toMatchObject({
+      roomCode: created.data.roomCode,
+      command: "next"
+    });
+    await expect(staleCommandReceived).resolves.toBe(false);
   });
 
   it("does not emit original submit to a paired extension socket after it rejoins as web", async () => {
@@ -985,6 +1156,7 @@ describe("answer socket events", () => {
       }
     });
     expect(stateAck).toEqual({ ok: true, data: undefined });
+    await expect(emitConnectedSource(secondExtensionSocket, created.data.roomCode)).resolves.toEqual({ ok: true, data: undefined });
 
     const hostSubmitAck = await emitSubmitAnswer(hostWebSocket, {
       roomCode: created.data.roomCode,

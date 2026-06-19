@@ -198,6 +198,7 @@ export function createSocketServer(httpServer: HttpServer, { roomService }: { ro
 
   function emitOriginalSubmitIfReady(roomCode: string, state: RoomState) {
     if (state.fairPlay.originalSubmitStatus !== "ready" || !state.fairPlay.questionKey) return;
+    if (state.sourceWindow.status !== "connected") return;
     const extensionSocketId = hostExtensionSocketIds.get(roomCode);
     if (!extensionSocketId) return;
     const extensionSocket = io.sockets.sockets.get(extensionSocketId);
@@ -246,6 +247,9 @@ export function createSocketServer(httpServer: HttpServer, { roomService }: { ro
         });
 
         socket.join(parsed.data.roomCode);
+        if (previousRoomCode && previousRoomCode !== parsed.data.roomCode) {
+          socket.leave(previousRoomCode);
+        }
         if (previousRoomCode) {
           deleteHostExtensionSocketId(previousRoomCode, socket.id);
         }
@@ -288,13 +292,22 @@ export function createSocketServer(httpServer: HttpServer, { roomService }: { ro
       }
 
       try {
+        const previousRoomCode = session.roomCode;
         const joined = roomService.joinHostExtension({
           roomCode: parsed.data.roomCode,
           hostCode: parsed.data.hostCode
         });
         const state = joined.state;
+        const previousExtensionSocketId = hostExtensionSocketIds.get(parsed.data.roomCode);
+        if (previousExtensionSocketId && previousExtensionSocketId !== socket.id) {
+          io.sockets.sockets.get(previousExtensionSocketId)?.leave(parsed.data.roomCode);
+        }
 
         socket.join(parsed.data.roomCode);
+        if (previousRoomCode && previousRoomCode !== parsed.data.roomCode) {
+          socket.leave(previousRoomCode);
+          deleteHostExtensionSocketId(previousRoomCode, socket.id);
+        }
         session.roomCode = parsed.data.roomCode;
         session.participantId = joined.participant.id;
         session.role = "host";
@@ -345,6 +358,7 @@ export function createSocketServer(httpServer: HttpServer, { roomService }: { ro
         const state = roomService.updateSourceWindow(parsed.data);
         io.to(parsed.data.roomCode).emit("room:state", state);
         ack({ ok: true, data: undefined });
+        emitOriginalSubmitIfReady(parsed.data.roomCode, state);
       } catch (error) {
         ackError(ack, error instanceof Error ? error.message : "Source update failed");
       }
@@ -412,7 +426,10 @@ export function createSocketServer(httpServer: HttpServer, { roomService }: { ro
 
       try {
         requireHostSession(session, parsed.data.roomCode);
-        io.to(parsed.data.roomCode).emit("quiz:command", parsed.data);
+        const extensionSocketId = hostExtensionSocketIds.get(parsed.data.roomCode);
+        if (extensionSocketId) {
+          io.to(extensionSocketId).emit("quiz:command", parsed.data);
+        }
         ack({ ok: true, data: undefined });
       } catch (error) {
         ackError(ack, error instanceof Error ? error.message : "Quiz command failed");
