@@ -50,6 +50,24 @@ function waitForEvent<EventName extends keyof ServerToClientEvents>(
   });
 }
 
+function eventReceivedWithin<EventName extends keyof ServerToClientEvents>(
+  socket: Socket<ServerToClientEvents, ClientToServerEvents>,
+  event: EventName,
+  timeoutMs = 100
+): Promise<boolean> {
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => {
+      socket.off(event, onEvent as never);
+      resolve(false);
+    }, timeoutMs);
+    const onEvent = () => {
+      clearTimeout(timer);
+      resolve(true);
+    };
+    socket.once(event, onEvent as never);
+  });
+}
+
 function emitJoin(
   socket: Socket<ServerToClientEvents, ClientToServerEvents>,
   payload: JoinRoomPayload
@@ -514,5 +532,173 @@ describe("answer socket events", () => {
       hostRawAnswer: "blue archive"
     });
     expect(leakedToHostWeb).toBe(false);
+  });
+
+  it("does not emit original submit to a paired extension socket after it rejoins as web", async () => {
+    const roomService = new RoomService();
+    const app = createApp({ roomService });
+    const server = createServer(app);
+    createSocketServer(server, { roomService });
+    servers.push(server);
+
+    const port = await listen(server);
+    const baseUrl = `http://127.0.0.1:${port}`;
+    const created = await createRoom(baseUrl, { roomName: "Room", public: false, nickname: "Host" });
+
+    const hostWebSocket = await connectClient(baseUrl);
+    const participantSocket = await connectClient(baseUrl);
+    const extensionThenWebSocket = await connectClient(baseUrl);
+    sockets.push(hostWebSocket, participantSocket, extensionThenWebSocket);
+
+    const hostWebJoin = await emitJoin(hostWebSocket, {
+      roomCode: created.data.roomCode,
+      nickname: "Host",
+      participantId: created.data.hostParticipantId,
+      participantCode: created.data.hostCode
+    });
+    const participantJoin = await emitJoin(participantSocket, {
+      roomCode: created.data.roomCode,
+      nickname: "Mina"
+    });
+    const extensionPair = await emitHostPair(extensionThenWebSocket, {
+      roomCode: created.data.roomCode,
+      hostCode: created.data.hostCode
+    });
+
+    expect(hostWebJoin.ok).toBe(true);
+    expect(participantJoin.ok).toBe(true);
+    expect(extensionPair.ok).toBe(true);
+    if (!hostWebJoin.ok || !participantJoin.ok || !extensionPair.ok) throw new Error("setup failed");
+
+    const stateAck = await emitExtensionState(extensionThenWebSocket, {
+      roomCode: created.data.roomCode,
+      quiz: {
+        quizTitle: "Quiz",
+        questionIndex: 1,
+        totalQuestions: 10,
+        questionType: "free-text",
+        questionText: "Name the game",
+        imageUrl: null,
+        audioUrl: null,
+        videoUrl: null,
+        choices: [],
+        timerSecondsRemaining: null,
+        canGoNext: false,
+        canGoPrevious: false,
+        resultMessage: null,
+        answerCandidates: []
+      }
+    });
+    expect(stateAck).toEqual({ ok: true, data: undefined });
+
+    const rejoinAck = await emitJoin(extensionThenWebSocket, {
+      roomCode: created.data.roomCode,
+      nickname: "Host",
+      participantId: created.data.hostParticipantId,
+      participantCode: created.data.hostCode
+    });
+    expect(rejoinAck.ok).toBe(true);
+    if (!rejoinAck.ok) throw new Error(rejoinAck.error);
+
+    const leakedToRejoinedWeb = eventReceivedWithin(extensionThenWebSocket, "original:submit-allowed");
+    const hostSubmitAck = await emitSubmitAnswer(hostWebSocket, {
+      roomCode: created.data.roomCode,
+      participantId: created.data.hostParticipantId,
+      rawAnswer: "blue archive"
+    });
+    const playerSubmitAck = await emitSubmitAnswer(participantSocket, {
+      roomCode: created.data.roomCode,
+      participantId: participantJoin.data.participantId,
+      rawAnswer: "wrong"
+    });
+
+    expect(hostSubmitAck).toEqual({ ok: true, data: undefined });
+    expect(playerSubmitAck).toEqual({ ok: true, data: undefined });
+    await expect(leakedToRejoinedWeb).resolves.toBe(false);
+  });
+
+  it("keeps the newer paired extension mapped when an older extension disconnects", async () => {
+    const roomService = new RoomService();
+    const app = createApp({ roomService });
+    const server = createServer(app);
+    createSocketServer(server, { roomService });
+    servers.push(server);
+
+    const port = await listen(server);
+    const baseUrl = `http://127.0.0.1:${port}`;
+    const created = await createRoom(baseUrl, { roomName: "Room", public: false, nickname: "Host" });
+
+    const hostWebSocket = await connectClient(baseUrl);
+    const participantSocket = await connectClient(baseUrl);
+    const firstExtensionSocket = await connectClient(baseUrl);
+    const secondExtensionSocket = await connectClient(baseUrl);
+    sockets.push(hostWebSocket, participantSocket, firstExtensionSocket, secondExtensionSocket);
+
+    const hostWebJoin = await emitJoin(hostWebSocket, {
+      roomCode: created.data.roomCode,
+      nickname: "Host",
+      participantId: created.data.hostParticipantId,
+      participantCode: created.data.hostCode
+    });
+    const participantJoin = await emitJoin(participantSocket, {
+      roomCode: created.data.roomCode,
+      nickname: "Mina"
+    });
+    const firstPair = await emitHostPair(firstExtensionSocket, {
+      roomCode: created.data.roomCode,
+      hostCode: created.data.hostCode
+    });
+    const secondPair = await emitHostPair(secondExtensionSocket, {
+      roomCode: created.data.roomCode,
+      hostCode: created.data.hostCode
+    });
+
+    expect(hostWebJoin.ok).toBe(true);
+    expect(participantJoin.ok).toBe(true);
+    expect(firstPair.ok).toBe(true);
+    expect(secondPair.ok).toBe(true);
+    if (!hostWebJoin.ok || !participantJoin.ok || !firstPair.ok || !secondPair.ok) throw new Error("setup failed");
+
+    firstExtensionSocket.disconnect();
+
+    const originalSubmitPromise = waitForEvent(secondExtensionSocket, "original:submit-allowed");
+    const stateAck = await emitExtensionState(secondExtensionSocket, {
+      roomCode: created.data.roomCode,
+      quiz: {
+        quizTitle: "Quiz",
+        questionIndex: 1,
+        totalQuestions: 10,
+        questionType: "free-text",
+        questionText: "Name the game",
+        imageUrl: null,
+        audioUrl: null,
+        videoUrl: null,
+        choices: [],
+        timerSecondsRemaining: null,
+        canGoNext: false,
+        canGoPrevious: false,
+        resultMessage: null,
+        answerCandidates: []
+      }
+    });
+    expect(stateAck).toEqual({ ok: true, data: undefined });
+
+    const hostSubmitAck = await emitSubmitAnswer(hostWebSocket, {
+      roomCode: created.data.roomCode,
+      participantId: created.data.hostParticipantId,
+      rawAnswer: "blue archive"
+    });
+    const playerSubmitAck = await emitSubmitAnswer(participantSocket, {
+      roomCode: created.data.roomCode,
+      participantId: participantJoin.data.participantId,
+      rawAnswer: "wrong"
+    });
+    expect(hostSubmitAck).toEqual({ ok: true, data: undefined });
+    expect(playerSubmitAck).toEqual({ ok: true, data: undefined });
+
+    await expect(originalSubmitPromise).resolves.toMatchObject({
+      roomCode: created.data.roomCode,
+      hostRawAnswer: "blue archive"
+    });
   });
 });

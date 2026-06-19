@@ -164,10 +164,27 @@ export function createSocketServer(httpServer: HttpServer, { roomService }: { ro
   });
   const hostExtensionSocketIds = new Map<string, string>();
 
+  function deleteHostExtensionSocketId(roomCode: string, socketId: string) {
+    if (hostExtensionSocketIds.get(roomCode) === socketId) {
+      hostExtensionSocketIds.delete(roomCode);
+    }
+  }
+
   function emitOriginalSubmitIfReady(roomCode: string, state: RoomState) {
     if (state.fairPlay.originalSubmitStatus !== "ready" || !state.fairPlay.questionKey) return;
     const extensionSocketId = hostExtensionSocketIds.get(roomCode);
     if (!extensionSocketId) return;
+    const extensionSocket = io.sockets.sockets.get(extensionSocketId);
+    const extensionSession = extensionSocket?.data as SocketSession | undefined;
+    if (
+      !extensionSocket?.connected ||
+      extensionSession?.roomCode !== roomCode ||
+      extensionSession.role !== "host" ||
+      extensionSession.clientKind !== "extension"
+    ) {
+      deleteHostExtensionSocketId(roomCode, extensionSocketId);
+      return;
+    }
 
     try {
       const payload = roomService.requestOriginalSubmission({
@@ -192,6 +209,7 @@ export function createSocketServer(httpServer: HttpServer, { roomService }: { ro
       }
 
       try {
+        const previousRoomCode = session.roomCode;
         const participantId = session.participantId;
         const trustedParticipantId = participantId ?? (parsed.data.participantCode ? parsed.data.participantId : undefined);
         const joined = roomService.joinParticipant({
@@ -202,6 +220,10 @@ export function createSocketServer(httpServer: HttpServer, { roomService }: { ro
         });
 
         socket.join(parsed.data.roomCode);
+        if (previousRoomCode) {
+          deleteHostExtensionSocketId(previousRoomCode, socket.id);
+        }
+        deleteHostExtensionSocketId(parsed.data.roomCode, socket.id);
         session.roomCode = parsed.data.roomCode;
         session.participantId = joined.participant.id;
         session.role = joined.participant.role === "host" ? "host" : "participant";
@@ -472,7 +494,7 @@ export function createSocketServer(httpServer: HttpServer, { roomService }: { ro
       if (!session.roomCode) return;
 
       if (session.clientKind === "extension" && session.roomCode) {
-        hostExtensionSocketIds.delete(session.roomCode);
+        deleteHostExtensionSocketId(session.roomCode, socket.id);
       }
 
       if (session.role === "host") {
