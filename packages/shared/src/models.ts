@@ -61,6 +61,17 @@ export interface RevealedSubmission extends SubmissionStatus {
   correct: boolean;
 }
 
+export type OriginalSubmitStatus = "idle" | "locked" | "ready" | "submitting" | "result-opened" | "unsupported";
+
+export interface FairPlayState {
+  questionKey: string | null;
+  requiredParticipantIds: string[];
+  submittedParticipantIds: string[];
+  allRequiredSubmitted: boolean;
+  originalSubmitStatus: OriginalSubmitStatus;
+  lockReason: string | null;
+}
+
 export interface RoomState {
   roomCode: string;
   phase: RoomPhase;
@@ -69,6 +80,7 @@ export interface RoomState {
   quiz: QuizState;
   submissions: SubmissionStatus[];
   revealedSubmissions: RevealedSubmission[];
+  fairPlay: FairPlayState;
   hostExtensionConnected: boolean;
   chatMessageCount: number;
 }

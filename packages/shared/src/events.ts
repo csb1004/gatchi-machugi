@@ -11,6 +11,7 @@ export interface ServerToClientEvents {
   "chat:message": (message: ChatMessagePayload) => void;
   "chat:system": (message: SystemMessagePayload) => void;
   "quiz:command": (payload: QuizCommandPayload) => void;
+  "original:submit-allowed": (payload: OriginalSubmitAllowedPayload) => void;
 }
 
 export interface ClientToServerEvents {
@@ -23,6 +24,8 @@ export interface ClientToServerEvents {
   "answer:submit": (payload: SubmitAnswerPayload, ack: Ack<void>) => void;
   "answer:reveal": (payload: RevealAnswerPayload, ack: Ack<void>) => void;
   "answer:add-alias": (payload: AddAliasPayload, ack: Ack<void>) => void;
+  "original:request-submit": (payload: OriginalSubmitRequestPayload, ack: Ack<void>) => void;
+  "original:result": (payload: OriginalResultPayload, ack: Ack<void>) => void;
   "score:adjust": (payload: AdjustScorePayload, ack: Ack<void>) => void;
   "chat:send": (payload: SendChatPayload, ack: Ack<void>) => void;
   "room:update-settings": (payload: UpdateSettingsPayload, ack: Ack<void>) => void;
@@ -82,6 +85,23 @@ export interface QuizCommandPayload {
 
 export interface ExtensionStatePayload {
   roomCode: string;
+  quiz: QuizState;
+}
+
+export interface OriginalSubmitAllowedPayload {
+  roomCode: string;
+  questionKey: string;
+  hostRawAnswer: string;
+}
+
+export interface OriginalSubmitRequestPayload {
+  roomCode: string;
+  questionKey: string;
+}
+
+export interface OriginalResultPayload {
+  roomCode: string;
+  questionKey: string;
   quiz: QuizState;
 }
 
