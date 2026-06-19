@@ -9,5 +9,6 @@ build/
 coverage/
 apps/extension/release/
 server-smoke.*.log
+local-preview.*.log
 .DS_Store
 Thumbs.db
