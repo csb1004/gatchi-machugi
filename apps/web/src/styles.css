@@ -495,6 +495,68 @@ h2 {
   width: min(480px, 100%);
 }
 
+.youtube-audio-only {
+  position: relative;
+  width: min(520px, 100%);
+  min-height: 170px;
+  display: grid;
+  place-items: center;
+}
+
+.question-stage .youtube-audio-frame {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  min-height: 0;
+  aspect-ratio: auto;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.youtube-audio-shell {
+  width: 100%;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 14px;
+  align-items: center;
+  border: 1px solid #d7e2f2;
+  border-radius: 8px;
+  padding: 18px;
+  background: #ffffff;
+  color: #172033;
+  text-align: left;
+  box-shadow: 0 8px 24px rgba(22, 31, 48, 0.04);
+}
+
+.youtube-audio-shell strong,
+.youtube-audio-shell span {
+  display: block;
+}
+
+.youtube-audio-shell strong {
+  margin-bottom: 2px;
+  font-size: 1rem;
+}
+
+.youtube-audio-shell span {
+  color: #607089;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.youtube-audio-shell button {
+  min-height: 40px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border: 0;
+  border-radius: 8px;
+  padding: 0 14px;
+  background: #235797;
+  color: #ffffff;
+  font-weight: 900;
+}
+
 .question-stage p {
   max-width: 680px;
   margin: 0;

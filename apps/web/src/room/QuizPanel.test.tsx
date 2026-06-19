@@ -4,6 +4,8 @@ import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { QuizPanel } from "./QuizPanel";
 
+const youtubeUrl = "https://www.youtube-nocookie.com/embed/seoefKzVDOk?start=0.5&end=141";
+
 const baseQuiz: QuizState = {
   quizTitle: "Pokemon",
   questionIndex: null,
@@ -37,22 +39,39 @@ describe("QuizPanel", () => {
     expect(screen.getByText("이브이")).toBeInTheDocument();
   });
 
-  it("renders YouTube iframe audio questions as embeds", () => {
+  it("hides YouTube video during audio questions behind an audio-only control", () => {
     render(
       <QuizPanel
         quiz={{
           ...baseQuiz,
           questionType: "audio",
           imageUrl: null,
-          audioUrl: "https://www.youtube-nocookie.com/embed/seoefKzVDOk?start=0.5&end=141"
+          audioUrl: youtubeUrl
         }}
       />
     );
 
-    expect(screen.getByTitle("음원 문제")).toHaveAttribute(
-      "src",
-      "https://www.youtube-nocookie.com/embed/seoefKzVDOk?start=0.5&end=141"
-    );
+    expect(screen.getByRole("button", { name: "재생" })).toBeInTheDocument();
+    expect(document.querySelector(".youtube-audio-frame")).toHaveAttribute("src", youtubeUrl);
+    expect(document.querySelector(".question-embed")).not.toBeInTheDocument();
     expect(document.querySelector("audio")).not.toBeInTheDocument();
+  });
+
+  it("shows the YouTube embed on audio result screens", () => {
+    render(
+      <QuizPanel
+        quiz={{
+          ...baseQuiz,
+          questionType: "audio",
+          imageUrl: null,
+          audioUrl: youtubeUrl,
+          resultMessage: "정답!",
+          answerCandidates: ["Song title"]
+        }}
+      />
+    );
+
+    expect(screen.getByTitle("정답 음원")).toHaveAttribute("src", youtubeUrl);
+    expect(screen.queryByRole("button", { name: "재생" })).not.toBeInTheDocument();
   });
 });

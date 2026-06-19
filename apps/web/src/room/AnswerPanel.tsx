@@ -16,15 +16,22 @@ export function AnswerPanel({
   onSubmitAnswer: (rawAnswer: string) => void;
 }) {
   const [answer, setAnswer] = useState("");
+  const [choiceSnapshot, setChoiceSnapshot] = useState(quiz.choices);
   const inputRef = useRef<HTMLInputElement | null>(null);
-  const hasChoices = quiz.choices.length > 0;
+  const visibleChoices = quiz.choices.length > 0 ? quiz.choices : choiceSnapshot;
+  const hasChoices = visibleChoices.length > 0;
   const canSubmit = !disabled && answer.trim().length > 0;
   const submitLabel = submitted ? (disabled ? "제출 완료" : "수정") : "제출";
   const submittedAnswer = submitted || hasChoices ? answer.trim() : "";
 
   useEffect(() => {
     setAnswer("");
+    setChoiceSnapshot(quiz.choices);
   }, [resetKey]);
+
+  useEffect(() => {
+    if (quiz.choices.length > 0) setChoiceSnapshot(quiz.choices);
+  }, [quiz.choices]);
 
   useEffect(() => {
     if (!disabled) inputRef.current?.focus();
@@ -45,7 +52,7 @@ export function AnswerPanel({
     return (
       <form className="answer-panel choice-answer-panel" aria-label="답변">
         <div className="choice-answer-grid" role="group" aria-label="선택지">
-          {quiz.choices.map((choice) => (
+          {visibleChoices.map((choice) => (
             <button
               key={choice.id}
               className={`choice-answer-button${answer === choice.label ? " selected" : ""}`}

@@ -5,7 +5,7 @@ import type {
   RoomState,
   SourceMirrorActionPayload
 } from "@gatchi/shared";
-import { runMachugiCommand, submitOriginalAnswer } from "./machugi/commands";
+import { runMachugiCommand, submitOriginalAnswerDetailed } from "./machugi/commands";
 import { extractQuizState } from "./machugi/extractor";
 import { runSourceMirrorAction } from "./machugi/sourceActions";
 import { extractSourceMirrorState } from "./machugi/sourceMirror";
@@ -113,7 +113,9 @@ function showLockNotice(message: string) {
   window.setTimeout(() => notice.remove(), 2400);
 }
 
-async function reportOriginalResultWhenReady(payload: OriginalSubmitAllowedPayload) {
+async function reportOriginalResultWhenReady(payload: OriginalSubmitAllowedPayload, shouldRetryChoiceFollowup = false) {
+  let followupAttempts = 0;
+
   for (let attempt = 0; attempt < 24; attempt += 1) {
     await delay(attempt === 0 ? 350 : 250);
     const quiz = extractQuizState(document);
@@ -127,6 +129,19 @@ async function reportOriginalResultWhenReady(payload: OriginalSubmitAllowedPaylo
       });
       return;
     }
+
+    if (shouldRetryChoiceFollowup && followupAttempts < 3 && quiz.choices.length === 0) {
+      followupAttempts += 1;
+      const retryResult =
+        originalSubmissionLock?.runWithOriginalSubmitBypass(() => submitOriginalAnswerDetailed(payload.hostRawAnswer, document)) ?? {
+          ok: false,
+          method: null
+        };
+
+      if (retryResult.ok && retryResult.method !== "choice") {
+        shouldRetryChoiceFollowup = false;
+      }
+    }
   }
 
   const reason = "원본 결과를 아직 읽지 못했습니다. 다시 시도해주세요.";
@@ -139,9 +154,13 @@ async function reportOriginalResultWhenReady(payload: OriginalSubmitAllowedPaylo
 }
 
 async function handleOriginalSubmitAllowed(payload: OriginalSubmitAllowedPayload) {
-  const submitted = originalSubmissionLock?.runWithOriginalSubmitBypass(() => submitOriginalAnswer(payload.hostRawAnswer, document)) ?? false;
+  const submitResult =
+    originalSubmissionLock?.runWithOriginalSubmitBypass(() => submitOriginalAnswerDetailed(payload.hostRawAnswer, document)) ?? {
+      ok: false,
+      method: null
+    };
 
-  if (!submitted) {
+  if (!submitResult.ok) {
     const reason = "원본 사이트에 답을 자동 제출하지 못했습니다.";
     sendOriginalFailure({
       roomCode: payload.roomCode,
@@ -152,7 +171,7 @@ async function handleOriginalSubmitAllowed(payload: OriginalSubmitAllowedPayload
     return;
   }
 
-  await reportOriginalResultWhenReady(payload);
+  await reportOriginalResultWhenReady(payload, submitResult.method === "choice");
 }
 
 if (!contentWindow.__gatchiMachugiContentScriptInstalled) {

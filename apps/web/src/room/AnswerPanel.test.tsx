@@ -81,4 +81,34 @@ describe("AnswerPanel", () => {
     expect(onSubmitAnswer).toHaveBeenCalledWith("가능");
     expect(screen.getByText("제출한 답: 가능")).toBeInTheDocument();
   });
+
+  it("keeps the selected choice UI when the original page briefly exposes a text input", () => {
+    const onSubmitAnswer = vi.fn();
+    const choiceQuiz = {
+      ...quiz,
+      questionType: "multiple-choice" as const,
+      choices: [
+        { id: "1", label: "Choice A" },
+        { id: "2", label: "Choice B" }
+      ]
+    };
+    const { rerender } = render(
+      <AnswerPanel disabled={false} quiz={choiceQuiz} resetKey="q1" onSubmitAnswer={onSubmitAnswer} />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Choice A" }));
+    rerender(
+      <AnswerPanel
+        disabled={false}
+        submitted
+        quiz={{ ...quiz, questionType: "free-text", choices: [] }}
+        resetKey="q1"
+        onSubmitAnswer={onSubmitAnswer}
+      />
+    );
+
+    expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Choice A" })).toHaveClass("selected");
+    expect(screen.getByText("제출한 답: Choice A")).toBeInTheDocument();
+  });
 });

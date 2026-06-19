@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { runMachugiCommand, submitOriginalAnswer } from "./commands";
+import { runMachugiCommand, submitOriginalAnswer, submitOriginalAnswerDetailed } from "./commands";
 
 describe("runMachugiCommand", () => {
   it("starts a machugi quiz by clicking the first solve-count button", () => {
@@ -131,5 +131,37 @@ describe("submitOriginalAnswer", () => {
 
     expect(submitOriginalAnswer("불 가능", document)).toBe(true);
     expect(click).toHaveBeenCalledTimes(1);
+  });
+
+  it("fills a follow-up text input when a matching choice opens one", () => {
+    document.body.innerHTML = `
+      <div class="QuizDetailPlaying_root__abc">
+        <button type="button">Choice A</button>
+      </div>
+    `;
+    const choice = document.querySelector("button") as HTMLButtonElement;
+    let submitClicks = 0;
+    choice.addEventListener("click", () => {
+      const root = document.querySelector(".QuizDetailPlaying_root__abc");
+      const input = document.createElement("input");
+      input.type = "text";
+      const submit = document.createElement("button");
+      submit.className = "NextButton_root__MHkxh";
+      submit.type = "button";
+      submit.textContent = "Submit";
+      submit.addEventListener("click", () => {
+        submitClicks += 1;
+      });
+      root?.append(input, submit);
+    });
+
+    const result = submitOriginalAnswerDetailed("Choice A", document);
+    const input = document.querySelector("input") as HTMLInputElement;
+    const submit = document.querySelector(".NextButton_root__MHkxh") as HTMLButtonElement;
+
+    expect(result).toEqual({ ok: true, method: "choice-then-text" });
+    expect(input.value).toBe("Choice A");
+    expect(submit).toBeTruthy();
+    expect(submitClicks).toBe(1);
   });
 });

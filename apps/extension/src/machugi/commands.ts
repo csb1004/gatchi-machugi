@@ -14,6 +14,8 @@ const textAnswerSelector = "textarea, input:not([type]), input[type='text'], inp
 const submitTextPattern = /제출|확인|정답|입력|submit|answer/i;
 const nextButtonPattern = /^(›|>|→|다음)$/i;
 type TextAnswerControl = HTMLInputElement | HTMLTextAreaElement | HTMLElement;
+export type OriginalAnswerSubmitMethod = "choice" | "choice-then-text" | "text";
+export type OriginalAnswerSubmitResult = { ok: true; method: OriginalAnswerSubmitMethod } | { ok: false; method: null };
 
 function clickElement(element: HTMLElement): true {
   element.click();
@@ -123,20 +125,11 @@ function clickChoiceByAnswer(root: ParentNode, answer: string): boolean {
   return choice instanceof HTMLElement ? clickElement(choice) : false;
 }
 
-export function submitOriginalAnswer(rawAnswer: string, root: Document = document): boolean {
-  const quizRoot = activeQuizRoot(root);
-
-  if (clickChoiceByAnswer(quizRoot, rawAnswer)) {
-    return true;
-  }
-
-  const input = findTextAnswerInput(quizRoot);
-  if (!input) return false;
-
+function submitTextAnswer(rawAnswer: string, root: ParentNode, input: TextAnswerControl): boolean {
   input.focus();
   setTextControlValue(input, rawAnswer);
 
-  const submitButton = findSubmitButton(quizRoot, input);
+  const submitButton = findSubmitButton(root, input);
   if (submitButton) {
     return clickElement(submitButton);
   }
@@ -144,6 +137,27 @@ export function submitOriginalAnswer(rawAnswer: string, root: Document = documen
   const form = input.closest("form");
   form?.requestSubmit();
   return Boolean(form);
+}
+
+export function submitOriginalAnswerDetailed(rawAnswer: string, root: Document = document): OriginalAnswerSubmitResult {
+  const quizRoot = activeQuizRoot(root);
+
+  if (clickChoiceByAnswer(quizRoot, rawAnswer)) {
+    const followupInput = findTextAnswerInput(quizRoot);
+    if (!followupInput) return { ok: true, method: "choice" };
+    return submitTextAnswer(rawAnswer, quizRoot, followupInput)
+      ? { ok: true, method: "choice-then-text" }
+      : { ok: false, method: null };
+  }
+
+  const input = findTextAnswerInput(quizRoot);
+  if (!input) return { ok: false, method: null };
+
+  return submitTextAnswer(rawAnswer, quizRoot, input) ? { ok: true, method: "text" } : { ok: false, method: null };
+}
+
+export function submitOriginalAnswer(rawAnswer: string, root: Document = document): boolean {
+  return submitOriginalAnswerDetailed(rawAnswer, root).ok;
 }
 
 export function runMachugiCommand(command: QuizCommandName, root: Document = document): boolean {
