@@ -20,7 +20,9 @@ describe("App", () => {
 
     expect(screen.getByRole("heading", { name: "가치 마추기" })).toBeInTheDocument();
     expect(screen.getByRole("complementary", { name: "방 만들기" })).toBeInTheDocument();
+    expect(screen.getByLabelText("방장 닉네임")).toBeInTheDocument();
     expect(screen.getByLabelText("방 이름")).toBeInTheDocument();
+    expect(screen.getByText("방 코드는 방을 만들면 자동으로 생성됩니다.")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "방 만들기" })).toBeDisabled();
     expect(screen.getByText("퀴즈를 진행할 브라우저 탭에서 machugi.io를 엽니다.")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "GitHub Releases에서 확장 프로그램 받기" })).toHaveAttribute(

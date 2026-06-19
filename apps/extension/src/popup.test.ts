@@ -5,9 +5,11 @@ import { describe, expect, it } from "vitest";
 const popupHtml = readFileSync(join(process.cwd(), "src", "popup.html"), "utf8");
 
 describe("popup markup", () => {
-  it("does not ask hosts to type the host code manually", () => {
+  it("does not ask hosts to type pairing codes manually", () => {
     expect(popupHtml).not.toContain('id="host-code"');
     expect(popupHtml).not.toContain('name="hostCode"');
-    expect(popupHtml).toContain("방장 화면에서 자동 저장된 연결 정보");
+    expect(popupHtml).not.toContain('name="roomCode"');
+    expect(popupHtml).not.toContain('name="serverUrl"');
+    expect(popupHtml).toContain("방 코드와 방장 코드는 방장 화면에서 자동 저장됩니다.");
   });
 });

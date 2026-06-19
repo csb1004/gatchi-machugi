@@ -37,20 +37,33 @@
         gap: 12px;
       }
 
-      label {
+      .pairing-summary {
         display: grid;
-        gap: 6px;
-        font-size: 12px;
-        color: #d7ddf0;
-      }
-
-      input {
+        gap: 8px;
         border: 1px solid #3a435d;
         border-radius: 8px;
-        padding: 10px 12px;
+        padding: 10px;
         background: #171d2d;
-        color: inherit;
+      }
+
+      .summary-row {
+        display: grid;
+        gap: 4px;
+      }
+
+      .summary-row span {
+        color: #b8c1d9;
+        font-size: 11px;
+        font-weight: 700;
+      }
+
+      .summary-row code,
+      .summary-row strong {
+        min-width: 0;
+        overflow-wrap: anywhere;
+        color: #ffffff;
         font: inherit;
+        font-weight: 700;
       }
 
       button {
@@ -93,15 +106,17 @@
       <h1>방장 연결</h1>
       <p>방장 화면에서 자동 저장된 연결 정보로 마추기아이오 탭을 연결합니다.</p>
       <form id="pair-form">
-        <label for="server-url">
-          서버 URL
-          <input id="server-url" name="serverUrl" type="url" placeholder="https://your-app.up.railway.app" required />
-        </label>
-        <label for="room-code">
-          방 코드
-          <input id="room-code" name="roomCode" type="text" maxlength="12" autocapitalize="characters" required />
-        </label>
-        <p class="hint">방장 코드는 방장 화면에서 확장 프로그램으로 자동 전달됩니다.</p>
+        <section class="pairing-summary" aria-label="저장된 연결 정보">
+          <div class="summary-row">
+            <span>서버 URL</span>
+            <code id="server-url">-</code>
+          </div>
+          <div class="summary-row">
+            <span>방 코드</span>
+            <strong id="room-code">-</strong>
+          </div>
+        </section>
+        <p class="hint">방 코드와 방장 코드는 방장 화면에서 자동 저장됩니다.</p>
         <button id="pair-button" type="submit">확장 프로그램 연결</button>
       </form>
       <output id="status" aria-live="polite"></output>

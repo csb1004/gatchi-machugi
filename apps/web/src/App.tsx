@@ -234,9 +234,14 @@ export function App() {
 
             <div className="create-form">
               <label>
+                방장 닉네임
+                <input value={nickname} onChange={(event) => setNickname(event.target.value)} maxLength={40} />
+              </label>
+              <label>
                 방 이름
                 <input value={roomName} onChange={(event) => setRoomName(event.target.value)} maxLength={100} />
               </label>
+              <p className="form-note">방 코드는 방을 만들면 자동으로 생성됩니다.</p>
               <label className="toggle-row">
                 <input type="checkbox" checked={isPublicRoom} onChange={(event) => setIsPublicRoom(event.target.checked)} />
                 공개방
@@ -280,11 +285,11 @@ export function App() {
                 GitHub Releases에서 확장 프로그램 받기
               </a>
               <ol>
-                <li>방을 만들면 확장 프로그램 연결 정보가 자동 저장됩니다.</li>
+                <li>방을 만들면 서버 URL, 방 코드, 방장 코드가 확장 프로그램에 자동 저장됩니다.</li>
                 <li>퀴즈를 진행할 브라우저 탭에서 machugi.io를 엽니다.</li>
                 <li>GitHub Releases에서 가치 마추기 확장 프로그램 zip을 내려받아 압축을 풉니다.</li>
                 <li>chrome://extensions에서 개발자 모드를 켜고 압축해제된 확장 프로그램을 로드합니다.</li>
-                <li>확장 popup에서 저장된 서버 URL과 방 코드를 확인한 뒤 연결합니다.</li>
+                <li>확장 popup에서 저장된 서버 URL과 방 코드를 확인하고 연결합니다.</li>
                 <li>확장이 연결된 뒤 참가자는 방 코드로 입장합니다.</li>
               </ol>
             </div>

@@ -3,8 +3,8 @@ import { PAIRING_REQUEST_TYPE, PAIRING_STORAGE_KEY } from "./socketClient.js";
 
 type PairFormElements = {
   form: HTMLFormElement;
-  serverUrl: HTMLInputElement;
-  roomCode: HTMLInputElement;
+  serverUrl: HTMLElement;
+  roomCode: HTMLElement;
   submitButton: HTMLButtonElement;
   status: HTMLOutputElement;
 };
@@ -43,8 +43,8 @@ async function sendPairRequest(payload: PairingSettings): Promise<PairHostRespon
 function getElements(): PairFormElements {
   return {
     form: document.querySelector("#pair-form") as HTMLFormElement,
-    serverUrl: document.querySelector("#server-url") as HTMLInputElement,
-    roomCode: document.querySelector("#room-code") as HTMLInputElement,
+    serverUrl: document.querySelector("#server-url") as HTMLElement,
+    roomCode: document.querySelector("#room-code") as HTMLElement,
     submitButton: document.querySelector("#pair-button") as HTMLButtonElement,
     status: document.querySelector("#status") as HTMLOutputElement
   };
@@ -74,22 +74,21 @@ function fillForm(elements: PairFormElements, stored: StoredPairingSettings | nu
     return;
   }
 
-  elements.serverUrl.value = stored.serverUrl;
-  elements.roomCode.value = stored.roomCode;
-  elements.serverUrl.readOnly = true;
-  elements.roomCode.readOnly = true;
+  elements.serverUrl.textContent = stored.serverUrl;
+  elements.roomCode.textContent = stored.roomCode;
+  elements.submitButton.disabled = false;
   setStatus(elements, `${stored.roomCode} 방 연결 정보를 불러왔습니다.`, "success");
 }
 
 async function handleSubmit(elements: PairFormElements, stored: StoredPairingSettings | null) {
-  if (!stored?.hostCode) {
+  if (!stored?.serverUrl || !stored.roomCode || !stored.hostCode) {
     setStatus(elements, "가치 마추기 방장 화면에서 연결 정보를 먼저 저장해주세요.", "error");
     return;
   }
 
   const payload: PairingSettings = {
-    serverUrl: elements.serverUrl.value,
-    roomCode: elements.roomCode.value,
+    serverUrl: stored.serverUrl,
+    roomCode: stored.roomCode,
     hostCode: stored.hostCode
   };
 
@@ -103,7 +102,7 @@ async function handleSubmit(elements: PairFormElements, stored: StoredPairingSet
       return;
     }
 
-    elements.roomCode.value = response.data.roomCode;
+    elements.roomCode.textContent = response.data.roomCode;
     setStatus(elements, `${response.data.roomCode} 방에 연결되었습니다.`, "success");
   } catch (error) {
     setStatus(elements, localizeError(error instanceof Error ? error.message : "연결에 실패했습니다."), "error");
@@ -116,10 +115,6 @@ async function init() {
   const elements = getElements();
   const stored = await readStoredPairing();
   fillForm(elements, stored);
-
-  elements.roomCode.addEventListener("input", () => {
-    elements.roomCode.value = elements.roomCode.value.toUpperCase();
-  });
 
   elements.form.addEventListener("submit", (event) => {
     event.preventDefault();
