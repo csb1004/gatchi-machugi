@@ -19,7 +19,7 @@ export function App() {
   const roomSocket = useRoomSocket();
   const canJoin = useMemo(() => nickname.trim().length > 0 && roomCode.trim().length > 0, [nickname, roomCode]);
   const serverUrl = window.location.origin;
-  const extensionReleaseUrl = import.meta.env.VITE_GITHUB_EXTENSION_RELEASE_URL ?? "https://github.com/OWNER/REPO/releases";
+  const extensionReleaseUrl = import.meta.env.VITE_GITHUB_EXTENSION_RELEASE_URL ?? "https://github.com/csb1004/gatchi-machugi/releases";
 
   useEffect(() => {
     void loadPublicRooms();

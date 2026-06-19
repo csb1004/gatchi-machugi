@@ -25,7 +25,7 @@ describe("App", () => {
     expect(screen.getByText("퀴즈를 진행할 브라우저 탭에서 machugi.io를 엽니다.")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "GitHub Releases에서 확장 프로그램 받기" })).toHaveAttribute(
       "href",
-      "https://github.com/OWNER/REPO/releases"
+      "https://github.com/csb1004/gatchi-machugi/releases"
     );
     expect(screen.getByLabelText("닉네임")).toBeInTheDocument();
     expect(screen.getByLabelText("방 코드")).toBeInTheDocument();
