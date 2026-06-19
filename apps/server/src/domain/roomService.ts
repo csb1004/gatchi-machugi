@@ -1,6 +1,11 @@
 import {
+  allRequiredSubmitted,
+  createQuestionKey,
+  requiredParticipantIds,
   scoreSubmissions,
+  submittedParticipantIds,
   type ChatMessagePayload,
+  type OriginalSubmitAllowedPayload,
   type Participant,
   type QuizState,
   type RevealedSubmission,
@@ -169,8 +174,52 @@ export class RoomService {
       skipped: false
     });
     room.state.submissions = this.publicSubmissionStatuses(room);
+    this.refreshFairPlaySubmissionState(room);
 
     return room.state;
+  }
+
+  requestOriginalSubmission(input: { roomCode: string; questionKey: string }): OriginalSubmitAllowedPayload {
+    const room = this.requireRoom(input.roomCode);
+
+    if (!room.state.fairPlay.questionKey || input.questionKey !== room.state.fairPlay.questionKey) {
+      throw new Error("Question changed before original submission");
+    }
+
+    if (room.state.fairPlay.originalSubmitStatus !== "ready") {
+      throw new Error("Original submission is still locked");
+    }
+
+    const hostSubmission = room.rawSubmissions.get(room.hostParticipantId);
+    if (!hostSubmission || hostSubmission.skipped) {
+      throw new Error("Host answer is required before original submission");
+    }
+
+    room.state.fairPlay.originalSubmitStatus = "submitting";
+
+    return {
+      roomCode: input.roomCode,
+      questionKey: input.questionKey,
+      hostRawAnswer: hostSubmission.rawAnswer
+    };
+  }
+
+  applyOriginalResult(input: { roomCode: string; questionKey: string; quiz: QuizState }): RoomState {
+    const room = this.requireRoom(input.roomCode);
+
+    if (!room.state.fairPlay.questionKey || input.questionKey !== room.state.fairPlay.questionKey) {
+      throw new Error("Question changed before original result");
+    }
+
+    if (room.state.fairPlay.originalSubmitStatus !== "submitting" && room.state.fairPlay.originalSubmitStatus !== "ready") {
+      throw new Error("Original submission has not been authorized");
+    }
+
+    room.state.quiz = input.quiz;
+    room.state.fairPlay.originalSubmitStatus = "result-opened";
+    room.state.fairPlay.lockReason = null;
+
+    return this.revealAnswers({ roomCode: input.roomCode, skippedParticipantIds: [] });
   }
 
   revealAnswers(input: { roomCode: string; skippedParticipantIds: string[] }): RoomState {
@@ -355,6 +404,28 @@ export class RoomService {
     room.rawSubmissions.clear();
     room.state.submissions = [];
     room.state.revealedSubmissions = [];
+    const questionKey = createQuestionKey(room.state.quiz);
+    const requiredIds = requiredParticipantIds(room.state.participants);
+    room.state.fairPlay = {
+      questionKey,
+      requiredParticipantIds: requiredIds,
+      submittedParticipantIds: [],
+      allRequiredSubmitted: false,
+      originalSubmitStatus: questionKey ? "locked" : "idle",
+      lockReason: questionKey ? "모든 참가자가 제출해야 원본 정답 제출이 가능합니다." : null
+    };
+  }
+
+  private refreshFairPlaySubmissionState(room: StoredRoom): void {
+    const submittedIds = submittedParticipantIds(room.state.submissions);
+    const complete = allRequiredSubmitted(room.state.fairPlay.requiredParticipantIds, room.state.submissions);
+    room.state.fairPlay.submittedParticipantIds = submittedIds;
+    room.state.fairPlay.allRequiredSubmitted = complete;
+
+    if (room.state.fairPlay.originalSubmitStatus === "locked" && complete) {
+      room.state.fairPlay.originalSubmitStatus = "ready";
+      room.state.fairPlay.lockReason = null;
+    }
   }
 
   private publicSubmissionStatuses(room: StoredRoom) {
@@ -445,6 +516,14 @@ export class RoomService {
       },
       submissions: [],
       revealedSubmissions: [],
+      fairPlay: {
+        questionKey: null,
+        requiredParticipantIds: [],
+        submittedParticipantIds: [],
+        allRequiredSubmitted: false,
+        originalSubmitStatus: "idle",
+        lockReason: null
+      },
       hostExtensionConnected: false,
       chatMessageCount: 0
     };
