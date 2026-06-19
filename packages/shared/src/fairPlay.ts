@@ -1,6 +1,19 @@
 import type { Participant, QuizState, SubmissionStatus } from "./models.js";
 
 export function createQuestionKey(quiz: QuizState): string | null {
+  const hasValue = (value: string | null) => value !== null && value !== "";
+  const hasActiveQuestionEvidence =
+    quiz.questionIndex !== null ||
+    hasValue(quiz.questionText) ||
+    hasValue(quiz.imageUrl) ||
+    hasValue(quiz.audioUrl) ||
+    hasValue(quiz.videoUrl) ||
+    quiz.choices.length > 0;
+
+  if (!hasActiveQuestionEvidence) {
+    return null;
+  }
+
   const visibleIdentity = [
     quiz.quizTitle,
     quiz.questionIndex,
@@ -10,12 +23,8 @@ export function createQuestionKey(quiz: QuizState): string | null {
     quiz.imageUrl,
     quiz.audioUrl,
     quiz.videoUrl,
-    quiz.choices.map((choice) => `${choice.id}:${choice.label}`).join("|")
+    quiz.choices.map((choice) => [choice.id, choice.label])
   ];
-
-  if (visibleIdentity.every((value) => value === null || value === "")) {
-    return null;
-  }
 
   return JSON.stringify(visibleIdentity);
 }
