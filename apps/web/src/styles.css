@@ -376,6 +376,14 @@ h2 {
   font-size: 1.65rem;
 }
 
+.room-title-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
 .host-badge {
   flex: 0 0 auto;
   border-radius: 999px;
@@ -443,6 +451,31 @@ h2 {
   margin-bottom: 0;
   color: #235797;
   font-weight: 800;
+}
+
+.answer-candidates {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.answer-candidates strong,
+.answer-candidates span {
+  border-radius: 999px;
+  padding: 6px 10px;
+  font-size: 0.84rem;
+  font-weight: 800;
+}
+
+.answer-candidates strong {
+  background: #172033;
+  color: #ffffff;
+}
+
+.answer-candidates span {
+  background: #edf1f7;
+  color: #26364d;
 }
 
 .answer-panel {
@@ -650,20 +683,33 @@ h2 {
   font-size: 0.92rem;
 }
 
-.host-frame-shell {
-  min-height: 640px;
+.host-source-panel {
+  display: grid;
+  gap: 8px;
   border: 1px solid #dbe4f0;
   border-radius: 8px;
-  overflow: hidden;
+  padding: 14px;
   background: #f8fafc;
 }
 
-.host-frame-shell iframe {
-  width: 100%;
-  height: min(72vh, 820px);
-  min-height: 640px;
-  border: 0;
-  background: #ffffff;
+.host-source-panel strong {
+  font-size: 1rem;
+}
+
+.host-source-panel span:not(.host-badge) {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: #526173;
+  font-size: 0.9rem;
+}
+
+.host-source-panel .setup-link {
+  width: fit-content;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #235797;
+  font-weight: 800;
 }
 
 .host-workspace-footer span {

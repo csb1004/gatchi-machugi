@@ -26,6 +26,14 @@ describe("QuizPanel", () => {
     render(<QuizPanel quiz={baseQuiz} />);
 
     expect(document.querySelector("img")).toHaveAttribute("src", "https://images.machugi.io/question-image");
-    expect(screen.queryByText("아직 방장 확장 프로그램에서 문제를 보내지 않았습니다.")).not.toBeInTheDocument();
+    expect(screen.queryByText("아직 원본 창에서 문제를 읽어오지 않았습니다.")).not.toBeInTheDocument();
+  });
+
+  it("shows answer candidates from the original result screen", () => {
+    render(<QuizPanel quiz={{ ...baseQuiz, resultMessage: "오답!", answerCandidates: ["텅비드"] }} />);
+
+    expect(screen.getByText("오답!")).toBeInTheDocument();
+    expect(screen.getByText("정답")).toBeInTheDocument();
+    expect(screen.getByText("텅비드")).toBeInTheDocument();
   });
 });

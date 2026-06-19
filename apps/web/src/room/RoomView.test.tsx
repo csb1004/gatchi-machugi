@@ -53,7 +53,8 @@ describe("RoomView", () => {
   it("shows submission status without raw answer before reveal", () => {
     render(<RoomView state={baseState} currentParticipantId="host" onSubmitAnswer={() => undefined} />);
 
-    expect(screen.getByText("Mina 제출됨")).toBeInTheDocument();
+    expect(screen.getByText("원본 창 연결됨")).toBeInTheDocument();
+    expect(screen.getByText("Mina 제출함")).toBeInTheDocument();
     expect(screen.queryByText("rawAnswer")).not.toBeInTheDocument();
     expect(screen.queryByText("blue archive")).not.toBeInTheDocument();
   });

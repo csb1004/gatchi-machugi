@@ -53,7 +53,7 @@ function state(overrides: Partial<RoomState> = {}): RoomState {
 }
 
 describe("HostWorkspace", () => {
-  it("renders machugi iframe and lock status for host", () => {
+  it("renders source-window status without embedding machugi", () => {
     render(
       <HostWorkspace
         state={state()}
@@ -63,7 +63,9 @@ describe("HostWorkspace", () => {
       />
     );
 
-    expect(screen.getByTitle("마추기아이오 원본 화면")).toHaveAttribute("src", "https://machugi.io/");
+    expect(screen.queryByTitle(/마추기아이오 원본 화면/)).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /마추기아이오 열기/ })).toHaveAttribute("href", "https://machugi.io/");
+    expect(screen.getAllByText("원본 창 연결됨").length).toBeGreaterThan(0);
     expect(screen.getByText("1 / 2명 제출")).toBeInTheDocument();
     expect(screen.getByText("원본 제출 잠금")).toBeInTheDocument();
   });
@@ -79,7 +81,7 @@ describe("HostWorkspace", () => {
     );
 
     expect(screen.getByText("확장 프로그램 연결 필요")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "확장 프로그램 다운로드" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: /확장 프로그램 다운로드/ })).toHaveAttribute(
       "href",
       "https://github.com/csb1004/gatchi-machugi/releases"
     );

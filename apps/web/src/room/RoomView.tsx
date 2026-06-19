@@ -14,6 +14,7 @@ export function RoomView(props: {
 }) {
   const currentParticipant = props.state.participants.find((participant) => participant.id === props.currentParticipantId);
   const currentSubmission = props.state.submissions.find((submission) => submission.participantId === props.currentParticipantId);
+  const sourceConnected = props.state.sourceWindow.status === "connected";
 
   return (
     <section className="room-layout" aria-label={`방 ${props.state.roomCode}`}>
@@ -23,9 +24,14 @@ export function RoomView(props: {
             <p className="eyebrow">{props.state.roomCode}</p>
             <h1>{props.state.settings.title}</h1>
           </div>
-          <span className={props.state.hostExtensionConnected ? "host-badge online" : "host-badge"}>
-            방장 확장 {props.state.hostExtensionConnected ? "연결됨" : "연결 안 됨"}
-          </span>
+          <div className="room-title-status">
+            <span className={props.state.hostExtensionConnected ? "host-badge online" : "host-badge"}>
+              방장 확장 {props.state.hostExtensionConnected ? "연결됨" : "연결 대기"}
+            </span>
+            <span className={sourceConnected ? "host-badge online" : "host-badge"}>
+              원본 창 {sourceConnected ? "연결됨" : "대기"}
+            </span>
+          </div>
         </header>
         <QuizPanel quiz={props.state.quiz} />
         <AnswerPanel
