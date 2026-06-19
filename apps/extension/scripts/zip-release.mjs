@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { mkdir, rm } from "node:fs/promises";
+import { access, mkdir, rm } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
@@ -19,5 +19,7 @@ await execFileAsync("powershell", [
   "-NoLogo",
   "-NoProfile",
   "-Command",
-  `Compress-Archive -Path '${resolve(distDirectory, "*")}' -DestinationPath '${zipPath}' -Force`
+  `$ErrorActionPreference = 'Stop'; Compress-Archive -Path (Join-Path '${distDirectory}' '*') -DestinationPath '${zipPath}' -Force`
 ]);
+
+await access(zipPath);
