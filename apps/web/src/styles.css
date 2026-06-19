@@ -490,6 +490,7 @@ h2 {
   grid-template-columns: 1fr auto;
   gap: 12px;
   align-items: end;
+  margin: 0;
 }
 
 .answer-panel label {

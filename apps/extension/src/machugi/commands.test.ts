@@ -63,6 +63,38 @@ describe("submitOriginalAnswer", () => {
     expect(click).toHaveBeenCalledTimes(1);
   });
 
+  it("fills a search-typed quiz answer input without treating it as the site search box", () => {
+    document.body.innerHTML = `
+      <div class="QuizDetailPlaying_root__abc">
+        <input type="search" placeholder="정답을 입력하세요" />
+        <button class="NextButton_root__MHkxh" type="button">›</button>
+      </div>
+    `;
+    const input = document.querySelector("input") as HTMLInputElement;
+    const button = document.querySelector("button") as HTMLButtonElement;
+    const click = vi.spyOn(button, "click");
+
+    expect(submitOriginalAnswer("미샤", document)).toBe(true);
+    expect(input.value).toBe("미샤");
+    expect(click).toHaveBeenCalledTimes(1);
+  });
+
+  it("fills a contenteditable quiz answer input", () => {
+    document.body.innerHTML = `
+      <div class="QuizDetailPlaying_root__abc">
+        <div contenteditable="true" role="textbox"></div>
+        <button class="NextButton_root__MHkxh" type="button">›</button>
+      </div>
+    `;
+    const input = document.querySelector("[contenteditable='true']") as HTMLElement;
+    const button = document.querySelector("button") as HTMLButtonElement;
+    const click = vi.spyOn(button, "click");
+
+    expect(submitOriginalAnswer("레그워크 샤르 미하일", document)).toBe(true);
+    expect(input.textContent).toBe("레그워크 샤르 미하일");
+    expect(click).toHaveBeenCalledTimes(1);
+  });
+
   it("clicks a matching O/X or choice answer when there is no text input", () => {
     document.body.innerHTML = `
       <div class="QuizDetailPlaying_root__abc">

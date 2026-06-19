@@ -143,6 +143,60 @@ describe("RoomView", () => {
     expect(onAddAlias).toHaveBeenCalledWith("미하일");
   });
 
+  it("lets the current participant revise a submitted answer while others are still pending", () => {
+    const onSubmitAnswer = vi.fn();
+    render(
+      <RoomView
+        state={{
+          ...baseState,
+          submissions: [{ participantId: "host", submitted: true, skipped: false }],
+          fairPlay: {
+            ...baseState.fairPlay,
+            submittedParticipantIds: ["host"],
+            allRequiredSubmitted: false,
+            originalSubmitStatus: "locked"
+          }
+        }}
+        currentParticipantId="host"
+        onSubmitAnswer={onSubmitAnswer}
+        onSourceAction={() => undefined}
+      />
+    );
+
+    const input = screen.getByRole("textbox", { name: "답변" });
+    fireEvent.change(input, { target: { value: "수정 답" } });
+    fireEvent.click(screen.getByRole("button", { name: "수정" }));
+
+    expect(input).not.toBeDisabled();
+    expect(onSubmitAnswer).toHaveBeenCalledWith("수정 답");
+  });
+
+  it("locks submitted answers once every required participant has submitted", () => {
+    render(
+      <RoomView
+        state={{
+          ...baseState,
+          submissions: [
+            { participantId: "host", submitted: true, skipped: false },
+            { participantId: "p1", submitted: true, skipped: false }
+          ],
+          fairPlay: {
+            ...baseState.fairPlay,
+            submittedParticipantIds: ["host", "p1"],
+            allRequiredSubmitted: true,
+            originalSubmitStatus: "ready"
+          }
+        }}
+        currentParticipantId="host"
+        onSubmitAnswer={() => undefined}
+        onSourceAction={() => undefined}
+      />
+    );
+
+    expect(screen.getByRole("textbox", { name: "답변" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "제출 완료" })).toBeDisabled();
+  });
+
   it("does not show the room code as the empty chat placeholder", () => {
     render(
       <RoomView

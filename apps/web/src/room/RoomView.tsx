@@ -83,7 +83,11 @@ export function RoomView(props: {
   const currentSubmission = props.state.submissions.find((submission) => submission.participantId === props.currentParticipantId);
   const sourceConnected = props.state.sourceWindow.status === "connected";
   const isHost = currentParticipant?.role === "host";
-  const answerLocked = props.state.phase !== "playing" || props.state.fairPlay.originalSubmitStatus === "submitting";
+  const answerLocked =
+    props.state.phase !== "playing" ||
+    props.state.fairPlay.allRequiredSubmitted ||
+    props.state.fairPlay.originalSubmitStatus === "ready" ||
+    props.state.fairPlay.originalSubmitStatus === "submitting";
 
   return (
     <section className="room-layout" aria-label={`방 ${props.state.roomCode}`}>
@@ -109,6 +113,7 @@ export function RoomView(props: {
           disabled={!currentParticipant?.connected || answerLocked}
           submitted={Boolean(currentSubmission)}
           quiz={props.state.quiz}
+          resetKey={props.state.fairPlay.questionKey}
           onSubmitAnswer={props.onSubmitAnswer}
         />
       </div>

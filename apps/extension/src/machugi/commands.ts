@@ -10,9 +10,10 @@ const commandSelectors: Partial<Record<QuizCommandName, string[]>> = {
 };
 
 const searchInputSelector = "input[aria-label='검색창'], input[type='search'], input[placeholder*='검색']";
-const textAnswerSelector = "textarea, input:not([type]), input[type='text'], input[type='search']";
+const textAnswerSelector = "textarea, input:not([type]), input[type='text'], input[type='search'], [contenteditable='true']";
 const submitTextPattern = /제출|확인|정답|입력|submit|answer/i;
 const nextButtonPattern = /^(›|>|→|다음)$/i;
+type TextAnswerControl = HTMLInputElement | HTMLTextAreaElement | HTMLElement;
 
 function clickElement(element: HTMLElement): true {
   element.click();
@@ -60,7 +61,19 @@ function runNavigationCommand(command: QuizCommandName, root: Document): boolean
   return null;
 }
 
-function setTextControlValue(input: HTMLInputElement | HTMLTextAreaElement, value: string): void {
+function isSiteSearchInput(input: HTMLInputElement): boolean {
+  const searchLabel = `${input.getAttribute("aria-label") ?? ""} ${input.getAttribute("placeholder") ?? ""} ${input.name ?? ""}`.trim();
+  return /검색|search/i.test(searchLabel);
+}
+
+function setTextControlValue(input: TextAnswerControl, value: string): void {
+  if (!(input instanceof HTMLInputElement) && !(input instanceof HTMLTextAreaElement)) {
+    input.textContent = value;
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+    return;
+  }
+
   const prototype = Object.getPrototypeOf(input) as HTMLInputElement | HTMLTextAreaElement;
   const descriptor = Object.getOwnPropertyDescriptor(prototype, "value");
 
@@ -74,16 +87,22 @@ function setTextControlValue(input: HTMLInputElement | HTMLTextAreaElement, valu
   input.dispatchEvent(new Event("change", { bubbles: true }));
 }
 
-function findTextAnswerInput(root: ParentNode): HTMLInputElement | HTMLTextAreaElement | null {
-  const inputs = Array.from(root.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>(textAnswerSelector));
-  return inputs.find((input) => {
-    if (input instanceof HTMLTextAreaElement) return true;
-    const type = input.type.toLowerCase();
-    return type !== "search" && type !== "hidden" && type !== "button" && type !== "submit";
-  }) ?? null;
+function findTextAnswerInput(root: ParentNode): TextAnswerControl | null {
+  const inputs = Array.from(root.querySelectorAll<TextAnswerControl>(textAnswerSelector));
+  return (
+    inputs.find((input) => {
+      if (input instanceof HTMLTextAreaElement) return !input.disabled && !input.readOnly;
+      if (!(input instanceof HTMLInputElement)) return input.getAttribute("contenteditable") === "true";
+
+      if (input.disabled || input.readOnly) return false;
+      const type = input.type.toLowerCase();
+      if (type === "search") return !isSiteSearchInput(input);
+      return type !== "hidden" && type !== "button" && type !== "submit";
+    }) ?? null
+  );
 }
 
-function findSubmitButton(root: ParentNode, input: HTMLInputElement | HTMLTextAreaElement | null): HTMLButtonElement | null {
+function findSubmitButton(root: ParentNode, input: TextAnswerControl | null): HTMLButtonElement | null {
   const form = input?.closest("form");
   const candidates = Array.from((form ?? root).querySelectorAll<HTMLButtonElement>("button"));
   return candidates.find((button) => {

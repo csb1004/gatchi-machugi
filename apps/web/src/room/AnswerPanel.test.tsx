@@ -1,0 +1,45 @@
+import "@testing-library/jest-dom/vitest";
+import { fireEvent, render, screen } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
+import { AnswerPanel } from "./AnswerPanel";
+
+const quiz = {
+  quizTitle: "Pokemon",
+  questionIndex: 1,
+  totalQuestions: 10,
+  questionType: "free-text" as const,
+  questionText: "Who is this?",
+  imageUrl: null,
+  audioUrl: null,
+  videoUrl: null,
+  choices: [],
+  timerSecondsRemaining: null,
+  canGoNext: false,
+  canGoPrevious: false,
+  resultMessage: null,
+  answerCandidates: []
+};
+
+describe("AnswerPanel", () => {
+  it("submits the answer with the Enter key", () => {
+    const onSubmitAnswer = vi.fn();
+    render(<AnswerPanel disabled={false} quiz={quiz} onSubmitAnswer={onSubmitAnswer} />);
+
+    fireEvent.change(screen.getByRole("textbox", { name: "답변" }), { target: { value: "미샤" } });
+    fireEvent.submit(screen.getByRole("form", { name: "답변" }));
+
+    expect(onSubmitAnswer).toHaveBeenCalledWith("미샤");
+  });
+
+  it("keeps a submitted answer editable until the round locks", () => {
+    const onSubmitAnswer = vi.fn();
+    render(<AnswerPanel disabled={false} submitted quiz={quiz} onSubmitAnswer={onSubmitAnswer} />);
+
+    const input = screen.getByRole("textbox", { name: "답변" });
+    fireEvent.change(input, { target: { value: "미샤" } });
+    fireEvent.click(screen.getByRole("button", { name: "수정" }));
+
+    expect(input).not.toBeDisabled();
+    expect(onSubmitAnswer).toHaveBeenCalledWith("미샤");
+  });
+});
