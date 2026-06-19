@@ -2,12 +2,17 @@ import { DoorOpen, RefreshCw, Users } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import type { PublicRoomSummary } from "@gatchi/shared";
 import { fetchPublicRooms } from "./api";
+import { HostControls } from "./host/HostControls";
+import { ExtensionSetup } from "./host/ExtensionSetup";
+import { RoomView } from "./room/RoomView";
+import { useRoomSocket } from "./socket/useRoomSocket";
 
 export function App() {
   const [nickname, setNickname] = useState("");
   const [roomCode, setRoomCode] = useState("");
   const [publicRooms, setPublicRooms] = useState<PublicRoomSummary[]>([]);
   const [roomsStatus, setRoomsStatus] = useState<"idle" | "loading" | "failed">("idle");
+  const roomSocket = useRoomSocket();
   const canJoin = useMemo(() => nickname.trim().length > 0 && roomCode.trim().length > 0, [nickname, roomCode]);
 
   useEffect(() => {
@@ -24,6 +29,30 @@ export function App() {
     }
   }
 
+  if (roomSocket.state && roomSocket.participantId) {
+    const currentParticipant = roomSocket.state.participants.find((participant) => participant.id === roomSocket.participantId);
+
+    return (
+      <main className="app-shell room-app-shell">
+        <div className="room-stack">
+          {currentParticipant?.role === "host" ? (
+            <>
+              <HostControls extensionConnected={roomSocket.state.hostExtensionConnected} onCommand={roomSocket.sendHostCommand} />
+              <ExtensionSetup releaseUrl="https://github.com/OWNER/REPO/releases" />
+            </>
+          ) : null}
+          <RoomView
+            state={roomSocket.state}
+            currentParticipantId={roomSocket.participantId}
+            chatMessages={roomSocket.chatMessages}
+            onSubmitAnswer={roomSocket.submitAnswer}
+            onSendChat={roomSocket.sendChat}
+          />
+        </div>
+      </main>
+    );
+  }
+
   return (
     <main className="app-shell">
       <section className="lobby-panel" aria-labelledby="lobby-title">
@@ -36,6 +65,8 @@ export function App() {
             <RefreshCw size={18} />
           </button>
         </header>
+
+        {roomSocket.error ? <p className="status-text">{roomSocket.error}</p> : null}
 
         <form className="join-form">
           <label>
@@ -51,7 +82,7 @@ export function App() {
               autoCapitalize="characters"
             />
           </label>
-          <button className="primary-button" type="button" disabled={!canJoin}>
+          <button className="primary-button" type="button" disabled={!canJoin} onClick={() => roomSocket.joinRoom({ roomCode, nickname })}>
             <DoorOpen size={18} />
             Join room
           </button>
