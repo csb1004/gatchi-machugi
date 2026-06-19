@@ -351,6 +351,43 @@ describe("RoomService", () => {
     expect(state.fairPlay.originalSubmitStatus).toBe("locked");
   });
 
+  it("removes answer data from playable mirror states before the original result is opened", async () => {
+    const service = new RoomService();
+    const created = await service.createRoom({
+      title: "Mirror room",
+      hostNickname: "Host",
+      visibility: "public"
+    });
+
+    const state = service.updateSourceMirror({
+      roomCode: created.roomCode,
+      sourceMirror: {
+        kind: "playing",
+        url: "https://machugi.io/quiz/1",
+        title: "Pokemon",
+        lastSeenAt: "2026-06-19T00:00:00.000Z",
+        quiz: {
+          ...created.state.quiz,
+          quizTitle: "Pokemon",
+          questionIndex: 1,
+          totalQuestions: 10,
+          questionType: "free-text",
+          questionText: "Who is this?",
+          resultMessage: "오답!",
+          answerCandidates: ["Pikachu"]
+        }
+      }
+    });
+
+    expect(state.sourceMirror.kind).toBe("playing");
+    if (state.sourceMirror.kind !== "playing") throw new Error("expected playing mirror");
+    expect(state.sourceMirror.quiz.resultMessage).toBeNull();
+    expect(state.sourceMirror.quiz.answerCandidates).toEqual([]);
+    expect(state.quiz.resultMessage).toBeNull();
+    expect(state.quiz.answerCandidates).toEqual([]);
+    expect(JSON.stringify(state)).not.toContain("Pikachu");
+  });
+
   it("resets the round when only multiple-choice choices change", async () => {
     const service = new RoomService();
     const { roomCode, hostParticipantId } = await service.createRoom({ title: "Room", visibility: "private", hostNickname: "Host" });
