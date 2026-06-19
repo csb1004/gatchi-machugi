@@ -16,6 +16,10 @@ export function MirrorResultsView(props: {
     }
   }, [props.results.length]);
 
+  useEffect(() => {
+    requestedAtCount.current = null;
+  }, [props.query]);
+
   function handleResultScroll(event: UIEvent<HTMLDivElement>) {
     if (!props.isHost) return;
 

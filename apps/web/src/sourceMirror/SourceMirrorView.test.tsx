@@ -77,6 +77,27 @@ describe("SourceMirrorView", () => {
     expect(onAction).toHaveBeenCalledWith({ name: "loadMoreResults" });
   });
 
+  it("allows another bottom-scroll load request after the search query changes", () => {
+    const onAction = vi.fn();
+    const { rerender } = render(<SourceMirrorView state={results} isHost onAction={onAction} />);
+
+    const scrollToBottom = () => {
+      const list = screen.getByRole("region", { name: "검색 결과 목록" });
+      Object.defineProperty(list, "clientHeight", { configurable: true, value: 300 });
+      Object.defineProperty(list, "scrollHeight", { configurable: true, value: 800 });
+      Object.defineProperty(list, "scrollTop", { configurable: true, value: 500 });
+      fireEvent.scroll(list);
+    };
+
+    scrollToBottom();
+    rerender(<SourceMirrorView state={{ ...results, query: "anime" }} isHost onAction={onAction} />);
+    scrollToBottom();
+
+    expect(onAction).toHaveBeenCalledTimes(2);
+    expect(onAction).toHaveBeenNthCalledWith(1, { name: "loadMoreResults" });
+    expect(onAction).toHaveBeenNthCalledWith(2, { name: "loadMoreResults" });
+  });
+
   it("shows host navigation controls during a mirrored quiz", () => {
     const onAction = vi.fn();
     render(
