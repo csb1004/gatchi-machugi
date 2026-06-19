@@ -125,12 +125,10 @@ function markParticipantDisconnected(roomService: RoomService, socket: SocketSes
   if (!socket.roomCode || !socket.participantId) return null;
 
   try {
-    const state = roomService.getState(socket.roomCode);
-    const participant = state.participants.find((entry) => entry.id === socket.participantId);
-    if (!participant) return null;
-
-    participant.connected = false;
-    return state;
+    return roomService.disconnectParticipant({
+      roomCode: socket.roomCode,
+      participantId: socket.participantId
+    });
   } catch {
     return null;
   }

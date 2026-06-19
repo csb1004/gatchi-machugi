@@ -2,10 +2,12 @@ import { createServer, type Server as HttpServer } from "node:http";
 import type { AddressInfo } from "node:net";
 import type {
   ClientToServerEvents,
+  ExtensionStatePayload,
   HostPairPayload,
   JoinRoomPayload,
   PublicRoomSummary,
-  ServerToClientEvents
+  ServerToClientEvents,
+  SubmitAnswerPayload
 } from "@gatchi/shared";
 import { afterEach, describe, expect, it } from "vitest";
 import { io as createClient, type Socket } from "socket.io-client";
@@ -90,6 +92,24 @@ async function connectClient(baseUrl: string): Promise<Socket<ServerToClientEven
   });
 
   return socket;
+}
+
+function emitExtensionState(
+  socket: Socket<ServerToClientEvents, ClientToServerEvents>,
+  payload: ExtensionStatePayload
+): Promise<{ ok: true; data: void } | { ok: false; error: string }> {
+  return new Promise((resolve) => {
+    socket.emit("extension:state", payload, resolve);
+  });
+}
+
+function emitAnswerSubmit(
+  socket: Socket<ServerToClientEvents, ClientToServerEvents>,
+  payload: SubmitAnswerPayload
+): Promise<{ ok: true; data: void } | { ok: false; error: string }> {
+  return new Promise((resolve) => {
+    socket.emit("answer:submit", payload, resolve);
+  });
 }
 
 describe("socket server", () => {
@@ -191,6 +211,72 @@ describe("socket server", () => {
         connected: true
       })
     );
+  });
+
+  it("refreshes fair play when a participant disconnects during a locked question", async () => {
+    const roomService = new RoomService();
+    const app = createApp({ roomService });
+    const server = createServer(app);
+    createSocketServer(server, { roomService });
+    servers.push(server);
+
+    const port = await listen(server);
+    const baseUrl = `http://127.0.0.1:${port}`;
+
+    const created = await createRoom(baseUrl, { roomName: "Private room", public: false });
+    const participantSocket = await connectClient(baseUrl);
+    sockets.push(participantSocket);
+
+    const joinAck = await emitJoin(participantSocket, {
+      roomCode: created.data.roomCode,
+      nickname: "Mina"
+    });
+    expect(joinAck.ok).toBe(true);
+    if (!joinAck.ok) {
+      throw new Error(joinAck.error);
+    }
+
+    const hostSocket = await connectClient(baseUrl);
+    sockets.push(hostSocket);
+
+    const hostAck = await emitHostPair(hostSocket, {
+      roomCode: created.data.roomCode,
+      hostCode: created.data.hostCode
+    });
+    expect(hostAck.ok).toBe(true);
+    if (!hostAck.ok) {
+      throw new Error(hostAck.error);
+    }
+
+    const extensionAck = await emitExtensionState(hostSocket, {
+      roomCode: created.data.roomCode,
+      quiz: {
+        ...roomService.getState(created.data.roomCode).quiz,
+        questionIndex: 1,
+        questionText: "Name the game",
+        questionType: "free-text"
+      }
+    });
+    expect(extensionAck.ok).toBe(true);
+
+    const submitAck = await emitAnswerSubmit(hostSocket, {
+      roomCode: created.data.roomCode,
+      participantId: created.data.hostParticipantId,
+      rawAnswer: "blue archive"
+    });
+    expect(submitAck.ok).toBe(true);
+
+    const disconnectedStatePromise = waitForEvent(hostSocket, "room:state");
+    participantSocket.disconnect();
+
+    const disconnectedState = await disconnectedStatePromise;
+    expect(disconnectedState.participants.find((participant) => participant.id === joinAck.data.participantId)?.connected).toBe(false);
+    expect(disconnectedState.fairPlay).toMatchObject({
+      requiredParticipantIds: [created.data.hostParticipantId],
+      submittedParticipantIds: [created.data.hostParticipantId],
+      allRequiredSubmitted: true,
+      originalSubmitStatus: "ready"
+    });
   });
 
   it("pairs hosts with a valid participant code, rejects invalid codes, and expires the room on extension disconnect", async () => {

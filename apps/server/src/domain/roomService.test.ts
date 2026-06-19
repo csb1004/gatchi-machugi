@@ -294,13 +294,110 @@ describe("RoomService", () => {
     });
     service.submitAnswer({ roomCode, participantId: hostParticipantId, rawAnswer: "blue archive" });
 
-    const refreshed = service.kickParticipant({ roomCode, participantId: player.participant.id });
+    const refreshed = service.disconnectParticipant({ roomCode, participantId: player.participant.id });
 
     expect(refreshed.fairPlay).toMatchObject({
       requiredParticipantIds: [hostParticipantId],
       submittedParticipantIds: [hostParticipantId],
       allRequiredSubmitted: true,
       originalSubmitStatus: "ready"
+    });
+  });
+
+  it("locks fair play again when a disconnected required participant rejoins before original submission", async () => {
+    const service = new RoomService();
+    const { roomCode, hostParticipantId } = await service.createRoom({ title: "Room", visibility: "private", hostNickname: "Host" });
+    const player = service.joinParticipant({ roomCode, nickname: "Mina" });
+
+    service.updateQuizState({
+      roomCode,
+      quiz: {
+        ...service.getState(roomCode).quiz,
+        questionIndex: 1,
+        questionText: "Name the game",
+        questionType: "free-text"
+      }
+    });
+    service.submitAnswer({ roomCode, participantId: hostParticipantId, rawAnswer: "blue archive" });
+    service.disconnectParticipant({ roomCode, participantId: player.participant.id });
+    expect(service.getState(roomCode).fairPlay.originalSubmitStatus).toBe("ready");
+
+    const rejoined = service.joinParticipant({
+      roomCode,
+      nickname: "Mina",
+      participantId: player.participant.id
+    });
+
+    expect(rejoined.state.fairPlay).toMatchObject({
+      requiredParticipantIds: [hostParticipantId, player.participant.id],
+      submittedParticipantIds: [hostParticipantId],
+      allRequiredSubmitted: false,
+      originalSubmitStatus: "locked"
+    });
+
+    const ready = service.submitAnswer({ roomCode, participantId: player.participant.id, rawAnswer: "wrong" });
+    expect(ready.fairPlay).toMatchObject({
+      submittedParticipantIds: [hostParticipantId, player.participant.id],
+      allRequiredSubmitted: true,
+      originalSubmitStatus: "ready"
+    });
+  });
+
+  it("locks fair play when a new participant joins an active question before original submission", async () => {
+    const service = new RoomService();
+    const { roomCode, hostParticipantId } = await service.createRoom({ title: "Room", visibility: "private", hostNickname: "Host" });
+
+    service.updateQuizState({
+      roomCode,
+      quiz: {
+        ...service.getState(roomCode).quiz,
+        questionIndex: 1,
+        questionText: "Name the game",
+        questionType: "free-text"
+      }
+    });
+    service.submitAnswer({ roomCode, participantId: hostParticipantId, rawAnswer: "blue archive" });
+    expect(service.getState(roomCode).fairPlay.originalSubmitStatus).toBe("ready");
+
+    const player = service.joinParticipant({ roomCode, nickname: "Mina" });
+
+    expect(player.state.fairPlay).toMatchObject({
+      requiredParticipantIds: [hostParticipantId, player.participant.id],
+      submittedParticipantIds: [hostParticipantId],
+      allRequiredSubmitted: false,
+      originalSubmitStatus: "locked"
+    });
+  });
+
+  it("locks fair play when the host extension reconnects the host during an active question", async () => {
+    const service = new RoomService();
+    const { roomCode, hostParticipantId, hostCode } = await service.createRoom({
+      title: "Room",
+      visibility: "private",
+      hostNickname: "Host"
+    });
+    const player = service.joinParticipant({ roomCode, nickname: "Mina" });
+
+    service.updateQuizState({
+      roomCode,
+      quiz: {
+        ...service.getState(roomCode).quiz,
+        questionIndex: 1,
+        questionText: "Name the game",
+        questionType: "free-text"
+      }
+    });
+    service.submitAnswer({ roomCode, participantId: player.participant.id, rawAnswer: "wrong" });
+    service.disconnectParticipant({ roomCode, participantId: hostParticipantId });
+    expect(service.getState(roomCode).fairPlay.originalSubmitStatus).toBe("ready");
+
+    const reconnected = service.joinHostExtension({ roomCode, hostCode });
+
+    expect(reconnected.state.fairPlay).toMatchObject({
+      requiredParticipantIds: [hostParticipantId, player.participant.id],
+      submittedParticipantIds: [player.participant.id],
+      allRequiredSubmitted: false,
+      originalSubmitStatus: "locked"
     });
   });
 

@@ -17,6 +17,7 @@ import { customAlphabet, nanoid } from "nanoid";
 
 const createRoomCode = customAlphabet("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ", 6);
 const createParticipantCodeValue = customAlphabet("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ", 4);
+const originalSubmissionLockReason = "모든 참가자가 제출해야 원본 정답 제출이 가능합니다.";
 
 interface StoredRoom {
   hostParticipantId: string;
@@ -87,6 +88,7 @@ export class RoomService {
         this.requireMatchingParticipantCode(room, existing.id, input.participantCode);
       }
       existing.connected = true;
+      this.refreshFairPlayRequiredParticipants(room);
       return { participant: existing, participantCode, state: room.state };
     }
 
@@ -101,6 +103,7 @@ export class RoomService {
     const participantCode = this.uniqueParticipantCode(room.participantCodes);
     room.participantCodes.set(participant.id, participantCode);
     room.state.participants.push(participant);
+    this.refreshFairPlayRequiredParticipants(room);
     return { participant, participantCode, state: room.state };
   }
 
@@ -110,6 +113,7 @@ export class RoomService {
 
     if (existing) {
       existing.connected = true;
+      this.refreshFairPlayRequiredParticipants(room);
       return { participant: existing, participantCode: this.requireParticipantCode(room, existing.id), state: room.state };
     }
 
@@ -125,6 +129,7 @@ export class RoomService {
     room.hostParticipantId = participant.id;
     room.participantCodes.set(participant.id, participantCode);
     room.state.participants.push(participant);
+    this.refreshFairPlayRequiredParticipants(room);
     return { participant, participantCode, state: room.state };
   }
 
@@ -140,6 +145,7 @@ export class RoomService {
     const participant = this.requireParticipant(room, room.hostParticipantId);
     participant.connected = true;
     room.state.hostExtensionConnected = true;
+    this.refreshFairPlayRequiredParticipants(room);
     return { participant, state: room.state };
   }
 
@@ -322,6 +328,14 @@ export class RoomService {
     return room.state;
   }
 
+  disconnectParticipant(input: { roomCode: string; participantId: string }): RoomState {
+    const room = this.requireRoom(input.roomCode);
+    const participant = this.requireParticipant(room, input.participantId);
+    participant.connected = false;
+    this.refreshFairPlayRequiredParticipants(room);
+    return room.state;
+  }
+
   expireRoom(roomCode: string): RoomState {
     const room = this.requireRoom(roomCode);
     room.state.phase = "expired";
@@ -413,7 +427,7 @@ export class RoomService {
       submittedParticipantIds: [],
       allRequiredSubmitted: false,
       originalSubmitStatus: questionKey ? "locked" : "idle",
-      lockReason: questionKey ? "모든 참가자가 제출해야 원본 정답 제출이 가능합니다." : null
+      lockReason: questionKey ? originalSubmissionLockReason : null
     };
   }
 
@@ -423,9 +437,9 @@ export class RoomService {
     room.state.fairPlay.submittedParticipantIds = submittedIds;
     room.state.fairPlay.allRequiredSubmitted = complete;
 
-    if (room.state.fairPlay.originalSubmitStatus === "locked" && complete) {
-      room.state.fairPlay.originalSubmitStatus = "ready";
-      room.state.fairPlay.lockReason = null;
+    if (room.state.fairPlay.originalSubmitStatus === "locked" || room.state.fairPlay.originalSubmitStatus === "ready") {
+      room.state.fairPlay.originalSubmitStatus = complete ? "ready" : "locked";
+      room.state.fairPlay.lockReason = complete ? null : originalSubmissionLockReason;
     }
   }
 
