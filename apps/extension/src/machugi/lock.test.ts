@@ -84,7 +84,12 @@ describe("createOriginalSubmissionLock", () => {
   });
 
   it("blocks original submit clicks while the room is locked", () => {
-    document.body.innerHTML = `<button class="NextButton_root">제출</button>`;
+    document.body.innerHTML = `
+      <div class="QuizDetailPlaying_root__abc">
+        <input type="text">
+        <button class="NextButton_root">제출</button>
+      </div>
+    `;
     const button = document.querySelector("button") as HTMLButtonElement;
     const click = vi.fn();
     const locked = vi.fn();
@@ -107,7 +112,12 @@ describe("createOriginalSubmissionLock", () => {
   });
 
   it("requests server authorization instead of letting a ready submit pass through", () => {
-    document.body.innerHTML = `<button class="NextButton_root">제출</button>`;
+    document.body.innerHTML = `
+      <div class="QuizDetailPlaying_root__abc">
+        <input type="text">
+        <button class="NextButton_root">제출</button>
+      </div>
+    `;
     const button = document.querySelector("button") as HTMLButtonElement;
     const request = vi.fn();
 
@@ -124,8 +134,42 @@ describe("createOriginalSubmissionLock", () => {
     });
   });
 
+  it("does not block a result-screen next button that has no answer input", () => {
+    document.body.innerHTML = `
+      <div class="QuizDetailPlaying_root__abc">
+        <article>정답!</article>
+        <strong>레그워크 샤르 미하일</strong>
+        <button class="NextButton_root" type="button">›</button>
+      </div>
+    `;
+    const button = document.querySelector("button") as HTMLButtonElement;
+    const click = vi.fn();
+    const request = vi.fn();
+    const locked = vi.fn();
+    button.addEventListener("click", click);
+
+    controller = createOriginalSubmissionLock(document, {
+      onRequestOriginalSubmit: request,
+      onLockedAttempt: locked
+    });
+    controller.updateRoomState(roomState({ originalSubmitStatus: "locked" }));
+
+    const event = new MouseEvent("click", { bubbles: true, cancelable: true });
+    button.dispatchEvent(event);
+
+    expect(event.defaultPrevented).toBe(false);
+    expect(click).toHaveBeenCalledTimes(1);
+    expect(request).not.toHaveBeenCalled();
+    expect(locked).not.toHaveBeenCalled();
+  });
+
   it("allows a retry after a failed original submission returns from submitting to ready", () => {
-    document.body.innerHTML = `<button class="NextButton_root">제출</button>`;
+    document.body.innerHTML = `
+      <div class="QuizDetailPlaying_root__abc">
+        <input type="text">
+        <button class="NextButton_root">제출</button>
+      </div>
+    `;
     const button = document.querySelector("button") as HTMLButtonElement;
     const request = vi.fn();
 
@@ -141,7 +185,12 @@ describe("createOriginalSubmissionLock", () => {
   });
 
   it("allows programmatic original submission while bypassed", () => {
-    document.body.innerHTML = `<button class="NextButton_root">제출</button>`;
+    document.body.innerHTML = `
+      <div class="QuizDetailPlaying_root__abc">
+        <input type="text">
+        <button class="NextButton_root">제출</button>
+      </div>
+    `;
     const button = document.querySelector("button") as HTMLButtonElement;
     const click = vi.fn();
     button.addEventListener("click", click);

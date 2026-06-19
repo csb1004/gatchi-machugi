@@ -198,9 +198,11 @@ describe("SourceMirrorView", () => {
     );
 
     fireEvent.click(screen.getByRole("button", { name: "홈 화면" }));
+    fireEvent.click(screen.getByRole("button", { name: "건너뛰기" }));
     fireEvent.click(screen.getByRole("button", { name: "다음 문제" }));
 
     expect(onAction).toHaveBeenCalledWith({ name: "focusHome" });
+    expect(onAction).toHaveBeenCalledWith({ name: "skip" });
     expect(onAction).toHaveBeenCalledWith({ name: "next" });
   });
 

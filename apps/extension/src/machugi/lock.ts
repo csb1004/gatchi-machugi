@@ -27,6 +27,14 @@ function hasAnswerInput(root: ParentNode): boolean {
   });
 }
 
+function hasAnswerInputNearButton(button: HTMLButtonElement): boolean {
+  const form = button.closest("form");
+  if (form && hasAnswerInput(form)) return true;
+
+  const quizRoot = button.closest("[class*='QuizDetailPlaying_root']");
+  return quizRoot ? hasAnswerInput(quizRoot) : false;
+}
+
 function isOriginalSubmitButton(button: HTMLButtonElement): boolean {
   const form = button.closest("form");
   if (form && hasAnswerInput(form)) return true;
@@ -34,7 +42,7 @@ function isOriginalSubmitButton(button: HTMLButtonElement): boolean {
   const label = `${button.textContent ?? ""} ${button.getAttribute("aria-label") ?? ""}`;
   const className = button.className;
 
-  return button.type === "submit" || submitTextPattern.test(label) || className.includes("NextButton_root");
+  return button.type === "submit" || submitTextPattern.test(label) || (className.includes("NextButton_root") && hasAnswerInputNearButton(button));
 }
 
 function isOriginalSubmitEvent(event: Event): boolean {

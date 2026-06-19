@@ -109,6 +109,14 @@ export function useRoomSocket() {
     });
   }
 
+  function addAlias(alias: string) {
+    if (!state) return;
+
+    socket.emit("answer:add-alias", { roomCode: state.roomCode, alias }, (ack) => {
+      if (!ack.ok) setError(localizeSocketError(ack.error));
+    });
+  }
+
   function sendChat(text: string) {
     if (!state || !participantId) return;
 
@@ -148,6 +156,7 @@ export function useRoomSocket() {
     error,
     joinRoom,
     submitAnswer,
+    addAlias,
     sendChat,
     sendHostCommand,
     sendSourceAction

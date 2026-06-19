@@ -74,4 +74,22 @@ describe("runSourceMirrorAction", () => {
     expect(scrollTo).toHaveBeenCalled();
     expect(scrollRoot.scrollTop).toBe(1600);
   });
+
+  it("runs host skip navigation through the original-submit lock bypass", () => {
+    let bypassed = false;
+    document.body.innerHTML = `<button class="NextButton_root" type="button">›</button>`;
+    const button = document.querySelector("button") as HTMLButtonElement;
+    const click = vi.spyOn(button, "click");
+
+    expect(
+      runSourceMirrorAction({ name: "skip" }, document, {
+        runWithOriginalSubmitBypass(action) {
+          bypassed = true;
+          return action();
+        }
+      })
+    ).toEqual({ ok: true });
+    expect(bypassed).toBe(true);
+    expect(click).toHaveBeenCalledTimes(1);
+  });
 });

@@ -2,6 +2,9 @@ import type { SourceMirrorAction } from "@gatchi/shared";
 import { runMachugiCommand } from "./commands";
 
 type ActionResult = { ok: true } | { ok: false; reason: string };
+type SourceMirrorActionOptions = {
+  runWithOriginalSubmitBypass?: <T>(action: () => T) => T;
+};
 
 const searchInputSelector = [
   "input[type='search']",
@@ -134,7 +137,13 @@ function runLoadMoreResults(root: Document): ActionResult {
   return { ok: true };
 }
 
-export function runSourceMirrorAction(action: SourceMirrorAction, root: Document = document): ActionResult {
+function runNavigationSourceCommand(command: "next" | "skip", root: Document, options?: SourceMirrorActionOptions): ActionResult {
+  const runCommand = () => runMachugiCommand(command, root);
+  const ok = options?.runWithOriginalSubmitBypass ? options.runWithOriginalSubmitBypass(runCommand) : runCommand();
+  return ok ? { ok: true } : { ok: false, reason: command === "next" ? "다음 버튼을 찾을 수 없습니다." : "건너뛰기 버튼을 찾을 수 없습니다." };
+}
+
+export function runSourceMirrorAction(action: SourceMirrorAction, root: Document = document, options?: SourceMirrorActionOptions): ActionResult {
   if (action.name === "focusHome") {
     return navigateCurrentTab(root, "https://machugi.io/");
   }
@@ -157,11 +166,11 @@ export function runSourceMirrorAction(action: SourceMirrorAction, root: Document
       ? { ok: true }
       : { ok: false, reason: "시작 버튼을 찾을 수 없습니다." };
   }
-  if (action.name === "next") return runMachugiCommand("next", root) ? { ok: true } : { ok: false, reason: "다음 버튼을 찾을 수 없습니다." };
+  if (action.name === "next") return runNavigationSourceCommand("next", root, options);
   if (action.name === "previous") {
     return runMachugiCommand("previous", root) ? { ok: true } : { ok: false, reason: "이전 화면으로 이동할 수 없습니다." };
   }
-  if (action.name === "skip") return runMachugiCommand("skip", root) ? { ok: true } : { ok: false, reason: "건너뛰기 버튼을 찾을 수 없습니다." };
+  if (action.name === "skip") return runNavigationSourceCommand("skip", root, options);
   if (action.name === "refreshSource") {
     root.defaultView?.location.reload();
     return { ok: true };

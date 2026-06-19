@@ -1,6 +1,7 @@
 import {
   allRequiredSubmitted,
   createQuestionKey,
+  normalizeAnswer,
   requiredParticipantIds,
   scoreSubmissions,
   submittedParticipantIds,
@@ -25,6 +26,11 @@ const originalSubmissionLockReason = "모든 참가자가 제출해야 원본 �
 
 function hasOriginalResult(quiz: QuizState): boolean {
   return quiz.resultMessage !== null || quiz.answerCandidates.length > 0;
+}
+
+function isCorrectOriginalResult(quiz: QuizState): boolean {
+  const message = normalizeAnswer(quiz.resultMessage ?? "");
+  return message.includes("정답") || message.includes("correct");
 }
 
 interface StoredRoom {
@@ -291,6 +297,7 @@ export class RoomService {
     room.state.quiz = input.quiz;
     room.state.fairPlay.originalSubmitStatus = "result-opened";
     room.state.fairPlay.lockReason = null;
+    this.addHostSubmissionAliasIfAccepted(room, input.quiz);
 
     return this.revealAnswers({ roomCode: input.roomCode, skippedParticipantIds: [] });
   }
@@ -588,6 +595,20 @@ export class RoomService {
       rawAnswer: submission.rawAnswer,
       correct: correctParticipantIds.has(submission.participantId)
     }));
+  }
+
+  private addHostSubmissionAliasIfAccepted(room: StoredRoom, quiz: QuizState): void {
+    if (!isCorrectOriginalResult(quiz)) return;
+
+    const hostSubmission = room.rawSubmissions.get(room.hostParticipantId);
+    const alias = hostSubmission?.rawAnswer.trim();
+    if (!alias || hostSubmission?.skipped) return;
+
+    const normalizedAlias = normalizeAnswer(alias);
+    const acceptedAnswers = new Set([...quiz.answerCandidates, ...room.aliases].map(normalizeAnswer).filter(Boolean));
+    if (acceptedAnswers.has(normalizedAlias)) return;
+
+    room.aliases.push(alias);
   }
 
   private correctParticipantIds(submissions: RevealedSubmission[]): Set<string> {

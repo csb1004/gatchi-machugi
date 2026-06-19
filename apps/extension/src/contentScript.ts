@@ -199,7 +199,11 @@ if (!contentWindow.__gatchiMachugiContentScriptInstalled) {
 
     if (messageType === CONTENT_SOURCE_ACTION_MESSAGE) {
       const payload = (message as unknown as { payload: SourceMirrorActionPayload }).payload;
-      const result = runSourceMirrorAction(payload.action, document);
+      const result = runSourceMirrorAction(payload.action, document, {
+        runWithOriginalSubmitBypass(action) {
+          return originalSubmissionLock?.runWithOriginalSubmitBypass(action) ?? action();
+        }
+      });
       if (!result.ok) {
         sendSourceActionFailure(payload, result.reason);
       }

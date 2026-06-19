@@ -590,6 +590,74 @@ describe("RoomService", () => {
     expect(revealed.revealedSubmissions.find((submission) => submission.participantId === player.participant.id)?.correct).toBe(false);
   });
 
+  it("accepts the host submitted answer as an alias when the original site marks it correct", async () => {
+    const service = new RoomService();
+    const { roomCode, hostParticipantId } = await service.createRoom({ title: "Room", visibility: "private", hostNickname: "Host" });
+    const player = service.joinParticipant({ roomCode, nickname: "Mina" });
+
+    service.updateQuizState({
+      roomCode,
+      quiz: {
+        ...service.getState(roomCode).quiz,
+        questionIndex: 1,
+        questionText: "Name the character",
+        questionType: "free-text"
+      }
+    });
+    service.submitAnswer({ roomCode, participantId: hostParticipantId, rawAnswer: "미샤" });
+    service.submitAnswer({ roomCode, participantId: player.participant.id, rawAnswer: "미샤" });
+    const questionKey = service.getState(roomCode).fairPlay.questionKey ?? "";
+    service.requestOriginalSubmission({ roomCode, questionKey });
+
+    const revealed = service.applyOriginalResult({
+      roomCode,
+      questionKey,
+      quiz: {
+        ...service.getState(roomCode).quiz,
+        resultMessage: "정답!",
+        answerCandidates: ["레그워크 샤르 미하일"],
+        canGoNext: true
+      }
+    });
+
+    expect(revealed.revealedSubmissions.find((submission) => submission.participantId === hostParticipantId)?.correct).toBe(true);
+    expect(revealed.revealedSubmissions.find((submission) => submission.participantId === player.participant.id)?.correct).toBe(true);
+  });
+
+  it("does not accept the host submitted answer as an alias when the original site marks it wrong", async () => {
+    const service = new RoomService();
+    const { roomCode, hostParticipantId } = await service.createRoom({ title: "Room", visibility: "private", hostNickname: "Host" });
+    const player = service.joinParticipant({ roomCode, nickname: "Mina" });
+
+    service.updateQuizState({
+      roomCode,
+      quiz: {
+        ...service.getState(roomCode).quiz,
+        questionIndex: 1,
+        questionText: "Name the character",
+        questionType: "free-text"
+      }
+    });
+    service.submitAnswer({ roomCode, participantId: hostParticipantId, rawAnswer: "미샤" });
+    service.submitAnswer({ roomCode, participantId: player.participant.id, rawAnswer: "미샤" });
+    const questionKey = service.getState(roomCode).fairPlay.questionKey ?? "";
+    service.requestOriginalSubmission({ roomCode, questionKey });
+
+    const revealed = service.applyOriginalResult({
+      roomCode,
+      questionKey,
+      quiz: {
+        ...service.getState(roomCode).quiz,
+        resultMessage: "오답!",
+        answerCandidates: ["레그워크 샤르 미하일"],
+        canGoNext: true
+      }
+    });
+
+    expect(revealed.revealedSubmissions.find((submission) => submission.participantId === hostParticipantId)?.correct).toBe(false);
+    expect(revealed.revealedSubmissions.find((submission) => submission.participantId === player.participant.id)?.correct).toBe(false);
+  });
+
   it("applies a source mirror result as the original result while original submission is pending", async () => {
     const service = new RoomService();
     const { roomCode, hostParticipantId } = await service.createRoom({ title: "Room", visibility: "private", hostNickname: "Host" });

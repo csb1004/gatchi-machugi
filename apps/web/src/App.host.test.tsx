@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const sendHostCommand = vi.hoisted(() => vi.fn());
 const sendSourceAction = vi.hoisted(() => vi.fn());
+const addAlias = vi.hoisted(() => vi.fn());
 const socketError = vi.hoisted(() => ({ value: null as string | null }));
 
 const hostState = vi.hoisted<() => RoomState>(() => () => ({
@@ -69,6 +70,7 @@ vi.mock("./socket/useRoomSocket", () => ({
     error: socketError.value,
     joinRoom: vi.fn(),
     submitAnswer: vi.fn(),
+    addAlias,
     sendChat: vi.fn(),
     sendHostCommand,
     sendSourceAction
@@ -81,6 +83,7 @@ describe("App host room", () => {
   beforeEach(() => {
     sendHostCommand.mockClear();
     sendSourceAction.mockClear();
+    addAlias.mockClear();
     socketError.value = null;
   });
 

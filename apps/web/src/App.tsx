@@ -127,6 +127,7 @@ export function App() {
             currentParticipantId={roomSocket.participantId}
             chatMessages={roomSocket.chatMessages}
             onSubmitAnswer={roomSocket.submitAnswer}
+            onAddAlias={roomSocket.addAlias}
             onSendChat={roomSocket.sendChat}
             onSourceAction={roomSocket.sendSourceAction}
           />

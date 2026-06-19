@@ -1,4 +1,4 @@
-import { ArrowRight, Home } from "lucide-react";
+import { ArrowRight, Home, SkipForward } from "lucide-react";
 import type { SourceMirrorAction, SourceMirrorState } from "@gatchi/shared";
 import { QuizPanel } from "../room/QuizPanel";
 import { MirrorResultsView } from "./MirrorResultsView";
@@ -31,6 +31,10 @@ export function SourceMirrorView(props: {
             <button type="button" onClick={() => props.onAction({ name: "focusHome" })}>
               <Home size={17} />
               홈 화면
+            </button>
+            <button type="button" onClick={() => props.onAction({ name: "skip" })}>
+              <SkipForward size={17} />
+              건너뛰기
             </button>
             <button type="button" disabled={!props.state.quiz.canGoNext} onClick={() => props.onAction({ name: "next" })}>
               <ArrowRight size={17} />

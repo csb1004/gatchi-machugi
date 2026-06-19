@@ -1,3 +1,5 @@
+import { Plus } from "lucide-react";
+import { useState } from "react";
 import type { ChatMessagePayload, RoomState, SourceMirrorAction } from "@gatchi/shared";
 import { AnswerPanel } from "./AnswerPanel";
 import { ChatPanel } from "./ChatPanel";
@@ -30,11 +32,50 @@ function PersonalResultPanel({
   );
 }
 
+function HostAliasPanel({
+  isHost,
+  state,
+  onAddAlias
+}: {
+  isHost: boolean;
+  state: RoomState;
+  onAddAlias: ((alias: string) => void) | undefined;
+}) {
+  const [alias, setAlias] = useState("");
+  if (!isHost || state.phase !== "revealed") return null;
+
+  const canAdd = alias.trim().length > 0;
+
+  return (
+    <section className="answer-panel alias-panel" aria-label="정답 추가 패널">
+      <label>
+        추가 정답
+        <input value={alias} onChange={(event) => setAlias(event.target.value)} />
+      </label>
+      <button
+        className="primary-button"
+        type="button"
+        disabled={!canAdd}
+        onClick={() => {
+          const nextAlias = alias.trim();
+          if (!nextAlias) return;
+          onAddAlias?.(nextAlias);
+          setAlias("");
+        }}
+      >
+        <Plus size={18} />
+        정답 추가
+      </button>
+    </section>
+  );
+}
+
 export function RoomView(props: {
   state: RoomState;
   currentParticipantId: string;
   chatMessages?: ChatMessagePayload[];
   onSubmitAnswer: (rawAnswer: string) => void;
+  onAddAlias?: (alias: string) => void;
   onSendChat?: (text: string) => void;
   onSourceAction: (action: SourceMirrorAction) => void;
 }) {
@@ -42,6 +83,7 @@ export function RoomView(props: {
   const currentSubmission = props.state.submissions.find((submission) => submission.participantId === props.currentParticipantId);
   const sourceConnected = props.state.sourceWindow.status === "connected";
   const isHost = currentParticipant?.role === "host";
+  const answerLocked = props.state.phase !== "playing" || props.state.fairPlay.originalSubmitStatus === "submitting";
 
   return (
     <section className="room-layout" aria-label={`방 ${props.state.roomCode}`}>
@@ -62,8 +104,9 @@ export function RoomView(props: {
         </header>
         <SourceMirrorView state={props.state.sourceMirror} isHost={Boolean(isHost)} onAction={props.onSourceAction} />
         <PersonalResultPanel state={props.state} participantId={props.currentParticipantId} />
+        <HostAliasPanel isHost={Boolean(isHost)} state={props.state} onAddAlias={props.onAddAlias} />
         <AnswerPanel
-          disabled={!currentParticipant?.connected || props.state.phase === "revealed"}
+          disabled={!currentParticipant?.connected || answerLocked}
           submitted={Boolean(currentSubmission)}
           quiz={props.state.quiz}
           onSubmitAnswer={props.onSubmitAnswer}

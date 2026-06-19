@@ -1,7 +1,7 @@
 import "@testing-library/jest-dom/vitest";
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import type { RoomState } from "@gatchi/shared";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { RoomView } from "./RoomView";
 
 const baseState: RoomState = {
@@ -107,6 +107,40 @@ describe("RoomView", () => {
     expect(screen.getByText("오답")).toBeInTheDocument();
     expect(screen.getByText("내 답: 팅비드")).toBeInTheDocument();
     expect(screen.getByText("정답: 디안시")).toBeInTheDocument();
+  });
+
+  it("lets the host add an accepted answer after reveal", () => {
+    const onAddAlias = vi.fn();
+    render(
+      <RoomView
+        state={{
+          ...baseState,
+          phase: "revealed",
+          quiz: {
+            ...baseState.quiz,
+            resultMessage: "정답!",
+            answerCandidates: ["레그워크 샤르 미하일"]
+          },
+          submissions: [
+            { participantId: "host", submitted: true, skipped: false },
+            { participantId: "p1", submitted: true, skipped: false }
+          ],
+          revealedSubmissions: [
+            { participantId: "host", submitted: true, skipped: false, rawAnswer: "미샤", correct: true },
+            { participantId: "p1", submitted: true, skipped: false, rawAnswer: "미샤", correct: true }
+          ]
+        }}
+        currentParticipantId="host"
+        onSubmitAnswer={() => undefined}
+        onSourceAction={() => undefined}
+        onAddAlias={onAddAlias}
+      />
+    );
+
+    fireEvent.change(screen.getByLabelText("추가 정답"), { target: { value: "미하일" } });
+    fireEvent.click(screen.getByRole("button", { name: "정답 추가" }));
+
+    expect(onAddAlias).toHaveBeenCalledWith("미하일");
   });
 
   it("does not show the room code as the empty chat placeholder", () => {
