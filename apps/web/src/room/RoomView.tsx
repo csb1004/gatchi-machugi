@@ -1,9 +1,9 @@
-import type { ChatMessagePayload, RoomState } from "@gatchi/shared";
+import type { ChatMessagePayload, RoomState, SourceMirrorAction } from "@gatchi/shared";
 import { AnswerPanel } from "./AnswerPanel";
 import { ChatPanel } from "./ChatPanel";
-import { QuizPanel } from "./QuizPanel";
 import { Scoreboard } from "./Scoreboard";
 import { SubmissionPanel } from "./SubmissionPanel";
+import { SourceMirrorView } from "../sourceMirror/SourceMirrorView";
 
 export function RoomView(props: {
   state: RoomState;
@@ -11,10 +11,12 @@ export function RoomView(props: {
   chatMessages?: ChatMessagePayload[];
   onSubmitAnswer: (rawAnswer: string) => void;
   onSendChat?: (text: string) => void;
+  onSourceAction: (action: SourceMirrorAction) => void;
 }) {
   const currentParticipant = props.state.participants.find((participant) => participant.id === props.currentParticipantId);
   const currentSubmission = props.state.submissions.find((submission) => submission.participantId === props.currentParticipantId);
   const sourceConnected = props.state.sourceWindow.status === "connected";
+  const isHost = currentParticipant?.role === "host";
 
   return (
     <section className="room-layout" aria-label={`방 ${props.state.roomCode}`}>
@@ -33,7 +35,7 @@ export function RoomView(props: {
             </span>
           </div>
         </header>
-        <QuizPanel quiz={props.state.quiz} />
+        <SourceMirrorView state={props.state.sourceMirror} isHost={Boolean(isHost)} onAction={props.onSourceAction} />
         <AnswerPanel
           disabled={!currentParticipant?.connected || props.state.phase === "revealed"}
           submitted={Boolean(currentSubmission)}

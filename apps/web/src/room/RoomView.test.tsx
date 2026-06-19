@@ -73,7 +73,7 @@ const baseState: RoomState = {
 
 describe("RoomView", () => {
   it("shows submission status without raw answer before reveal", () => {
-    render(<RoomView state={baseState} currentParticipantId="host" onSubmitAnswer={() => undefined} />);
+    render(<RoomView state={baseState} currentParticipantId="host" onSubmitAnswer={() => undefined} onSourceAction={() => undefined} />);
 
     expect(screen.getByText("원본 창 연결됨")).toBeInTheDocument();
     expect(screen.getByText("Mina 제출함")).toBeInTheDocument();

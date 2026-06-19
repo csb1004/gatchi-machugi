@@ -7,7 +7,6 @@ import {
 } from "@gatchi/shared";
 import { createRoom, fetchPublicRooms, type CreatedRoom } from "./api";
 import { ExtensionSetup } from "./host/ExtensionSetup";
-import { HostControls } from "./host/HostControls";
 import { HostWorkspace } from "./host/HostWorkspace";
 import { RoomView } from "./room/RoomView";
 import { useRoomSocket } from "./socket/useRoomSocket";
@@ -133,7 +132,6 @@ export function App() {
                   if (createdRoom) sendPairingSettingsToExtension(createdRoom);
                 }}
               />
-              <HostControls extensionConnected={roomSocket.state.hostExtensionConnected} onCommand={roomSocket.sendHostCommand} />
               <ExtensionSetup releaseUrl={extensionReleaseUrl} />
             </>
           ) : null}
@@ -143,6 +141,7 @@ export function App() {
             chatMessages={roomSocket.chatMessages}
             onSubmitAnswer={roomSocket.submitAnswer}
             onSendChat={roomSocket.sendChat}
+            onSourceAction={roomSocket.sendSourceAction}
           />
         </div>
       </main>
