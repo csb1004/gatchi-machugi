@@ -1,13 +1,19 @@
 import type {
   AppPairingSettingsPayload,
+  OriginalResultPayload,
   OriginalSubmitAllowedPayload,
+  OriginalSubmitRequestPayload,
   QuizCommandPayload,
-  QuizState
+  QuizState,
+  RoomState
 } from "@gatchi/shared";
 import { APP_PAIRING_SETTINGS_MESSAGE } from "@gatchi/shared";
 import {
   CONTENT_COMMAND_MESSAGE,
+  CONTENT_FAIR_PLAY_MESSAGE,
   CONTENT_FRAME_READY_MESSAGE,
+  CONTENT_ORIGINAL_REQUEST_SUBMIT_MESSAGE,
+  CONTENT_ORIGINAL_RESULT_MESSAGE,
   CONTENT_ORIGINAL_SUBMIT_MESSAGE,
   CONTENT_STATE_MESSAGE
 } from "./messages.js";
@@ -28,6 +34,7 @@ const socketClient = new MachugiSocketClient();
 let pairedRoomCode: string | null = null;
 let pairedAppTabId: number | null = null;
 let pairedMachugiFrame: MachugiFrameTarget | null = null;
+let latestRoomState: RoomState | null = null;
 
 function isPairHostRequestMessage(message: unknown): message is PairHostRequestMessage {
   return (
@@ -62,6 +69,12 @@ async function savePairingSettings(settings: StoredPairingSettings): Promise<voi
   });
 }
 
+function rememberRoomState(state: RoomState | undefined): void {
+  if (!state) return;
+  latestRoomState = state;
+  void sendFairPlayStateToPairedMachugiFrame(state);
+}
+
 function registerPairedBridge(roomCode: string, appTabId: number | null) {
   pairedRoomCode = roomCode;
   pairedAppTabId = appTabId;
@@ -71,6 +84,9 @@ function registerPairedBridge(roomCode: string, appTabId: number | null) {
   socketClient.onOriginalSubmitAllowed((payload) => {
     void sendOriginalSubmitToPairedMachugiFrame(payload);
   });
+  socketClient.onRoomState((state) => {
+    rememberRoomState(state);
+  });
 }
 
 async function pairHost(payload: PairingSettings, appTabId: number | null): Promise<PairHostResponse> {
@@ -79,6 +95,7 @@ async function pairHost(payload: PairingSettings, appTabId: number | null): Prom
   try {
     const pairResult = await socketClient.connectAndPair(payload);
     registerPairedBridge(pairResult.roomCode, appTabId);
+    rememberRoomState(pairResult.state);
     await savePairingSettings(settings);
     return {
       ok: true,
@@ -129,6 +146,13 @@ async function sendCommandToPairedMachugiFrame(command: QuizCommandPayload): Pro
   });
 }
 
+async function sendFairPlayStateToPairedMachugiFrame(state: RoomState): Promise<void> {
+  await sendMessageToPairedMachugiFrame({
+    type: CONTENT_FAIR_PLAY_MESSAGE,
+    payload: state
+  });
+}
+
 async function sendOriginalSubmitToPairedMachugiFrame(payload: OriginalSubmitAllowedPayload): Promise<void> {
   await sendMessageToPairedMachugiFrame({
     type: CONTENT_ORIGINAL_SUBMIT_MESSAGE,
@@ -149,18 +173,58 @@ async function forwardQuizState(quiz: QuizState): Promise<void> {
   }
 }
 
+async function requestOriginalSubmit(payload: OriginalSubmitRequestPayload): Promise<void> {
+  try {
+    await socketClient.requestOriginalSubmit(payload);
+  } catch (error) {
+    console.error("원본 제출 권한 요청에 실패했습니다.", error);
+  }
+}
+
+async function forwardOriginalResult(payload: OriginalResultPayload): Promise<void> {
+  try {
+    await socketClient.sendOriginalResult(payload);
+  } catch (error) {
+    console.error("원본 결과 전달에 실패했습니다.", error);
+  }
+}
+
 chrome.runtime.onMessage.addListener((message: unknown, sender, sendResponse) => {
   if (typeof message === "object" && message !== null && "type" in message) {
     const messageType = (message as { type?: unknown }).type;
 
     if (messageType === CONTENT_FRAME_READY_MESSAGE) {
-      sendResponse({ ok: bindMachugiFrame(sender) });
+      const bound = bindMachugiFrame(sender);
+      if (bound && latestRoomState) {
+        void sendFairPlayStateToPairedMachugiFrame(latestRoomState);
+      }
+      sendResponse({ ok: bound });
       return true;
     }
 
     if (messageType === CONTENT_STATE_MESSAGE) {
       if (bindMachugiFrame(sender)) {
         void forwardQuizState((message as unknown as { payload: QuizState }).payload);
+        sendResponse({ ok: true });
+      } else {
+        sendResponse({ ok: false, error: "연결되지 않은 마추기아이오 화면입니다." });
+      }
+      return true;
+    }
+
+    if (messageType === CONTENT_ORIGINAL_REQUEST_SUBMIT_MESSAGE) {
+      if (bindMachugiFrame(sender)) {
+        void requestOriginalSubmit((message as unknown as { payload: OriginalSubmitRequestPayload }).payload);
+        sendResponse({ ok: true });
+      } else {
+        sendResponse({ ok: false, error: "연결되지 않은 마추기아이오 화면입니다." });
+      }
+      return true;
+    }
+
+    if (messageType === CONTENT_ORIGINAL_RESULT_MESSAGE) {
+      if (bindMachugiFrame(sender)) {
+        void forwardOriginalResult((message as unknown as { payload: OriginalResultPayload }).payload);
         sendResponse({ ok: true });
       } else {
         sendResponse({ ok: false, error: "연결되지 않은 마추기아이오 화면입니다." });
