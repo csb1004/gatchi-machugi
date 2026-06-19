@@ -16,6 +16,10 @@ export function normalizeRoomCode(value: string) {
   return value.trim().toUpperCase();
 }
 
+export function shouldReturnToLobbyOnState(state: Pick<RoomState, "phase">) {
+  return state.phase === "expired";
+}
+
 function localizeSocketError(message: string) {
   const translations: Record<string, string> = {
     "Room not found": "방을 찾을 수 없습니다.",
@@ -52,6 +56,13 @@ export function useRoomSocket() {
 
   useEffect(() => {
     function handleState(nextState: RoomState) {
+      if (shouldReturnToLobbyOnState(nextState)) {
+        setState(null);
+        setChatMessages([]);
+        setError(null);
+        return;
+      }
+
       setState(nextState);
     }
 

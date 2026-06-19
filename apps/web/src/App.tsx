@@ -1,5 +1,5 @@
 import { DoorOpen, Plus, RefreshCw, Users } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   APP_PAIRING_SETTINGS_ACK_MESSAGE,
   APP_PAIRING_SETTINGS_MESSAGE,
@@ -21,6 +21,7 @@ export function App() {
   const [publicRooms, setPublicRooms] = useState<PublicRoomSummary[]>([]);
   const [roomsStatus, setRoomsStatus] = useState<"idle" | "loading" | "failed">("idle");
   const [extensionSyncStatus, setExtensionSyncStatus] = useState<"idle" | "waiting" | "saved" | "failed">("idle");
+  const wasInRoomRef = useRef(false);
   const roomSocket = useRoomSocket();
   const canJoin = useMemo(() => nickname.trim().length > 0 && roomCode.trim().length > 0, [nickname, roomCode]);
   const serverUrl = window.location.origin;
@@ -54,6 +55,21 @@ export function App() {
   useEffect(() => {
     void loadPublicRooms();
   }, []);
+
+  useEffect(() => {
+    if (roomSocket.state) {
+      wasInRoomRef.current = true;
+      return;
+    }
+
+    if (wasInRoomRef.current) {
+      wasInRoomRef.current = false;
+      setCreatedRoom(null);
+      setRoomCode("");
+      setExtensionSyncStatus("idle");
+      void loadPublicRooms();
+    }
+  }, [roomSocket.state]);
 
   useEffect(() => {
     function handlePairingAck(event: MessageEvent) {
@@ -131,12 +147,7 @@ export function App() {
             onSendChat={roomSocket.sendChat}
             onSourceAction={roomSocket.sendSourceAction}
             onLeaveRoom={() => {
-              roomSocket.leaveRoom(() => {
-                setCreatedRoom(null);
-                setRoomCode("");
-                setExtensionSyncStatus("idle");
-                void loadPublicRooms();
-              });
+              roomSocket.leaveRoom();
             }}
           />
           {roomSocket.error ? <p className="status-text">{roomSocket.error}</p> : null}

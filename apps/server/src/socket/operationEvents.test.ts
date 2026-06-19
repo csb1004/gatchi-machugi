@@ -1,5 +1,4 @@
 import { createServer, request, type Server as HttpServer } from "node:http";
-import type { AddressInfo } from "node:net";
 import type {
   ChatMessagePayload,
   ClientToServerEvents,
@@ -13,15 +12,7 @@ import { io as createClient, type Socket } from "socket.io-client";
 import { createApp } from "../app.js";
 import { RoomService } from "../domain/roomService.js";
 import { createSocketServer } from "./createSocketServer.js";
-
-async function listen(server: HttpServer): Promise<number> {
-  await new Promise<void>((resolve, reject) => {
-    server.once("error", reject);
-    server.listen(0, "127.0.0.1", () => resolve());
-  });
-
-  return (server.address() as AddressInfo).port;
-}
+import { listenOnTestPort } from "./testListen.js";
 
 async function createRoom(baseUrl: string) {
   return await new Promise<{ roomCode: string; hostParticipantId: string; hostCode: string }>((resolve, reject) => {
@@ -133,7 +124,7 @@ describe("operation socket events", () => {
     createSocketServer(server, { roomService });
     servers.push(server);
 
-    const port = await listen(server);
+    const port = await listenOnTestPort(server);
     const baseUrl = `http://127.0.0.1:${port}`;
     const room = await createRoom(baseUrl);
     const socket = await connectClient(baseUrl);
@@ -162,7 +153,7 @@ describe("operation socket events", () => {
     createSocketServer(server, { roomService });
     servers.push(server);
 
-    const port = await listen(server);
+    const port = await listenOnTestPort(server);
     const baseUrl = `http://127.0.0.1:${port}`;
     const room = await createRoom(baseUrl);
     const socket = await connectClient(baseUrl);
@@ -190,7 +181,7 @@ describe("operation socket events", () => {
     createSocketServer(server, { roomService });
     servers.push(server);
 
-    const port = await listen(server);
+    const port = await listenOnTestPort(server);
     const baseUrl = `http://127.0.0.1:${port}`;
     const room = await createRoom(baseUrl);
     const hostWebSocket = await connectClient(baseUrl);

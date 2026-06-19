@@ -1,5 +1,4 @@
 import { createServer, type Server as HttpServer } from "node:http";
-import type { AddressInfo } from "node:net";
 import type {
   ClientToServerEvents,
   ExtensionStatePayload,
@@ -16,15 +15,7 @@ import { io as createClient, type Socket } from "socket.io-client";
 import { RoomService } from "../domain/roomService.js";
 import { createApp } from "../app.js";
 import { createSocketServer } from "./createSocketServer.js";
-
-async function listen(server: HttpServer): Promise<number> {
-  await new Promise<void>((resolve, reject) => {
-    server.once("error", reject);
-    server.listen(0, "127.0.0.1", () => resolve());
-  });
-
-  return (server.address() as AddressInfo).port;
-}
+import { listenOnTestPort } from "./testListen.js";
 
 async function createRoom(baseUrl: string, body: { roomName: string; public: boolean; nickname?: string }) {
   const response = await fetch(`${baseUrl}/api/rooms`, {
@@ -166,7 +157,7 @@ describe("socket server", () => {
     createSocketServer(server, { roomService });
     servers.push(server);
 
-    const port = await listen(server);
+    const port = await listenOnTestPort(server);
     const baseUrl = `http://127.0.0.1:${port}`;
 
     const healthResponse = await fetch(`${baseUrl}/health`);
@@ -240,7 +231,7 @@ describe("socket server", () => {
     createSocketServer(server, { roomService });
     servers.push(server);
 
-    const port = await listen(server);
+    const port = await listenOnTestPort(server);
     const baseUrl = `http://127.0.0.1:${port}`;
 
     const created = await createRoom(baseUrl, { roomName: "Private room", public: false });
@@ -306,7 +297,7 @@ describe("socket server", () => {
     createSocketServer(server, { roomService });
     servers.push(server);
 
-    const port = await listen(server);
+    const port = await listenOnTestPort(server);
     const baseUrl = `http://127.0.0.1:${port}`;
 
     const created = await createRoom(baseUrl, { roomName: "Private room", public: false });
@@ -372,7 +363,7 @@ describe("socket server", () => {
     createSocketServer(server, { roomService });
     servers.push(server);
 
-    const port = await listen(server);
+    const port = await listenOnTestPort(server);
     const baseUrl = `http://127.0.0.1:${port}`;
     const created = await createRoom(baseUrl, { roomName: "Public room", public: true });
 
@@ -416,7 +407,7 @@ describe("socket server", () => {
     createSocketServer(server, { roomService });
     servers.push(server);
 
-    const port = await listen(server);
+    const port = await listenOnTestPort(server);
     const baseUrl = `http://127.0.0.1:${port}`;
     const created = await createRoom(baseUrl, { roomName: "Mirror room", public: false });
 

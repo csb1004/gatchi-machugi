@@ -1,5 +1,5 @@
 import { MessageSquare } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ChatMessagePayload } from "@gatchi/shared";
 
 export function ChatPanel({
@@ -10,6 +10,13 @@ export function ChatPanel({
   onSendMessage: (text: string) => void;
 }) {
   const [text, setText] = useState("");
+  const listRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const list = listRef.current;
+    if (!list) return;
+    list.scrollTop = list.scrollHeight;
+  }, [messages.length]);
 
   return (
     <section className="side-panel" aria-label="채팅">
@@ -17,7 +24,7 @@ export function ChatPanel({
         <h2>채팅</h2>
         <MessageSquare size={18} aria-hidden="true" />
       </div>
-      <div className="chat-list">
+      <div ref={listRef} className="chat-list" role="log" aria-label="채팅 메시지 목록" aria-live="polite">
         {messages.length === 0 ? (
           <div className="chat-empty">아직 채팅 메시지가 없습니다.</div>
         ) : (
