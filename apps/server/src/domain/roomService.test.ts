@@ -931,6 +931,77 @@ describe("RoomService", () => {
     ]);
   });
 
+  it("applies original result from legacy extension state while original submission is pending", async () => {
+    const service = new RoomService();
+    const { roomCode, hostParticipantId } = await service.createRoom({ title: "Room", visibility: "private", hostNickname: "Host" });
+
+    const playingQuiz = {
+      ...service.getState(roomCode).quiz,
+      quizTitle: "Pokemon",
+      questionIndex: 1,
+      totalQuestions: 10,
+      questionText: null,
+      questionType: "free-text" as const,
+      imageUrl: "https://images.machugi.io/blurred.png"
+    };
+    service.updateQuizState({ roomCode, quiz: playingQuiz });
+    service.submitAnswer({ roomCode, participantId: hostParticipantId, rawAnswer: "어래곤" });
+    service.requestOriginalSubmission({ roomCode, questionKey: service.getState(roomCode).fairPlay.questionKey ?? "" });
+
+    const revealed = service.updateQuizState({
+      roomCode,
+      quiz: {
+        ...playingQuiz,
+        imageUrl: "https://images.machugi.io/revealed.png",
+        resultMessage: "오답!",
+        answerCandidates: ["어래곤"],
+        canGoNext: true
+      }
+    });
+
+    expect(revealed.phase).toBe("revealed");
+    expect(revealed.fairPlay.originalSubmitStatus).toBe("result-opened");
+    expect(revealed.revealedSubmissions).toEqual([
+      { participantId: hostParticipantId, submitted: true, skipped: false, rawAnswer: "어래곤", correct: true }
+    ]);
+  });
+
+  it("does not clear first-screen submissions when legacy extension state sees the answer image before result text", async () => {
+    const service = new RoomService();
+    const { roomCode, hostParticipantId } = await service.createRoom({ title: "Room", visibility: "private", hostNickname: "Host" });
+    const player = service.joinParticipant({ roomCode, nickname: "Mina" });
+
+    const playingQuiz = {
+      ...service.getState(roomCode).quiz,
+      quizTitle: "Pokemon",
+      questionIndex: 1,
+      totalQuestions: 10,
+      questionText: null,
+      questionType: "free-text" as const,
+      imageUrl: "https://images.machugi.io/blurred.png"
+    };
+    service.updateQuizState({ roomCode, quiz: playingQuiz });
+    service.submitAnswer({ roomCode, participantId: hostParticipantId, rawAnswer: "어래곤" });
+    service.submitAnswer({ roomCode, participantId: player.participant.id, rawAnswer: "어래곤" });
+    service.requestOriginalSubmission({ roomCode, questionKey: service.getState(roomCode).fairPlay.questionKey ?? "" });
+
+    const waiting = service.updateQuizState({
+      roomCode,
+      quiz: {
+        ...playingQuiz,
+        imageUrl: "https://images.machugi.io/revealed.png",
+        canGoNext: true
+      }
+    });
+
+    expect(waiting.phase).toBe("playing");
+    expect(waiting.fairPlay.originalSubmitStatus).toBe("submitting");
+    expect(waiting.submissions).toEqual([
+      { participantId: hostParticipantId, submitted: true, skipped: false },
+      { participantId: player.participant.id, submitted: true, skipped: false }
+    ]);
+  });
+
   it("does not require late participants after original submission starts", async () => {
     const service = new RoomService();
     const { roomCode, hostParticipantId } = await service.createRoom({ title: "Room", visibility: "private", hostNickname: "Host" });

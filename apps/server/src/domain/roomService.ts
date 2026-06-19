@@ -179,6 +179,23 @@ export class RoomService {
 
   updateQuizState(input: { roomCode: string; quiz: QuizState }): RoomState {
     const room = this.requireRoom(input.roomCode);
+
+    if (
+      room.state.fairPlay.originalSubmitStatus === "submitting" &&
+      room.state.fairPlay.questionKey &&
+      this.matchesCurrentOriginalResult(room, input.quiz)
+    ) {
+      if (hasOriginalResult(input.quiz)) {
+        return this.applyOriginalResult({
+          roomCode: input.roomCode,
+          questionKey: room.state.fairPlay.questionKey,
+          quiz: input.quiz
+        });
+      }
+
+      return room.state;
+    }
+
     const shouldResetRound = this.shouldResetRound(room.state.quiz, input.quiz);
 
     room.state.quiz = input.quiz;
