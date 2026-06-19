@@ -403,6 +403,10 @@ describe("socket server", () => {
       ok: false,
       error: "Host authorization required"
     });
+    await expect(emitSourceMirrorAction(extensionSocket, action)).resolves.toEqual({
+      ok: false,
+      error: "Host web authorization required"
+    });
 
     await expect(emitSourceMirrorAction(hostWebSocket, action)).resolves.toEqual({
       ok: true,

@@ -167,6 +167,13 @@ function requireHostExtensionSession(session: SocketSession, roomCode: string) {
   }
 }
 
+function requireHostWebSession(session: SocketSession, roomCode: string) {
+  requireHostSession(session, roomCode);
+  if (session.clientKind !== "web") {
+    throw new Error("Host web authorization required");
+  }
+}
+
 function requireCurrentHostExtensionSession(session: SocketSession, socketId: string, roomCode: string, hostExtensionSocketIds: Map<string, string>) {
   requireHostExtensionSession(session, roomCode);
   if (hostExtensionSocketIds.get(roomCode) !== socketId) {
@@ -411,7 +418,7 @@ export function createSocketServer(httpServer: HttpServer, { roomService }: { ro
       }
 
       try {
-        requireHostSession(session, parsed.data.roomCode);
+        requireHostWebSession(session, parsed.data.roomCode);
         const extensionSocketId = hostExtensionSocketIds.get(parsed.data.roomCode);
         if (!extensionSocketId) {
           throw new Error("Host extension is not connected");
