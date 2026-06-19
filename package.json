@@ -7,6 +7,7 @@
     "build": "pnpm -r build",
     "test": "pnpm -r test",
     "typecheck": "pnpm -r typecheck",
+    "start": "pnpm --filter @gatchi/server start",
     "dev": "pnpm --filter @gatchi/server dev",
     "dev:web": "pnpm --filter @gatchi/web dev",
     "dev:server": "pnpm --filter @gatchi/server dev",

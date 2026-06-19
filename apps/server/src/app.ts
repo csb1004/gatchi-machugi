@@ -1,3 +1,5 @@
+import { existsSync } from "node:fs";
+import { join } from "node:path";
 import cors from "cors";
 import express from "express";
 import { z } from "zod";
@@ -20,7 +22,7 @@ function resolveVisibility(input: { public: boolean | undefined; visibility: Roo
   return input.public ? "public" : "private";
 }
 
-export function createApp({ roomService }: { roomService: RoomService; repository?: unknown }) {
+export function createApp({ roomService, staticDir }: { roomService: RoomService; repository?: unknown; staticDir?: string }) {
   const app = express();
 
   app.use(cors());
@@ -54,6 +56,18 @@ export function createApp({ roomService }: { roomService: RoomService; repositor
       hostToken: created.hostToken
     });
   });
+
+  if (staticDir && existsSync(staticDir)) {
+    app.use(express.static(staticDir));
+    app.get("*", (request, response, next) => {
+      if (request.path.startsWith("/api/") || request.path === "/health" || request.path.startsWith("/socket.io/")) {
+        next();
+        return;
+      }
+
+      response.sendFile(join(staticDir, "index.html"));
+    });
+  }
 
   return app;
 }

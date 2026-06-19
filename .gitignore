@@ -7,5 +7,6 @@ build/
 .env.*
 !.env.example
 coverage/
+apps/extension/release/
 .DS_Store
 Thumbs.db
