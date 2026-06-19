@@ -57,4 +57,28 @@ describe("AnswerPanel", () => {
 
     expect(input).toHaveFocus();
   });
+
+  it("submits multiple-choice answers by clicking the choice", () => {
+    const onSubmitAnswer = vi.fn();
+    render(
+      <AnswerPanel
+        disabled={false}
+        quiz={{
+          ...quiz,
+          questionType: "multiple-choice",
+          choices: [
+            { id: "1", label: "가능" },
+            { id: "2", label: "불가능" }
+          ]
+        }}
+        onSubmitAnswer={onSubmitAnswer}
+      />
+    );
+
+    expect(screen.queryByRole("textbox", { name: "답변" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "가능" }));
+
+    expect(onSubmitAnswer).toHaveBeenCalledWith("가능");
+    expect(screen.getByText("제출한 답: 가능")).toBeInTheDocument();
+  });
 });

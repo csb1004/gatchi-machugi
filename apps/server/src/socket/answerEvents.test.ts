@@ -734,6 +734,7 @@ describe("answer socket events", () => {
       }
     });
     expect(stateAck).toEqual({ ok: true, data: undefined });
+    const expiredStatePromise = waitForEvent(participantSocket, "room:state");
     await expect(
       emitExtensionSource(extensionSocket, {
         roomCode: created.data.roomCode,
@@ -747,7 +748,11 @@ describe("answer socket events", () => {
       })
     ).resolves.toEqual({ ok: true, data: undefined });
 
-    const leakedWhileDisconnected = eventReceivedWithin(extensionSocket, "original:submit-allowed");
+    const expiredState = await expiredStatePromise;
+    expect(expiredState.phase).toBe("expired");
+    expect(expiredState.hostExtensionConnected).toBe(false);
+    await expect(eventReceivedWithin(extensionSocket, "original:submit-allowed")).resolves.toBe(false);
+
     const hostSubmitAck = await emitSubmitAnswer(hostWebSocket, {
       roomCode: created.data.roomCode,
       participantId: created.data.hostParticipantId,
@@ -759,17 +764,9 @@ describe("answer socket events", () => {
       rawAnswer: "wrong"
     });
 
-    expect(hostSubmitAck).toEqual({ ok: true, data: undefined });
-    expect(playerSubmitAck).toEqual({ ok: true, data: undefined });
-    await expect(leakedWhileDisconnected).resolves.toBe(false);
-    expect(roomService.getState(created.data.roomCode).fairPlay.originalSubmitStatus).toBe("ready");
-
-    const originalSubmitPromise = waitForEvent(extensionSocket, "original:submit-allowed");
-    await expect(emitConnectedSource(extensionSocket, created.data.roomCode)).resolves.toEqual({ ok: true, data: undefined });
-    await expect(originalSubmitPromise).resolves.toMatchObject({
-      roomCode: created.data.roomCode,
-      hostRawAnswer: "blue archive"
-    });
+    expect(hostSubmitAck).toEqual({ ok: false, error: "Submissions are closed for this question" });
+    expect(playerSubmitAck).toEqual({ ok: false, error: "Submissions are closed for this question" });
+    expect(roomService.getState(created.data.roomCode).phase).toBe("expired");
   });
 
   it("rejects extension-only events from a superseded paired extension socket", async () => {

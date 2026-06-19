@@ -17,9 +17,10 @@ export function AnswerPanel({
 }) {
   const [answer, setAnswer] = useState("");
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const hasChoices = quiz.choices.length > 0;
   const canSubmit = !disabled && answer.trim().length > 0;
   const submitLabel = submitted ? (disabled ? "제출 완료" : "수정") : "제출";
-  const submittedAnswer = submitted ? answer.trim() : "";
+  const submittedAnswer = submitted || hasChoices ? answer.trim() : "";
 
   useEffect(() => {
     setAnswer("");
@@ -32,6 +33,33 @@ export function AnswerPanel({
   function submitAnswer() {
     if (!canSubmit) return;
     onSubmitAnswer(answer);
+  }
+
+  function submitChoice(choiceLabel: string) {
+    if (disabled) return;
+    setAnswer(choiceLabel);
+    onSubmitAnswer(choiceLabel);
+  }
+
+  if (hasChoices) {
+    return (
+      <form className="answer-panel choice-answer-panel" aria-label="답변">
+        <div className="choice-answer-grid" role="group" aria-label="선택지">
+          {quiz.choices.map((choice) => (
+            <button
+              key={choice.id}
+              className={`choice-answer-button${answer === choice.label ? " selected" : ""}`}
+              type="button"
+              disabled={disabled}
+              onClick={() => submitChoice(choice.label)}
+            >
+              {choice.label}
+            </button>
+          ))}
+        </div>
+        {submittedAnswer ? <p className="submitted-answer">제출한 답: {submittedAnswer}</p> : null}
+      </form>
+    );
   }
 
   return (

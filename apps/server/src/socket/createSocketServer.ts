@@ -427,6 +427,18 @@ export function createSocketServer(httpServer: HttpServer, { roomService }: { ro
 
       try {
         requireCurrentHostExtensionSession(session, socket.id, parsed.data.roomCode, hostExtensionSocketIds);
+        if (parsed.data.sourceWindow.status === "disconnected") {
+          roomService.updateSourceWindow(parsed.data);
+          const state = roomService.expireRoom(parsed.data.roomCode);
+          state.hostExtensionConnected = false;
+          deleteHostExtensionSocketId(parsed.data.roomCode, socket.id);
+          socket.leave(parsed.data.roomCode);
+          io.to(parsed.data.roomCode).emit("host:disconnected");
+          io.to(parsed.data.roomCode).emit("room:state", state);
+          ack({ ok: true, data: undefined });
+          return;
+        }
+
         const state = roomService.updateSourceWindow(parsed.data);
         io.to(parsed.data.roomCode).emit("room:state", state);
         ack({ ok: true, data: undefined });

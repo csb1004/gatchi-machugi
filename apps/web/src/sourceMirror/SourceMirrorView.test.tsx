@@ -199,6 +199,7 @@ describe("SourceMirrorView", () => {
       />
     );
 
+    expect(screen.getByLabelText("방장 진행 조작")).toHaveClass("mirror-host-actions-split");
     fireEvent.click(screen.getByRole("button", { name: "홈 화면" }));
     fireEvent.click(screen.getByRole("button", { name: "건너뛰기" }));
     fireEvent.click(screen.getByRole("button", { name: "다음 문제" }));

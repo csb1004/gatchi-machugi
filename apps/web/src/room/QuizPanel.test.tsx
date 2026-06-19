@@ -36,4 +36,23 @@ describe("QuizPanel", () => {
     expect(screen.getByText("정답")).toBeInTheDocument();
     expect(screen.getByText("이브이")).toBeInTheDocument();
   });
+
+  it("renders YouTube iframe audio questions as embeds", () => {
+    render(
+      <QuizPanel
+        quiz={{
+          ...baseQuiz,
+          questionType: "audio",
+          imageUrl: null,
+          audioUrl: "https://www.youtube-nocookie.com/embed/seoefKzVDOk?start=0.5&end=141"
+        }}
+      />
+    );
+
+    expect(screen.getByTitle("음원 문제")).toHaveAttribute(
+      "src",
+      "https://www.youtube-nocookie.com/embed/seoefKzVDOk?start=0.5&end=141"
+    );
+    expect(document.querySelector("audio")).not.toBeInTheDocument();
+  });
 });

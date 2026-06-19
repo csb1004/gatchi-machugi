@@ -12,10 +12,6 @@ function numberText(selector: string, root: ParentNode): number | null {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
 }
 
-function attr(selector: string, attribute: string, root: ParentNode): string | null {
-  return root.querySelector(selector)?.getAttribute(attribute) || null;
-}
-
 function absoluteUrl(value: string | null, root: Document): string | null {
   if (!value) return null;
 
@@ -24,6 +20,32 @@ function absoluteUrl(value: string | null, root: Document): string | null {
   } catch {
     return value;
   }
+}
+
+function firstSrcFromSrcSet(value: string | null): string | null {
+  return value?.split(",")[0]?.trim().split(/\s+/)[0] || null;
+}
+
+function elementMediaUrl(element: Element | null): string | null {
+  if (!element) return null;
+
+  if (element instanceof HTMLImageElement) {
+    return element.currentSrc || element.getAttribute("src") || element.getAttribute("data-src") || firstSrcFromSrcSet(element.getAttribute("srcset"));
+  }
+
+  if (element instanceof HTMLAudioElement || element instanceof HTMLVideoElement) {
+    return element.currentSrc || element.getAttribute("src") || element.querySelector("source")?.getAttribute("src") || null;
+  }
+
+  if (element instanceof HTMLSourceElement || element instanceof HTMLIFrameElement) {
+    return element.getAttribute("src");
+  }
+
+  return element.getAttribute("src") || element.getAttribute("data-src");
+}
+
+function mediaUrl(selector: string, root: ParentNode, documentRoot: Document): string | null {
+  return absoluteUrl(elementMediaUrl(root.querySelector(selector)), documentRoot);
 }
 
 function titleFromDocument(root: Document): string | null {
@@ -125,9 +147,17 @@ export function extractQuizState(root: Document): QuizState {
     }))
     .filter((choice) => choice.label.length > 0);
 
-  const imageUrl = absoluteUrl(attr("[data-question-image], img[data-question], img[class*='ImageQuizDisplay_root']", "src", quizRoot), root);
-  const audioUrl = absoluteUrl(attr("[data-question-audio], audio, [class*='AudioQuizDisplay'] audio", "src", quizRoot), root);
-  const videoUrl = absoluteUrl(attr("[data-question-video], video, [class*='VideoQuizDisplay'] video", "src", quizRoot), root);
+  const imageUrl = mediaUrl(
+    "[data-question-image], img[data-question], img[class*='ImageQuizDisplay_root'], img[class*='CropQuizDisplay_root']",
+    quizRoot,
+    root
+  );
+  const audioUrl = mediaUrl(
+    "[data-question-audio], audio, [class*='AudioQuizDisplay'] audio, iframe[src*='youtube.com/embed'], iframe[src*='youtube-nocookie.com/embed'], iframe[src*='youtu.be']",
+    quizRoot,
+    root
+  );
+  const videoUrl = mediaUrl("[data-question-video], video, [class*='VideoQuizDisplay'] video", quizRoot, root);
   const resultMessageElement = findResultMessageElement(quizRoot);
   const resultMessage = resultMessageElement?.textContent?.trim() || null;
   const answerCandidates = unique([

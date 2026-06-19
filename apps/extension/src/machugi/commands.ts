@@ -116,7 +116,9 @@ function clickChoiceByAnswer(root: ParentNode, answer: string): boolean {
   const expected = normalizedAnswer(answer);
   if (!expected) return false;
 
-  const choices = Array.from(root.querySelectorAll<HTMLButtonElement | HTMLElement>("button, [role='button'], [data-choice], [class*='Choice']"));
+  const choices = Array.from(
+    root.querySelectorAll<HTMLButtonElement | HTMLElement>("[class*='Choice'] button, button[role='option'], [data-choice], button")
+  );
   const choice = choices.find((element) => normalizedAnswer(element.textContent ?? "") === expected);
   return choice instanceof HTMLElement ? clickElement(choice) : false;
 }

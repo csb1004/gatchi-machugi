@@ -63,21 +63,23 @@ export function SourceMirrorView(props: {
     return (
       <section className="mirror-playable" aria-label="마추기 진행 화면">
         {props.isHost ? (
-          <div className="mirror-host-actions" aria-label="방장 진행 조작">
+          <div className="mirror-host-actions mirror-host-actions-split" aria-label="방장 진행 조작">
             <button type="button" onClick={focusHome}>
               <Home size={17} />
               홈 화면
             </button>
-            {props.state.kind === "playing" ? (
-              <button type="button" onClick={() => sendAction({ name: "skip" })}>
-                <SkipForward size={17} />
-                건너뛰기
+            <div className="mirror-host-primary-actions">
+              {props.state.kind === "playing" ? (
+                <button type="button" onClick={() => sendAction({ name: "skip" })}>
+                  <SkipForward size={17} />
+                  건너뛰기
+                </button>
+              ) : null}
+              <button type="button" disabled={!props.state.quiz.canGoNext} onClick={() => sendAction({ name: "next" })}>
+                <ArrowRight size={17} />
+                다음 문제
               </button>
-            ) : null}
-            <button type="button" disabled={!props.state.quiz.canGoNext} onClick={() => sendAction({ name: "next" })}>
-              <ArrowRight size={17} />
-              다음 문제
-            </button>
+            </div>
           </div>
         ) : null}
         <QuizPanel quiz={props.state.quiz} />

@@ -1,6 +1,7 @@
 import { createServer, type Server as HttpServer } from "node:http";
 import type {
   ClientToServerEvents,
+  ExtensionSourcePayload,
   ExtensionStatePayload,
   HostPairPayload,
   JoinRoomPayload,
@@ -102,6 +103,15 @@ function emitAnswerSubmit(
 ): Promise<{ ok: true; data: void } | { ok: false; error: string }> {
   return new Promise((resolve) => {
     socket.emit("answer:submit", payload, resolve);
+  });
+}
+
+function emitExtensionSource(
+  socket: Socket<ServerToClientEvents, ClientToServerEvents>,
+  payload: ExtensionSourcePayload
+): Promise<{ ok: true; data: void } | { ok: false; error: string }> {
+  return new Promise((resolve) => {
+    socket.emit("extension:source", payload, resolve);
   });
 }
 
@@ -397,6 +407,55 @@ describe("socket server", () => {
 
     const expiredState = await expiredStatePromise;
     expect(expiredState.phase).toBe("expired");
+    expect(roomService.listPublicRooms()).toEqual([]);
+  });
+
+  it("expires the room when the current host source window disconnects", async () => {
+    const roomService = new RoomService();
+    const app = createApp({ roomService });
+    const server = createServer(app);
+    createSocketServer(server, { roomService });
+    servers.push(server);
+
+    const port = await listenOnTestPort(server);
+    const baseUrl = `http://127.0.0.1:${port}`;
+    const created = await createRoom(baseUrl, { roomName: "Public room", public: true });
+
+    const participantSocket = await connectClient(baseUrl);
+    sockets.push(participantSocket);
+    const participantJoin = await emitJoin(participantSocket, {
+      roomCode: created.data.roomCode,
+      nickname: "Mina"
+    });
+    expect(participantJoin.ok).toBe(true);
+
+    const extensionSocket = await connectClient(baseUrl);
+    sockets.push(extensionSocket);
+    const connectedState = waitForEvent(participantSocket, "room:state");
+    const hostAck = await emitHostPair(extensionSocket, {
+      roomCode: created.data.roomCode,
+      hostCode: created.data.hostCode
+    });
+    expect(hostAck.ok).toBe(true);
+    await connectedState;
+
+    const expiredEvent = waitForEvent(participantSocket, "room:state");
+    await expect(
+      emitExtensionSource(extensionSocket, {
+        roomCode: created.data.roomCode,
+        sourceWindow: {
+          status: "disconnected",
+          url: null,
+          title: null,
+          lastSeenAt: new Date().toISOString(),
+          message: "원본 창이 닫혔습니다."
+        }
+      })
+    ).resolves.toEqual({ ok: true, data: undefined });
+
+    const expiredState = await expiredEvent;
+    expect(expiredState.phase).toBe("expired");
+    expect(expiredState.hostExtensionConnected).toBe(false);
     expect(roomService.listPublicRooms()).toEqual([]);
   });
 

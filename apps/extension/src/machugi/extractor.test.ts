@@ -45,6 +45,66 @@ describe("extractQuizState", () => {
     expect(state.answerCandidates).toEqual([]);
   });
 
+  it("extracts cropped image questions from machugi.io crop markup", () => {
+    document.body.innerHTML = `
+      <div class="QuizDetailPlaying_root__k7OA0">
+        <img class="CropQuizDisplay_root__z88f2" src="https://images.machugi.io/cropped-food.jpeg" alt="">
+        <div class="QuizDetailAnswerFreeResponse_questionInputContainer__UGgOR">
+          <input class="ant-input QuizDetailAnswerFreeResponse_questionInput__7urV0" type="text" value="">
+          <button type="button" class="ant-btn CommonButton_root__6p8FJ NextButton_root__MHkxh"></button>
+        </div>
+      </div>
+    `;
+
+    const state = extractQuizState(document);
+    expect(state.questionType).toBe("image");
+    expect(state.imageUrl).toBe("https://images.machugi.io/cropped-food.jpeg");
+  });
+
+  it("extracts YouTube iframe audio questions as playable audio media", () => {
+    document.body.innerHTML = `
+      <div class="QuizDetailPlaying_root__k7OA0">
+        <iframe
+          class="MusicDurationEditor_hide__kwrcw"
+          title="YouTube video player"
+          src="https://www.youtube-nocookie.com/embed/seoefKzVDOk?start=0.5&end=141"
+        ></iframe>
+        <div class="QuizDetailAnswerFreeResponse_questionInputContainer__UGgOR">
+          <input class="ant-input QuizDetailAnswerFreeResponse_questionInput__7urV0" type="text" value="">
+          <button type="button" class="ant-btn CommonButton_root__6p8FJ NextButton_root__MHkxh"></button>
+        </div>
+      </div>
+    `;
+
+    const state = extractQuizState(document);
+    expect(state.questionType).toBe("audio");
+    expect(state.audioUrl).toBe("https://www.youtube-nocookie.com/embed/seoefKzVDOk?start=0.5&end=141");
+  });
+
+  it("extracts machugi multiple-choice buttons without treating the container as a choice", () => {
+    document.body.innerHTML = `
+      <div class="QuizDetailPlaying_root__k7OA0">
+        <img class="ImageQuizDisplay_root__YvVai" src="https://images.machugi.io/question-image" alt="">
+        <div class="QuizDetailAnswerMultipleChoice_questionChoiceContainer__aRzUN">
+          <div class="Button_root__Lkq_P Button_containerLarge__f8qmK">
+            <button class="Button_button__AA3bX Button_rectangle__kpD4n Button_colorPurple__mWYQA Button_sizeLarge__v5dm1">
+              <span class="Button_text__w5EbU Button_textWhite__95AYV">가능</span>
+            </button>
+          </div>
+          <div class="Button_root__Lkq_P Button_containerLarge__f8qmK">
+            <button class="Button_button__AA3bX Button_rectangle__kpD4n Button_colorPurple__mWYQA Button_sizeLarge__v5dm1">
+              <span class="Button_text__w5EbU Button_textWhite__95AYV">불가능</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    `;
+
+    const state = extractQuizState(document);
+    expect(state.questionType).toBe("multiple-choice");
+    expect(state.choices.map((choice) => choice.label)).toEqual(["가능", "불가능"]);
+  });
+
   it("extracts result feedback and the original answer from machugi.io result markup", () => {
     document.body.innerHTML = `
       <div class="QuizDetailPlaying_root__k7OA0">

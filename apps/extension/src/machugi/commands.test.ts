@@ -108,4 +108,28 @@ describe("submitOriginalAnswer", () => {
     expect(submitOriginalAnswer(" o ", document)).toBe(true);
     expect(click).toHaveBeenCalledTimes(1);
   });
+
+  it("clicks a matching machugi multiple-choice button", () => {
+    document.body.innerHTML = `
+      <div class="QuizDetailPlaying_root__abc">
+        <div class="QuizDetailAnswerMultipleChoice_questionChoiceContainer__aRzUN">
+          <div class="Button_root__Lkq_P Button_containerLarge__f8qmK">
+            <button class="Button_button__AA3bX Button_rectangle__kpD4n Button_colorPurple__mWYQA Button_sizeLarge__v5dm1">
+              <span class="Button_text__w5EbU Button_textWhite__95AYV">가능</span>
+            </button>
+          </div>
+          <div class="Button_root__Lkq_P Button_containerLarge__f8qmK">
+            <button class="Button_button__AA3bX Button_rectangle__kpD4n Button_colorPurple__mWYQA Button_sizeLarge__v5dm1">
+              <span class="Button_text__w5EbU Button_textWhite__95AYV">불가능</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    `;
+    const button = document.querySelectorAll("button")[1] as HTMLButtonElement;
+    const click = vi.spyOn(button, "click");
+
+    expect(submitOriginalAnswer("불 가능", document)).toBe(true);
+    expect(click).toHaveBeenCalledTimes(1);
+  });
 });
