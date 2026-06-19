@@ -212,6 +212,82 @@ describe("RoomService", () => {
     expect(service.getState(roomCode).fairPlay.originalSubmitStatus).toBe("submitting");
   });
 
+  it("forces original submission for host skip with a fallback answer and skips missing participants", async () => {
+    const service = new RoomService();
+    const { roomCode, hostParticipantId } = await service.createRoom({ title: "Room", visibility: "private", hostNickname: "Host" });
+    const answeredPlayer = service.joinParticipant({ roomCode, nickname: "Mina" });
+    const missingPlayer = service.joinParticipant({ roomCode, nickname: "Nari" });
+
+    service.updateQuizState({
+      roomCode,
+      quiz: {
+        ...service.getState(roomCode).quiz,
+        questionIndex: 1,
+        questionText: "Name the character",
+        questionType: "free-text"
+      }
+    });
+    service.submitAnswer({ roomCode, participantId: answeredPlayer.participant.id, rawAnswer: "diancie" });
+    const questionKey = service.getState(roomCode).fairPlay.questionKey ?? "";
+
+    const allowed = service.requestSkippedOriginalSubmission({ roomCode, questionKey });
+
+    expect(allowed).toEqual({
+      roomCode,
+      questionKey,
+      hostRawAnswer: "."
+    });
+    expect(service.getState(roomCode).submissions).toEqual([
+      { participantId: hostParticipantId, submitted: true, skipped: false },
+      { participantId: answeredPlayer.participant.id, submitted: true, skipped: false },
+      { participantId: missingPlayer.participant.id, submitted: false, skipped: true }
+    ]);
+    expect(service.getState(roomCode).fairPlay.originalSubmitStatus).toBe("submitting");
+
+    const revealed = service.applyOriginalResult({
+      roomCode,
+      questionKey,
+      quiz: {
+        ...service.getState(roomCode).quiz,
+        resultMessage: "wrong",
+        answerCandidates: ["diancie"],
+        canGoNext: true
+      }
+    });
+
+    expect(revealed.revealedSubmissions).toEqual([
+      { participantId: hostParticipantId, submitted: true, skipped: false, rawAnswer: ".", correct: false },
+      { participantId: answeredPlayer.participant.id, submitted: true, skipped: false, rawAnswer: "diancie", correct: true },
+      { participantId: missingPlayer.participant.id, submitted: false, skipped: true, rawAnswer: "", correct: false }
+    ]);
+  });
+
+  it("uses the host answer when forcing original submission for host skip", async () => {
+    const service = new RoomService();
+    const { roomCode, hostParticipantId } = await service.createRoom({ title: "Room", visibility: "private", hostNickname: "Host" });
+    const player = service.joinParticipant({ roomCode, nickname: "Mina" });
+
+    service.updateQuizState({
+      roomCode,
+      quiz: {
+        ...service.getState(roomCode).quiz,
+        questionIndex: 1,
+        questionText: "Name the character",
+        questionType: "free-text"
+      }
+    });
+    service.submitAnswer({ roomCode, participantId: hostParticipantId, rawAnswer: "misha" });
+    const questionKey = service.getState(roomCode).fairPlay.questionKey ?? "";
+
+    const allowed = service.requestSkippedOriginalSubmission({ roomCode, questionKey });
+
+    expect(allowed.hostRawAnswer).toBe("misha");
+    expect(service.getState(roomCode).submissions).toEqual([
+      { participantId: hostParticipantId, submitted: true, skipped: false },
+      { participantId: player.participant.id, submitted: false, skipped: true }
+    ]);
+  });
+
   it("locks answer changes after original submission authorization", async () => {
     const service = new RoomService();
     const { roomCode, hostParticipantId } = await service.createRoom({ title: "Room", visibility: "private", hostNickname: "Host" });

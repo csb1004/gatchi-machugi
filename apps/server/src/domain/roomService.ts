@@ -323,6 +323,36 @@ export class RoomService {
     };
   }
 
+  requestSkippedOriginalSubmission(input: { roomCode: string; questionKey: string }): OriginalSubmitAllowedPayload {
+    const room = this.requireRoom(input.roomCode);
+
+    if (!room.state.fairPlay.questionKey || input.questionKey !== room.state.fairPlay.questionKey) {
+      throw new Error("Question changed before original submission");
+    }
+
+    if (room.state.fairPlay.originalSubmitStatus === "submitting") {
+      throw new Error("Original submission has already started");
+    }
+
+    if (room.state.fairPlay.originalSubmitStatus === "result-opened") {
+      throw new Error("Original result is already opened");
+    }
+
+    const hostRawAnswer = this.ensureHostSkipSubmission(room);
+    this.skipMissingRequiredParticipants(room);
+    room.state.submissions = this.publicSubmissionStatuses(room);
+    room.state.fairPlay.submittedParticipantIds = submittedParticipantIds(room.state.submissions);
+    room.state.fairPlay.allRequiredSubmitted = allRequiredSubmitted(room.state.fairPlay.requiredParticipantIds, room.state.submissions);
+    room.state.fairPlay.originalSubmitStatus = "submitting";
+    room.state.fairPlay.lockReason = null;
+
+    return {
+      roomCode: input.roomCode,
+      questionKey: input.questionKey,
+      hostRawAnswer
+    };
+  }
+
   applyOriginalResult(input: { roomCode: string; questionKey: string; quiz: QuizState }): RoomState {
     const room = this.requireRoom(input.roomCode);
 
@@ -598,6 +628,22 @@ export class RoomService {
 
     if (missingRequiredIds.length > 0) {
       throw new Error("All active participants must submit or be skipped before reveal");
+    }
+  }
+
+  private ensureHostSkipSubmission(room: StoredRoom): string {
+    const existing = room.rawSubmissions.get(room.hostParticipantId);
+    const hostRawAnswer = existing && !existing.skipped && existing.rawAnswer.trim() ? existing.rawAnswer : ".";
+    room.rawSubmissions.set(room.hostParticipantId, { rawAnswer: hostRawAnswer, skipped: false });
+    return hostRawAnswer;
+  }
+
+  private skipMissingRequiredParticipants(room: StoredRoom): void {
+    for (const participantId of room.state.fairPlay.requiredParticipantIds) {
+      this.requireParticipant(room, participantId);
+      if (!room.rawSubmissions.has(participantId)) {
+        room.rawSubmissions.set(participantId, { rawAnswer: "", skipped: true });
+      }
     }
   }
 

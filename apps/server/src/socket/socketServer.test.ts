@@ -459,4 +459,89 @@ describe("socket server", () => {
     });
     await expect(forwarded).resolves.toEqual(action);
   });
+
+  it("forwards host skip source actions with a forced original answer and skips missing participants", async () => {
+    const roomService = new RoomService();
+    const app = createApp({ roomService });
+    const server = createServer(app);
+    createSocketServer(server, { roomService });
+    servers.push(server);
+
+    const port = await listenOnTestPort(server);
+    const baseUrl = `http://127.0.0.1:${port}`;
+    const created = await createRoom(baseUrl, { roomName: "Mirror room", public: false });
+
+    const participantSocket = await connectClient(baseUrl);
+    sockets.push(participantSocket);
+    const participantJoin = await emitJoin(participantSocket, {
+      roomCode: created.data.roomCode,
+      nickname: "Mina"
+    });
+    expect(participantJoin.ok).toBe(true);
+    if (!participantJoin.ok) throw new Error(participantJoin.error);
+
+    const extensionSocket = await connectClient(baseUrl);
+    sockets.push(extensionSocket);
+    const hostAck = await emitHostPair(extensionSocket, {
+      roomCode: created.data.roomCode,
+      hostCode: created.data.hostCode
+    });
+    expect(hostAck.ok).toBe(true);
+
+    const hostWebSocket = await connectClient(baseUrl);
+    sockets.push(hostWebSocket);
+    const hostJoinAck = await emitJoin(hostWebSocket, {
+      roomCode: created.data.roomCode,
+      nickname: "Host",
+      participantId: created.data.hostParticipantId,
+      participantCode: created.data.hostCode
+    });
+    expect(hostJoinAck.ok).toBe(true);
+
+    await expect(
+      emitExtensionState(extensionSocket, {
+        roomCode: created.data.roomCode,
+        quiz: {
+          ...roomService.getState(created.data.roomCode).quiz,
+          questionIndex: 1,
+          questionText: "Name the character",
+          questionType: "free-text"
+        }
+      })
+    ).resolves.toEqual({ ok: true, data: undefined });
+    await expect(
+      emitAnswerSubmit(hostWebSocket, {
+        roomCode: created.data.roomCode,
+        participantId: created.data.hostParticipantId,
+        rawAnswer: "misha"
+      })
+    ).resolves.toEqual({ ok: true, data: undefined });
+
+    const action: SourceMirrorActionPayload = {
+      roomCode: created.data.roomCode,
+      actionId: "skip-1",
+      action: { name: "skip" }
+    };
+    const forwarded = waitForEvent(extensionSocket, "source:action");
+    const forcedState = waitForEvent(participantSocket, "room:state");
+
+    await expect(emitSourceMirrorAction(hostWebSocket, action)).resolves.toEqual({
+      ok: true,
+      data: undefined
+    });
+
+    await expect(forwarded).resolves.toEqual({
+      ...action,
+      action: { name: "skip", rawAnswer: "misha" }
+    });
+    await expect(forcedState).resolves.toMatchObject({
+      fairPlay: {
+        originalSubmitStatus: "submitting"
+      },
+      submissions: [
+        { participantId: created.data.hostParticipantId, submitted: true, skipped: false },
+        { participantId: participantJoin.data.participantId, submitted: false, skipped: true }
+      ]
+    });
+  });
 });

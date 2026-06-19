@@ -127,7 +127,7 @@ export type SourceMirrorAction =
   | { name: "loadMoreResults" }
   | { name: "next" }
   | { name: "previous" }
-  | { name: "skip" }
+  | { name: "skip"; rawAnswer?: string }
   | { name: "refreshSource" }
   | { name: "focusOriginalTab" };
 

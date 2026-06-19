@@ -24,6 +24,7 @@ function PersonalResultPanel({
 
   const acceptedAnswers = state.quiz.answerCandidates.join(", ");
   const resultText = result.skipped ? "미제출" : result.correct ? "정답" : "오답";
+  const rawAnswerText = result.skipped ? "입력하지 않음" : result.rawAnswer || "-";
 
   return (
     <section className={`personal-result ${result.correct ? "correct" : "incorrect"}`} aria-label="내 결과">
@@ -31,7 +32,7 @@ function PersonalResultPanel({
         <h2>내 결과</h2>
         <strong>{resultText}</strong>
       </div>
-      <p>내 답: {result.rawAnswer || "-"}</p>
+      <p>내 답: {rawAnswerText}</p>
       {acceptedAnswers ? <p>정답: {acceptedAnswers}</p> : null}
     </section>
   );

@@ -109,6 +109,32 @@ describe("RoomView", () => {
     expect(screen.getByText("정답: 디안시")).toBeInTheDocument();
   });
 
+  it("labels skipped personal results as not entered", () => {
+    render(
+      <RoomView
+        state={{
+          ...baseState,
+          phase: "revealed",
+          quiz: {
+            ...baseState.quiz,
+            resultMessage: "정답!",
+            answerCandidates: ["디안시"]
+          },
+          revealedSubmissions: [
+            { participantId: "host", submitted: true, skipped: false, rawAnswer: "디안시", correct: true },
+            { participantId: "p1", submitted: false, skipped: true, rawAnswer: "", correct: false }
+          ]
+        }}
+        currentParticipantId="p1"
+        onSubmitAnswer={() => undefined}
+        onSourceAction={() => undefined}
+      />
+    );
+
+    expect(screen.getByText("미제출")).toBeInTheDocument();
+    expect(screen.getByText("내 답: 입력하지 않음")).toBeInTheDocument();
+  });
+
   it("lets the host add an accepted answer after reveal", () => {
     const onAddAlias = vi.fn();
     render(

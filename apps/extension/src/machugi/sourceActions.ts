@@ -1,5 +1,5 @@
 import type { SourceMirrorAction } from "@gatchi/shared";
-import { runMachugiCommand } from "./commands";
+import { runMachugiCommand, submitOriginalAnswer } from "./commands";
 
 type ActionResult = { ok: true } | { ok: false; reason: string };
 type SourceMirrorActionOptions = {
@@ -152,6 +152,13 @@ function runNavigationSourceCommand(command: "next" | "skip", root: Document, op
   return ok ? { ok: true } : { ok: false, reason: command === "next" ? "다음 버튼을 찾을 수 없습니다." : "건너뛰기 버튼을 찾을 수 없습니다." };
 }
 
+function runSkipSubmissionSourceCommand(action: Extract<SourceMirrorAction, { name: "skip" }>, root: Document, options?: SourceMirrorActionOptions): ActionResult {
+  const rawAnswer = action.rawAnswer?.trim() ? action.rawAnswer : ".";
+  const runCommand = () => submitOriginalAnswer(rawAnswer, root);
+  const ok = options?.runWithOriginalSubmitBypass ? options.runWithOriginalSubmitBypass(runCommand) : runCommand();
+  return ok ? { ok: true } : { ok: false, reason: "정답 입력칸을 찾을 수 없습니다." };
+}
+
 export function runSourceMirrorAction(action: SourceMirrorAction, root: Document = document, options?: SourceMirrorActionOptions): ActionResult {
   if (action.name === "focusHome") {
     return navigateCurrentTab(root, createHomeUrl(action.query));
@@ -179,7 +186,7 @@ export function runSourceMirrorAction(action: SourceMirrorAction, root: Document
   if (action.name === "previous") {
     return runMachugiCommand("previous", root) ? { ok: true } : { ok: false, reason: "이전 화면으로 이동할 수 없습니다." };
   }
-  if (action.name === "skip") return runNavigationSourceCommand("skip", root, options);
+  if (action.name === "skip") return runSkipSubmissionSourceCommand(action, root, options);
   if (action.name === "refreshSource") {
     root.defaultView?.location.reload();
     return { ok: true };

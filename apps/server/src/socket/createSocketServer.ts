@@ -468,7 +468,27 @@ export function createSocketServer(httpServer: HttpServer, { roomService }: { ro
           throw new Error("Host extension is not connected");
         }
 
-        io.to(extensionSocketId).emit("source:action", parsed.data);
+        let actionPayload = parsed.data;
+        if (parsed.data.action.name === "skip") {
+          const questionKey = roomService.getState(parsed.data.roomCode).fairPlay.questionKey;
+          if (!questionKey) {
+            throw new Error("No active question to skip");
+          }
+          const allowed = roomService.requestSkippedOriginalSubmission({
+            roomCode: parsed.data.roomCode,
+            questionKey
+          });
+          actionPayload = {
+            ...parsed.data,
+            action: {
+              ...parsed.data.action,
+              rawAnswer: allowed.hostRawAnswer
+            }
+          };
+          io.to(parsed.data.roomCode).emit("room:state", roomService.getState(parsed.data.roomCode));
+        }
+
+        io.to(extensionSocketId).emit("source:action", actionPayload);
         ack({ ok: true, data: undefined });
       } catch (error) {
         ackError(ack, error instanceof Error ? error.message : "Source action failed");

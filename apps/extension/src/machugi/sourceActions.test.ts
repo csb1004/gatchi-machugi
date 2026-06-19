@@ -75,9 +75,14 @@ describe("runSourceMirrorAction", () => {
     expect(scrollRoot.scrollTop).toBe(1600);
   });
 
-  it("runs host skip navigation through the original-submit lock bypass", () => {
+  it("submits a dot answer for host skip through the original-submit lock bypass", () => {
     let bypassed = false;
-    document.body.innerHTML = `<button class="NextButton_root" type="button">›</button>`;
+    document.body.innerHTML = `
+      <form>
+        <input type="text" aria-label="답변">
+        <button type="button">제출</button>
+      </form>
+    `;
     const button = document.querySelector("button") as HTMLButtonElement;
     const click = vi.spyOn(button, "click");
 
@@ -90,6 +95,22 @@ describe("runSourceMirrorAction", () => {
       })
     ).toEqual({ ok: true });
     expect(bypassed).toBe(true);
+    expect((document.querySelector("input") as HTMLInputElement).value).toBe(".");
+    expect(click).toHaveBeenCalledTimes(1);
+  });
+
+  it("uses the host answer when host skip includes one", () => {
+    document.body.innerHTML = `
+      <form>
+        <input type="text" aria-label="답변">
+        <button type="button">제출</button>
+      </form>
+    `;
+    const button = document.querySelector("button") as HTMLButtonElement;
+    const click = vi.spyOn(button, "click");
+
+    expect(runSourceMirrorAction({ name: "skip", rawAnswer: "misha" }, document)).toEqual({ ok: true });
+    expect((document.querySelector("input") as HTMLInputElement).value).toBe("misha");
     expect(click).toHaveBeenCalledTimes(1);
   });
 
