@@ -1,6 +1,6 @@
 import "@testing-library/jest-dom/vitest";
-import type { RoomState } from "@gatchi/shared";
 import { render, screen } from "@testing-library/react";
+import type { RoomState } from "@gatchi/shared";
 import { describe, expect, it } from "vitest";
 import { RoomView } from "./RoomView";
 
@@ -30,6 +30,14 @@ const baseState: RoomState = {
   },
   submissions: [{ participantId: "p1", submitted: true, skipped: false }],
   revealedSubmissions: [],
+  fairPlay: {
+    questionKey: "q1",
+    requiredParticipantIds: ["host", "p1"],
+    submittedParticipantIds: ["p1"],
+    allRequiredSubmitted: false,
+    originalSubmitStatus: "locked",
+    lockReason: "모든 참가자가 제출해야 원본 정답 제출이 가능합니다."
+  },
   hostExtensionConnected: true,
   chatMessageCount: 0
 };
@@ -38,7 +46,7 @@ describe("RoomView", () => {
   it("shows submission status without raw answer before reveal", () => {
     render(<RoomView state={baseState} currentParticipantId="host" onSubmitAnswer={() => undefined} />);
 
-    expect(screen.getByText("Mina 제출함")).toBeInTheDocument();
+    expect(screen.getByText("Mina 제출됨")).toBeInTheDocument();
     expect(screen.queryByText("rawAnswer")).not.toBeInTheDocument();
     expect(screen.queryByText("blue archive")).not.toBeInTheDocument();
   });

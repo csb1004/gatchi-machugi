@@ -1,5 +1,4 @@
-import type { RoomState } from "@gatchi/shared";
-import type { ChatMessagePayload } from "@gatchi/shared";
+import type { ChatMessagePayload, RoomState } from "@gatchi/shared";
 import { AnswerPanel } from "./AnswerPanel";
 import { ChatPanel } from "./ChatPanel";
 import { QuizPanel } from "./QuizPanel";
@@ -14,6 +13,7 @@ export function RoomView(props: {
   onSendChat?: (text: string) => void;
 }) {
   const currentParticipant = props.state.participants.find((participant) => participant.id === props.currentParticipantId);
+  const currentSubmission = props.state.submissions.find((submission) => submission.participantId === props.currentParticipantId);
 
   return (
     <section className="room-layout" aria-label={`방 ${props.state.roomCode}`}>
@@ -30,6 +30,7 @@ export function RoomView(props: {
         <QuizPanel quiz={props.state.quiz} />
         <AnswerPanel
           disabled={!currentParticipant?.connected || props.state.phase === "revealed"}
+          submitted={Boolean(currentSubmission)}
           quiz={props.state.quiz}
           onSubmitAnswer={props.onSubmitAnswer}
         />

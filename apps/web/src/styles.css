@@ -612,6 +612,76 @@ h2 {
   margin-top: 6px;
 }
 
+.host-workspace {
+  display: grid;
+  gap: 12px;
+  border: 1px solid #d9e0ec;
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 12px;
+}
+
+.host-workspace-bar,
+.host-workspace-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.host-workspace-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.host-workspace-status .host-badge,
+.host-workspace-footer a,
+.host-workspace-footer button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.host-workspace-status strong {
+  color: #172033;
+  font-size: 0.92rem;
+}
+
+.host-frame-shell {
+  min-height: 640px;
+  border: 1px solid #dbe4f0;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #f8fafc;
+}
+
+.host-frame-shell iframe {
+  width: 100%;
+  height: min(72vh, 820px);
+  min-height: 640px;
+  border: 0;
+  background: #ffffff;
+}
+
+.host-workspace-footer span {
+  min-width: min(360px, 100%);
+  color: #526173;
+  font-size: 0.9rem;
+  font-weight: 800;
+}
+
+.host-workspace-footer button {
+  border: 1px solid #c9d3e4;
+  border-radius: 6px;
+  padding: 8px 10px;
+  background: #ffffff;
+  color: #235797;
+  font-weight: 800;
+}
+
 @media (max-width: 900px) {
   .room-layout {
     grid-template-columns: 1fr;

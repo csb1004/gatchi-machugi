@@ -1,4 +1,4 @@
-import { Copy, DoorOpen, Plus, RefreshCw, Users } from "lucide-react";
+import { DoorOpen, Plus, RefreshCw, Users } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import {
   APP_PAIRING_SETTINGS_ACK_MESSAGE,
@@ -6,8 +6,8 @@ import {
   type PublicRoomSummary
 } from "@gatchi/shared";
 import { createRoom, fetchPublicRooms, type CreatedRoom } from "./api";
-import { HostControls } from "./host/HostControls";
 import { ExtensionSetup } from "./host/ExtensionSetup";
+import { HostWorkspace } from "./host/HostWorkspace";
 import { RoomView } from "./room/RoomView";
 import { useRoomSocket } from "./socket/useRoomSocket";
 
@@ -45,9 +45,10 @@ export function App() {
   }
 
   function extensionSyncLabel() {
-    if (extensionSyncStatus === "saved") return "확장 프로그램에 저장됨";
-    if (extensionSyncStatus === "failed") return "확장 설치 후 다시 저장하세요";
-    return "자동 저장 대기 중";
+    if (extensionSyncStatus === "saved") return "확장 프로그램에 연결 정보를 저장했습니다.";
+    if (extensionSyncStatus === "failed") return "확장 설치 후 다시 저장하세요.";
+    if (extensionSyncStatus === "waiting") return "확장 프로그램에 저장 중입니다.";
+    return "방을 만든 뒤 확장 프로그램에 연결 정보를 저장합니다.";
   }
 
   useEffect(() => {
@@ -123,26 +124,14 @@ export function App() {
         <div className="room-stack">
           {currentParticipant?.role === "host" ? (
             <>
-              {createdRoom ? (
-                <div className="host-code-panel" role="status" aria-label="확장 프로그램 연결 정보">
-                  <span>서버 URL</span>
-                  <code>{serverUrl}</code>
-                  <span>방 코드</span>
-                  <strong>{createdRoom.roomCode}</strong>
-                  <span>확장 연결 정보</span>
-                  <strong>{extensionSyncLabel()}</strong>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      sendPairingSettingsToExtension(createdRoom);
-                    }}
-                  >
-                    <Copy size={16} />
-                    확장 프로그램에 저장
-                  </button>
-                </div>
-              ) : null}
-              <HostControls extensionConnected={roomSocket.state.hostExtensionConnected} onCommand={roomSocket.sendHostCommand} />
+              <HostWorkspace
+                state={roomSocket.state}
+                extensionReleaseUrl={extensionReleaseUrl}
+                extensionSyncLabel={extensionSyncLabel()}
+                onResendPairing={() => {
+                  if (createdRoom) sendPairingSettingsToExtension(createdRoom);
+                }}
+              />
               <ExtensionSetup releaseUrl={extensionReleaseUrl} />
             </>
           ) : null}
@@ -259,26 +248,6 @@ export function App() {
 
             {createStatus === "failed" ? <p className="status-text">방을 만들지 못했습니다.</p> : null}
 
-            {createdRoom ? (
-              <div className="host-code-panel" role="status">
-                <span>서버 URL</span>
-                <code>{serverUrl}</code>
-                <span>방 코드</span>
-                <strong>{createdRoom.roomCode}</strong>
-                <span>확장 연결 정보</span>
-                <strong>{extensionSyncLabel()}</strong>
-                <button
-                  type="button"
-                  onClick={() => {
-                    sendPairingSettingsToExtension(createdRoom);
-                  }}
-                >
-                  <Copy size={16} />
-                  확장 프로그램에 저장
-                </button>
-              </div>
-            ) : null}
-
             <div className="host-setup-card">
               <h3>방장 설정</h3>
               <a className="setup-link" href={extensionReleaseUrl} target="_blank" rel="noreferrer">
@@ -286,12 +255,11 @@ export function App() {
               </a>
               <ol>
                 <li>방을 만들면 서버 URL, 방 코드, 방장 코드가 확장 프로그램에 자동 저장됩니다.</li>
-                <li>퀴즈를 진행할 브라우저 탭에서 machugi.io를 엽니다.</li>
+                <li>방장 화면에서 마추기아이오 원본 화면을 열고 퀴즈를 고릅니다.</li>
                 <li>GitHub Releases에서 가치 마추기 확장 프로그램 zip을 내려받아 압축을 풉니다.</li>
-                <li>chrome://extensions에서 개발자 모드를 켜고 압축해제된 확장 프로그램을 로드합니다.</li>
-                <li>확장 프로그램을 새로 설치하거나 업데이트했다면 방장 화면을 새로고침한 뒤 다시 저장합니다.</li>
-                <li>확장 popup에서 저장된 서버 URL과 방 코드를 확인하고 연결합니다.</li>
-                <li>확장이 연결된 뒤 참가자는 방 코드로 입장합니다.</li>
+                <li>chrome://extensions에서 개발자 모드를 켜고 압축 해제된 확장 프로그램을 로드합니다.</li>
+                <li>확장을 새로 설치하거나 업데이트했다면 방장 화면에서 다시 저장합니다.</li>
+                <li>확장이 연결되면 참가자는 방 코드로 입장합니다.</li>
               </ol>
             </div>
           </aside>
