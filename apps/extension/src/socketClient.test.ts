@@ -31,6 +31,18 @@ describe("MachugiSocketClient", () => {
 
     expect(() => client.onOriginalSubmitAllowed(vi.fn())).toThrow(NOT_CONNECTED_MESSAGE);
     expect(() => client.onRoomState(vi.fn())).toThrow(NOT_CONNECTED_MESSAGE);
+    expect(() =>
+      client.sendSourceWindow({
+        roomCode: "ABC123",
+        sourceWindow: {
+          status: "connected",
+          url: "https://machugi.io/",
+          title: "Machugi",
+          lastSeenAt: "2026-06-19T00:00:00.000Z",
+          message: null
+        }
+      })
+    ).toThrow(NOT_CONNECTED_MESSAGE);
     expect(() => client.requestOriginalSubmit({ roomCode: "ABC123", questionKey: "q1" })).toThrow(NOT_CONNECTED_MESSAGE);
     expect(() =>
       client.sendOriginalResult({

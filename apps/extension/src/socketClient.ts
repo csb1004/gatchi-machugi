@@ -1,5 +1,6 @@
 import type {
   ClientToServerEvents,
+  ExtensionSourcePayload,
   ExtensionStatePayload,
   HostPairAck,
   HostPairPayload,
@@ -142,6 +143,23 @@ export class MachugiSocketClient {
 
     return new Promise((resolve, reject) => {
       this.socket?.emit("extension:state", payload, (response) => {
+        if (response.ok) {
+          resolve();
+          return;
+        }
+
+        reject(new Error(response.error));
+      });
+    });
+  }
+
+  sendSourceWindow(payload: ExtensionSourcePayload): Promise<void> {
+    if (!this.socket) {
+      throw new Error(NOT_CONNECTED_MESSAGE);
+    }
+
+    return new Promise((resolve, reject) => {
+      this.socket?.emit("extension:source", payload, (response) => {
         if (response.ok) {
           resolve();
           return;

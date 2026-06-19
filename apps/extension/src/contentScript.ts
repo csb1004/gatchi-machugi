@@ -20,6 +20,8 @@ let originalSubmissionLock: OriginalSubmissionLockController | null = null;
 function sendState() {
   chrome.runtime.sendMessage({
     type: CONTENT_STATE_MESSAGE,
+    href: window.location.href,
+    title: document.title,
     payload: extractQuizState(document)
   });
 }
@@ -129,7 +131,7 @@ if (!contentWindow.__gatchiMachugiContentScriptInstalled) {
     onLockedAttempt: showLockNotice
   });
 
-  chrome.runtime.sendMessage({ type: CONTENT_FRAME_READY_MESSAGE, href: window.location.href });
+  chrome.runtime.sendMessage({ type: CONTENT_FRAME_READY_MESSAGE, href: window.location.href, title: document.title });
 
   chrome.runtime.onMessage.addListener((message: unknown, _sender, sendResponse) => {
     if (typeof message !== "object" || message === null || !("type" in message)) {

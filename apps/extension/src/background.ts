@@ -6,7 +6,8 @@ import type {
   OriginalSubmitRequestPayload,
   QuizCommandPayload,
   QuizState,
-  RoomState
+  RoomState,
+  SourceWindowState
 } from "@gatchi/shared";
 import { APP_PAIRING_SETTINGS_MESSAGE } from "@gatchi/shared";
 import {
@@ -17,20 +18,32 @@ import {
   CONTENT_ORIGINAL_REQUEST_SUBMIT_MESSAGE,
   CONTENT_ORIGINAL_RESULT_MESSAGE,
   CONTENT_ORIGINAL_SUBMIT_MESSAGE,
-  CONTENT_STATE_MESSAGE
+  CONTENT_REQUEST_STATE_MESSAGE,
+  CONTENT_STATE_MESSAGE,
+  USE_CURRENT_TAB_AS_SOURCE_MESSAGE
 } from "./messages.js";
 import { normalizePairingSettingsForStorage } from "./pairingSettings.js";
 import type { PairHostRequestMessage, PairHostResponse, PairingSettings, StoredPairingSettings } from "./socketClient.js";
-import {
-  MachugiSocketClient,
-  PAIRING_REQUEST_TYPE,
-  PAIRING_STORAGE_KEY
-} from "./socketClient.js";
+import { MachugiSocketClient, PAIRING_REQUEST_TYPE, PAIRING_STORAGE_KEY } from "./socketClient.js";
 
 interface MachugiFrameTarget {
   tabId: number;
   frameId: number;
 }
+
+interface RuntimeMessage {
+  type?: unknown;
+  href?: unknown;
+  title?: unknown;
+  payload?: unknown;
+}
+
+type SourceResponse = { ok: true } | { ok: false; error: string };
+
+const SOURCE_CLOSED_MESSAGE = "마추기아이오 원본 창이 닫혔습니다.";
+const UNPAIRED_SOURCE_MESSAGE = "먼저 확장 프로그램을 방에 연결해주세요.";
+const NOT_MACHUGI_TAB_MESSAGE = "현재 탭이 마추기아이오가 아닙니다.";
+const UNBOUND_SOURCE_MESSAGE = "연결되지 않은 마추기아이오 원본 창입니다.";
 
 const socketClient = new MachugiSocketClient();
 let pairedRoomCode: string | null = null;
@@ -38,6 +51,10 @@ let pairedAppTabId: number | null = null;
 let pairedMachugiFrame: MachugiFrameTarget | null = null;
 let latestRoomState: RoomState | null = null;
 let unregisterBridgeHandlers: Array<() => void> = [];
+
+function isRuntimeMessage(message: unknown): message is RuntimeMessage {
+  return typeof message === "object" && message !== null && "type" in message;
+}
 
 function isPairHostRequestMessage(message: unknown): message is PairHostRequestMessage {
   return (
@@ -59,6 +76,75 @@ function isAppPairingSettingsMessage(message: unknown): message is { type: typeo
   );
 }
 
+function isQuizState(value: unknown): value is QuizState {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    Array.isArray((value as QuizState).choices) &&
+    Array.isArray((value as QuizState).answerCandidates)
+  );
+}
+
+function isMachugiUrl(url: string | null | undefined): boolean {
+  if (!url) return false;
+
+  try {
+    const parsed = new URL(url);
+    return parsed.hostname === "machugi.io" || parsed.hostname.endsWith(".machugi.io");
+  } catch {
+    return false;
+  }
+}
+
+function targetFromSender(sender: chrome.runtime.MessageSender): MachugiFrameTarget | null {
+  if (typeof sender.tab?.id !== "number" || typeof sender.frameId !== "number") return null;
+  return {
+    tabId: sender.tab.id,
+    frameId: sender.frameId
+  };
+}
+
+function isSameTarget(left: MachugiFrameTarget, right: MachugiFrameTarget): boolean {
+  return left.tabId === right.tabId && left.frameId === right.frameId;
+}
+
+function isCurrentSourceTarget(sender: chrome.runtime.MessageSender): boolean {
+  const target = targetFromSender(sender);
+  return Boolean(target && pairedMachugiFrame && isSameTarget(target, pairedMachugiFrame));
+}
+
+function hasActiveQuizEvidence(quiz: QuizState): boolean {
+  return Boolean(
+    quiz.questionIndex !== null ||
+      quiz.questionText ||
+      quiz.imageUrl ||
+      quiz.audioUrl ||
+      quiz.videoUrl ||
+      quiz.choices.length > 0 ||
+      quiz.resultMessage ||
+      quiz.answerCandidates.length > 0
+  );
+}
+
+function shouldBindReadySource(sender: chrome.runtime.MessageSender): boolean {
+  const target = targetFromSender(sender);
+  if (!target) return false;
+  return !pairedMachugiFrame || isSameTarget(target, pairedMachugiFrame) || sender.tab?.active === true;
+}
+
+function shouldAcceptQuizSource(sender: chrome.runtime.MessageSender, quiz: QuizState): boolean {
+  const target = targetFromSender(sender);
+  if (!target) return false;
+  if (!pairedMachugiFrame || isSameTarget(target, pairedMachugiFrame)) return true;
+  return sender.tab?.active === true && hasActiveQuizEvidence(quiz);
+}
+
+function shouldAcceptOriginalEvent(sender: chrome.runtime.MessageSender): boolean {
+  const target = targetFromSender(sender);
+  if (!target) return false;
+  return !pairedMachugiFrame || isSameTarget(target, pairedMachugiFrame);
+}
+
 async function savePairingSettings(settings: StoredPairingSettings): Promise<void> {
   await new Promise((resolve, reject) => {
     chrome.storage.local.set({ [PAIRING_STORAGE_KEY]: settings }, () => {
@@ -70,6 +156,44 @@ async function savePairingSettings(settings: StoredPairingSettings): Promise<voi
       resolve(undefined);
     });
   });
+}
+
+function sourceWindowFromMetadata(message: RuntimeMessage, sender: chrome.runtime.MessageSender): SourceWindowState {
+  const url = typeof message.href === "string" ? message.href : sender.url ?? sender.tab?.url ?? null;
+  const title = typeof message.title === "string" ? message.title : sender.tab?.title ?? null;
+
+  return {
+    status: "connected",
+    url,
+    title,
+    lastSeenAt: new Date().toISOString(),
+    message: null
+  };
+}
+
+function bindMachugiFrame(sender: chrome.runtime.MessageSender): boolean {
+  const target = targetFromSender(sender);
+  if (!target) return false;
+
+  pairedMachugiFrame = target;
+  return true;
+}
+
+async function forwardSourceWindow(sourceWindow: SourceWindowState): Promise<void> {
+  if (!pairedRoomCode) return;
+
+  try {
+    await socketClient.sendSourceWindow({
+      roomCode: pairedRoomCode,
+      sourceWindow
+    });
+  } catch (error) {
+    console.error("마추기아이오 원본 창 상태 전달에 실패했습니다.", error);
+  }
+}
+
+async function announceSourceWindow(message: RuntimeMessage, sender: chrome.runtime.MessageSender): Promise<void> {
+  await forwardSourceWindow(sourceWindowFromMetadata(message, sender));
 }
 
 function rememberRoomState(state: RoomState | undefined): void {
@@ -117,17 +241,6 @@ async function pairHost(payload: PairingSettings, appTabId: number | null): Prom
   }
 }
 
-function bindMachugiFrame(sender: chrome.runtime.MessageSender): boolean {
-  if (!sender.tab?.id || sender.frameId === undefined) return false;
-  if (pairedAppTabId !== null && sender.tab.id !== pairedAppTabId) return false;
-
-  pairedMachugiFrame = {
-    tabId: sender.tab.id,
-    frameId: sender.frameId
-  };
-  return true;
-}
-
 async function sendMessageToPairedMachugiFrame(message: unknown): Promise<void> {
   const target = pairedMachugiFrame;
   if (!target) return;
@@ -163,6 +276,12 @@ async function sendOriginalSubmitToPairedMachugiFrame(payload: OriginalSubmitAll
   await sendMessageToPairedMachugiFrame({
     type: CONTENT_ORIGINAL_SUBMIT_MESSAGE,
     payload
+  });
+}
+
+async function requestStateFromPairedMachugiFrame(): Promise<void> {
+  await sendMessageToPairedMachugiFrame({
+    type: CONTENT_REQUEST_STATE_MESSAGE
   });
 }
 
@@ -203,55 +322,122 @@ async function forwardOriginalFailure(payload: OriginalFailurePayload): Promise<
   }
 }
 
+function queryActiveTab(): Promise<chrome.tabs.Tab | null> {
+  return new Promise((resolve, reject) => {
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      if (chrome.runtime.lastError) {
+        reject(new Error(chrome.runtime.lastError.message));
+        return;
+      }
+
+      resolve(tabs[0] ?? null);
+    });
+  });
+}
+
+async function useCurrentTabAsSource(): Promise<SourceResponse> {
+  if (!pairedRoomCode) {
+    return { ok: false, error: UNPAIRED_SOURCE_MESSAGE };
+  }
+
+  const tab = await queryActiveTab();
+  if (typeof tab?.id !== "number" || !isMachugiUrl(tab.url)) {
+    return { ok: false, error: NOT_MACHUGI_TAB_MESSAGE };
+  }
+
+  pairedMachugiFrame = {
+    tabId: tab.id,
+    frameId: 0
+  };
+
+  await forwardSourceWindow({
+    status: "connected",
+    url: tab.url ?? null,
+    title: tab.title ?? null,
+    lastSeenAt: new Date().toISOString(),
+    message: null
+  });
+
+  if (latestRoomState) {
+    void sendFairPlayStateToPairedMachugiFrame(latestRoomState);
+  }
+
+  void requestStateFromPairedMachugiFrame().catch((error) => {
+    console.error("현재 원본 창에서 문제 상태를 요청하지 못했습니다.", error);
+  });
+
+  return { ok: true };
+}
+
 chrome.runtime.onMessage.addListener((message: unknown, sender, sendResponse) => {
-  if (typeof message === "object" && message !== null && "type" in message) {
-    const messageType = (message as { type?: unknown }).type;
+  if (isRuntimeMessage(message)) {
+    const messageType = message.type;
+
+    if (messageType === USE_CURRENT_TAB_AS_SOURCE_MESSAGE) {
+      void useCurrentTabAsSource()
+        .then(sendResponse)
+        .catch((error) => sendResponse({ ok: false, error: error instanceof Error ? error.message : "원본 창 연결에 실패했습니다." }));
+      return true;
+    }
 
     if (messageType === CONTENT_FRAME_READY_MESSAGE) {
-      const bound = bindMachugiFrame(sender);
-      if (bound && latestRoomState) {
-        void sendFairPlayStateToPairedMachugiFrame(latestRoomState);
+      const bound = shouldBindReadySource(sender) && bindMachugiFrame(sender);
+      if (bound) {
+        void announceSourceWindow(message, sender);
+        if (latestRoomState) {
+          void sendFairPlayStateToPairedMachugiFrame(latestRoomState);
+        }
       }
+
       sendResponse({ ok: bound });
       return true;
     }
 
     if (messageType === CONTENT_STATE_MESSAGE) {
-      if (bindMachugiFrame(sender)) {
-        void forwardQuizState((message as unknown as { payload: QuizState }).payload);
+      if (!isQuizState(message.payload)) {
+        sendResponse({ ok: false, error: "올바른 문제 상태가 아닙니다." });
+        return true;
+      }
+
+      if (shouldAcceptQuizSource(sender, message.payload) && bindMachugiFrame(sender)) {
+        void announceSourceWindow(message, sender);
+        void forwardQuizState(message.payload);
+        if (latestRoomState) {
+          void sendFairPlayStateToPairedMachugiFrame(latestRoomState);
+        }
         sendResponse({ ok: true });
       } else {
-        sendResponse({ ok: false, error: "연결되지 않은 마추기아이오 화면입니다." });
+        sendResponse({ ok: false, error: UNBOUND_SOURCE_MESSAGE });
       }
       return true;
     }
 
     if (messageType === CONTENT_ORIGINAL_REQUEST_SUBMIT_MESSAGE) {
-      if (bindMachugiFrame(sender)) {
-        void requestOriginalSubmit((message as unknown as { payload: OriginalSubmitRequestPayload }).payload);
+      if (shouldAcceptOriginalEvent(sender) && bindMachugiFrame(sender)) {
+        void requestOriginalSubmit(message.payload as OriginalSubmitRequestPayload);
         sendResponse({ ok: true });
       } else {
-        sendResponse({ ok: false, error: "연결되지 않은 마추기아이오 화면입니다." });
+        sendResponse({ ok: false, error: UNBOUND_SOURCE_MESSAGE });
       }
       return true;
     }
 
     if (messageType === CONTENT_ORIGINAL_RESULT_MESSAGE) {
-      if (bindMachugiFrame(sender)) {
-        void forwardOriginalResult((message as unknown as { payload: OriginalResultPayload }).payload);
+      if (shouldAcceptOriginalEvent(sender) && bindMachugiFrame(sender)) {
+        void forwardOriginalResult(message.payload as OriginalResultPayload);
         sendResponse({ ok: true });
       } else {
-        sendResponse({ ok: false, error: "연결되지 않은 마추기아이오 화면입니다." });
+        sendResponse({ ok: false, error: UNBOUND_SOURCE_MESSAGE });
       }
       return true;
     }
 
     if (messageType === CONTENT_ORIGINAL_FAILURE_MESSAGE) {
-      if (bindMachugiFrame(sender)) {
-        void forwardOriginalFailure((message as unknown as { payload: OriginalFailurePayload }).payload);
+      if (shouldAcceptOriginalEvent(sender) && bindMachugiFrame(sender)) {
+        void forwardOriginalFailure(message.payload as OriginalFailurePayload);
         sendResponse({ ok: true });
       } else {
-        sendResponse({ ok: false, error: "연결되지 않은 마추기아이오 화면입니다." });
+        sendResponse({ ok: false, error: UNBOUND_SOURCE_MESSAGE });
       }
       return true;
     }
@@ -268,4 +454,30 @@ chrome.runtime.onMessage.addListener((message: unknown, sender, sendResponse) =>
 
   void pairHost(message.payload, sender.tab?.id ?? null).then(sendResponse);
   return true;
+});
+
+chrome.tabs.onRemoved.addListener((tabId) => {
+  if (pairedMachugiFrame?.tabId !== tabId) return;
+
+  pairedMachugiFrame = null;
+  void forwardSourceWindow({
+    status: "disconnected",
+    url: null,
+    title: null,
+    lastSeenAt: new Date().toISOString(),
+    message: SOURCE_CLOSED_MESSAGE
+  });
+});
+
+chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
+  if (pairedMachugiFrame?.tabId !== tabId || !("url" in changeInfo) || isMachugiUrl(changeInfo.url)) return;
+
+  pairedMachugiFrame = null;
+  void forwardSourceWindow({
+    status: "disconnected",
+    url: null,
+    title: null,
+    lastSeenAt: new Date().toISOString(),
+    message: "원본 창이 마추기아이오를 벗어났습니다."
+  });
 });

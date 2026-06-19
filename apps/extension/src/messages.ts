@@ -7,3 +7,4 @@ export const CONTENT_ORIGINAL_REQUEST_SUBMIT_MESSAGE = "machugi-original-request
 export const CONTENT_ORIGINAL_SUBMIT_MESSAGE = "machugi-original-submit";
 export const CONTENT_ORIGINAL_RESULT_MESSAGE = "machugi-original-result";
 export const CONTENT_ORIGINAL_FAILURE_MESSAGE = "machugi-original-failure";
+export const USE_CURRENT_TAB_AS_SOURCE_MESSAGE = "machugi-use-current-tab-as-source";
