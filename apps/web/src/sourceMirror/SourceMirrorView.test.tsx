@@ -242,7 +242,7 @@ describe("SourceMirrorView", () => {
     expect(screen.getByRole("button", { name: "다음 문제" })).toBeInTheDocument();
   });
 
-  it("shows the mirrored game-end screen with continue and home actions", () => {
+  it("shows the mirrored game-end screen with only an ended message and a main home action", () => {
     const onAction = vi.fn();
     render(
       <SourceMirrorView
@@ -253,36 +253,19 @@ describe("SourceMirrorView", () => {
           url: "https://machugi.io/quiz/123/play",
           title: "Pokemon",
           lastSeenAt: "2026-06-19T00:00:00.000Z",
-          summaryText: "8개 맞히셨습니다",
-          percentileText: "당신은 상위 24%입니다",
-          results: [
-            {
-              id: "https://machugi.io/quiz/recommended-1",
-              title: "포켓몬스터 타입 맞추기 NEW",
-              href: "https://machugi.io/quiz/recommended-1",
-              thumbnailUrl: null,
-              description: "타입을 맞춰보세요",
-              meta: []
-            }
-          ]
+          message: "퀴즈가 종료되었습니다."
         }}
       />
     );
 
-    expect(screen.getByText("8개 맞히셨습니다")).toBeInTheDocument();
-    expect(screen.getByText("당신은 상위 24%입니다")).toBeInTheDocument();
+    expect(screen.getByText("퀴즈 종료")).toBeInTheDocument();
+    expect(screen.getByText("퀴즈가 종료되었습니다.")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "이어 풀기" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "포켓몬스터 타입 맞추기 NEW 선택" })).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "이어 풀기" }));
     fireEvent.click(screen.getByRole("button", { name: "홈 화면" }));
-    fireEvent.click(screen.getByRole("button", { name: "포켓몬스터 타입 맞추기 NEW 선택" }));
 
-    expect(onAction).toHaveBeenCalledWith({ name: "startQuiz" });
     expect(onAction).toHaveBeenCalledWith({ name: "focusHome" });
-    expect(onAction).toHaveBeenCalledWith({
-      name: "selectResult",
-      resultId: "https://machugi.io/quiz/recommended-1",
-      href: "https://machugi.io/quiz/recommended-1"
-    });
   });
 
   it("renders participant results as read-only", () => {

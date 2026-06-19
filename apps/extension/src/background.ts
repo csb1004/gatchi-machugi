@@ -59,6 +59,10 @@ let pairedMachugiFrame: MachugiFrameTarget | null = null;
 let latestRoomState: RoomState | null = null;
 let unregisterBridgeHandlers: Array<() => void> = [];
 
+interface PairHostOptions {
+  resetSourceToHome?: boolean;
+}
+
 function isRuntimeMessage(message: unknown): message is RuntimeMessage {
   return typeof message === "object" && message !== null && "type" in message;
 }
@@ -248,7 +252,7 @@ function rememberRoomState(state: RoomState | undefined): void {
   void sendFairPlayStateToPairedMachugiFrame(state);
 }
 
-function registerPairedBridge(roomCode: string, appTabId: number | null) {
+function registerPairedBridge(roomCode: string, appTabId: number | null, options: { requestState?: boolean } = {}) {
   pairedRoomCode = roomCode;
   pairedAppTabId = appTabId;
   unregisterBridgeHandlers.forEach((unregister) => unregister());
@@ -266,18 +270,54 @@ function registerPairedBridge(roomCode: string, appTabId: number | null) {
       rememberRoomState(state);
     })
   ];
+  if (options.requestState === false) return;
+
   void requestStateFromPairedMachugiFrame().catch((error) => {
     console.error("연결된 원본 창에서 문제 상태를 요청하지 못했습니다.", error);
   });
 }
 
-async function pairHost(payload: PairingSettings, appTabId: number | null): Promise<PairHostResponse> {
+async function resetPairedSourceToHome(roomCode: string): Promise<boolean> {
+  if (!pairedMachugiFrame) return false;
+
+  const delivered = await sendMessageToPairedMachugiFrame({
+    type: CONTENT_SOURCE_ACTION_MESSAGE,
+    payload: {
+      roomCode,
+      actionId: `source-home-${Date.now()}`,
+      action: { name: "focusHome" }
+    } satisfies SourceMirrorActionPayload
+  }).catch((error) => {
+    console.error("원본 창을 기본 화면으로 이동하지 못했습니다.", error);
+    return false;
+  });
+
+  if (delivered) {
+    globalThis.setTimeout(() => {
+      void requestStateFromPairedMachugiFrame().catch((error) => {
+        console.error("기본 화면 이동 후 원본 창 상태를 요청하지 못했습니다.", error);
+      });
+    }, 400);
+  }
+
+  return delivered;
+}
+
+async function pairHost(payload: PairingSettings, appTabId: number | null, options: PairHostOptions = {}): Promise<PairHostResponse> {
   const settings = normalizePairingSettingsForStorage(payload);
 
   try {
     const pairResult = await socketClient.connectAndPair(payload);
-    registerPairedBridge(pairResult.roomCode, appTabId);
+    registerPairedBridge(pairResult.roomCode, appTabId, { requestState: !options.resetSourceToHome });
     rememberRoomState(pairResult.state);
+    if (options.resetSourceToHome) {
+      const reset = await resetPairedSourceToHome(pairResult.roomCode);
+      if (!reset) {
+        void requestStateFromPairedMachugiFrame().catch((error) => {
+          console.error("연결된 원본 창에서 문제 상태를 요청하지 못했습니다.", error);
+        });
+      }
+    }
     await savePairingSettings(settings);
     return {
       ok: true,
@@ -593,7 +633,7 @@ chrome.runtime.onMessage.addListener((message: unknown, sender, sendResponse) =>
 
   if (!isPairHostRequestMessage(message)) {
     if (isAppPairingSettingsMessage(message)) {
-      void pairHost(message.payload, sender.tab?.id ?? null).then(sendResponse);
+      void pairHost(message.payload, sender.tab?.id ?? null, { resetSourceToHome: true }).then(sendResponse);
       return true;
     }
 

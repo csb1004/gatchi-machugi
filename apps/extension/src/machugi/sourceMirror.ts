@@ -16,8 +16,11 @@ const resultSelector = [
 const playingSelector = "[class*='QuizDetailPlaying'], [data-question-text], [data-question-image], audio, video";
 const resultFeedbackSelector = "[class*='QuizDetailAnswerResult'], [role='alert'], [data-result-message]";
 const detailReadySelector = "[class*='QuizDetailReady_mainContainer'], [class*='QuizDetailReady_title'], [class*='QuizDetailReadyButtonGroup']";
-const gameEndSummaryPattern = /\d+\s*개\s*맞히셨습니다/;
-const gameEndPercentilePattern = /상위\s*\d+\s*%/;
+const gameEndMessage = "퀴즈가 종료되었습니다.";
+const gameEndSummaryPattern = /\d+\s*개\s*(?:맞히셨습니다|맞혔습니다|맞췄습니다|정답|맞힘)/;
+const gameEndContinuePattern = /이어\s*풀기/;
+const gameEndHomePattern = /홈(?:으로| 화면)/;
+const gameEndRecommendationPattern = /오늘의\s*추천\s*퀴즈/;
 
 function now(): string {
   return new Date().toISOString();
@@ -47,27 +50,6 @@ function currentQuery(root: Document): string {
 
 function compactText(value: string | null | undefined): string {
   return (value ?? "").replace(/\s+/g, " ").trim();
-}
-
-function directText(element: Element): string {
-  return Array.from(element.childNodes)
-    .filter((node) => node.nodeType === Node.TEXT_NODE)
-    .map((node) => node.textContent?.trim() ?? "")
-    .join(" ")
-    .trim();
-}
-
-function firstMatchingText(root: ParentNode, pattern: RegExp): string | null {
-  const elements = Array.from(root.querySelectorAll("*"));
-  for (const element of elements) {
-    const directValue = compactText(directText(element));
-    if (directValue && pattern.test(directValue)) return directValue;
-
-    if (element.children.length > 0) continue;
-    const value = compactText(element.textContent);
-    if (pattern.test(value)) return value;
-  }
-  return null;
 }
 
 function firstText(root: Element, selectors: string[]): string {
@@ -234,18 +216,30 @@ function extractQuizDetail(root: Document): Extract<SourceMirrorState, { kind: "
   };
 }
 
+function hasControlText(root: Document, pattern: RegExp): boolean {
+  return Array.from(root.querySelectorAll<HTMLElement>("button, a, [role='button']"))
+    .some((element) => pattern.test(compactText(`${element.textContent ?? ""} ${element.getAttribute("aria-label") ?? ""}`)));
+}
+
+function hasGameEndEvidence(root: Document): boolean {
+  const pageText = compactText(root.body.textContent);
+  const hasSummary = gameEndSummaryPattern.test(pageText);
+  const hasContinue = hasControlText(root, gameEndContinuePattern);
+  const hasHome = hasControlText(root, gameEndHomePattern);
+  const hasRecommendations = gameEndRecommendationPattern.test(pageText);
+
+  return hasSummary || (hasContinue && hasHome) || (hasRecommendations && (hasContinue || hasHome));
+}
+
 function extractGameEnd(root: Document): Extract<SourceMirrorState, { kind: "gameEnd" }> | null {
-  const summaryText = firstMatchingText(root.body, gameEndSummaryPattern);
-  if (!summaryText) return null;
+  if (!hasGameEndEvidence(root)) return null;
 
   return {
     kind: "gameEnd",
     url: root.location.href,
     title: root.title || null,
     lastSeenAt: now(),
-    summaryText,
-    percentileText: firstMatchingText(root.body, gameEndPercentilePattern),
-    results: extractResults(root)
+    message: gameEndMessage
   };
 }
 

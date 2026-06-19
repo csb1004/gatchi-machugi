@@ -94,9 +94,7 @@ export type SourceMirrorState =
       url: string;
       title: string | null;
       lastSeenAt: string;
-      summaryText: string;
-      percentileText: string | null;
-      results: MirrorQuizResult[];
+      message: string;
     }
   | {
       kind: "unsupported";

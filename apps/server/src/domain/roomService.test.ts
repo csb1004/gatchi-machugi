@@ -426,9 +426,7 @@ describe("RoomService", () => {
         url: "https://machugi.io/quiz/1/play",
         title: "Pokemon",
         lastSeenAt: "2026-06-19T00:00:01.000Z",
-        summaryText: "8개 맞히셨습니다",
-        percentileText: "당신은 상위 24%입니다",
-        results: []
+        message: "퀴즈가 종료되었습니다."
       }
     });
 

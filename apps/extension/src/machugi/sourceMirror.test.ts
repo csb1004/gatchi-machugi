@@ -174,13 +174,33 @@ describe("extractSourceMirrorState", () => {
     const state = extractSourceMirrorState(root);
     expect(state.kind).toBe("gameEnd");
     if (state.kind !== "gameEnd") throw new Error("expected gameEnd");
-    expect(state.summaryText).toBe("8개 맞히셨습니다");
-    expect(state.percentileText).toBe("당신은 상위 24%입니다");
-    expect(state.results).toEqual([
-      expect.objectContaining({
-        title: "포켓몬스터 타입 맞추기 NEW",
-        href: new URL("/quiz/recommended-1", document.location.href).toString()
-      })
-    ]);
+    expect(state.message).toBe("퀴즈가 종료되었습니다.");
+  });
+
+  it("extracts game-end screens from controls when the score summary is not readable", () => {
+    const root = setDocument(
+      "/quiz/123/play",
+      `
+      <main>
+        <section>
+          <button>카톡 공유하기</button>
+          <button>이어 풀기</button>
+          <button>홈으로</button>
+        </section>
+        <aside>
+          <h2>오늘의 추천 퀴즈는?</h2>
+          <a class="RecommendedQuizCard_link__abc" href="/quiz/recommended-1">
+            <strong>포켓몬스터 타입 맞추기 NEW</strong>
+          </a>
+        </aside>
+      </main>
+    `,
+      "Pokemon - 마추기 아이오"
+    );
+
+    const state = extractSourceMirrorState(root);
+    expect(state.kind).toBe("gameEnd");
+    if (state.kind !== "gameEnd") throw new Error("expected gameEnd");
+    expect(state.message).toBe("퀴즈가 종료되었습니다.");
   });
 });

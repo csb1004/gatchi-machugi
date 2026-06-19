@@ -877,7 +877,7 @@ h2 {
   gap: 18px;
 }
 
-.game-end-summary {
+.game-end-message {
   display: grid;
   gap: 12px;
   justify-items: start;
@@ -887,25 +887,21 @@ h2 {
   padding: 18px;
 }
 
-.game-end-summary p,
-.game-end-summary strong {
+.game-end-message h2,
+.game-end-message p {
   margin: 0;
 }
 
-.game-end-summary p {
+.game-end-message h2 {
   color: #0b1730;
   font-size: 1.18rem;
   font-weight: 900;
 }
 
-.game-end-summary strong {
+.game-end-message p {
   color: #31506f;
   font-size: 0.98rem;
-}
-
-.game-end-recommendations {
-  display: grid;
-  gap: 12px;
+  font-weight: 700;
 }
 
 .mirror-results-heading {

@@ -52,12 +52,9 @@ export function SourceMirrorView(props: {
   if (props.state.kind === "gameEnd") {
     return (
       <MirrorGameEndView
-        summaryText={props.state.summaryText}
-        percentileText={props.state.percentileText}
-        results={props.state.results}
+        message={props.state.message}
         isHost={props.isHost}
-        onAction={sendAction}
-        onHome={focusHome}
+        onHome={() => sendAction({ name: "focusHome" })}
       />
     );
   }
