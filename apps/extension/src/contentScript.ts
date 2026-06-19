@@ -11,6 +11,7 @@ const CONTENT_FAIR_PLAY_MESSAGE = "machugi-fair-play";
 const CONTENT_ORIGINAL_REQUEST_SUBMIT_MESSAGE = "machugi-original-request-submit";
 const CONTENT_ORIGINAL_SUBMIT_MESSAGE = "machugi-original-submit";
 const CONTENT_ORIGINAL_RESULT_MESSAGE = "machugi-original-result";
+const CONTENT_ORIGINAL_FAILURE_MESSAGE = "machugi-original-failure";
 
 const contentWindow = window as Window & { __gatchiMachugiContentScriptInstalled?: boolean };
 
@@ -33,6 +34,13 @@ function sendOriginalSubmitRequest(payload: { roomCode: string; questionKey: str
 function sendOriginalResult(payload: { roomCode: string; questionKey: string; quiz: QuizState }) {
   chrome.runtime.sendMessage({
     type: CONTENT_ORIGINAL_RESULT_MESSAGE,
+    payload
+  });
+}
+
+function sendOriginalFailure(payload: { roomCode: string; questionKey: string; reason: string }) {
+  chrome.runtime.sendMessage({
+    type: CONTENT_ORIGINAL_FAILURE_MESSAGE,
     payload
   });
 }
@@ -87,14 +95,26 @@ async function reportOriginalResultWhenReady(payload: OriginalSubmitAllowedPaylo
     }
   }
 
-  showLockNotice("원본 결과를 아직 읽지 못했습니다. 결과가 표시되면 다시 시도해주세요.");
+  const reason = "원본 결과를 아직 읽지 못했습니다. 다시 시도해주세요.";
+  sendOriginalFailure({
+    roomCode: payload.roomCode,
+    questionKey: payload.questionKey,
+    reason
+  });
+  showLockNotice(reason);
 }
 
 async function handleOriginalSubmitAllowed(payload: OriginalSubmitAllowedPayload) {
   const submitted = originalSubmissionLock?.runWithOriginalSubmitBypass(() => submitOriginalAnswer(payload.hostRawAnswer, document)) ?? false;
 
   if (!submitted) {
-    showLockNotice("원본 사이트에 답을 자동 제출하지 못했습니다.");
+    const reason = "원본 사이트에 답을 자동 제출하지 못했습니다.";
+    sendOriginalFailure({
+      roomCode: payload.roomCode,
+      questionKey: payload.questionKey,
+      reason
+    });
+    showLockNotice(reason);
     return;
   }
 

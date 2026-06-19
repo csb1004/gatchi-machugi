@@ -95,6 +95,22 @@ describe("createOriginalSubmissionLock", () => {
     });
   });
 
+  it("allows a retry after a failed original submission returns from submitting to ready", () => {
+    document.body.innerHTML = `<button class="NextButton_root">제출</button>`;
+    const button = document.querySelector("button") as HTMLButtonElement;
+    const request = vi.fn();
+
+    controller = createOriginalSubmissionLock(document, { onRequestOriginalSubmit: request });
+    controller.updateRoomState(roomState({ originalSubmitStatus: "ready", allRequiredSubmitted: true }));
+    button.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+
+    controller.updateRoomState(roomState({ originalSubmitStatus: "submitting", allRequiredSubmitted: true }));
+    controller.updateRoomState(roomState({ originalSubmitStatus: "ready", allRequiredSubmitted: true }));
+    button.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+
+    expect(request).toHaveBeenCalledTimes(2);
+  });
+
   it("allows programmatic original submission while bypassed", () => {
     document.body.innerHTML = `<button class="NextButton_root">제출</button>`;
     const button = document.querySelector("button") as HTMLButtonElement;

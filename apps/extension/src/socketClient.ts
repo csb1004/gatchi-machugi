@@ -3,6 +3,7 @@ import type {
   ExtensionStatePayload,
   HostPairAck,
   HostPairPayload,
+  OriginalFailurePayload,
   OriginalResultPayload,
   OriginalSubmitAllowedPayload,
   OriginalSubmitRequestPayload,
@@ -175,6 +176,23 @@ export class MachugiSocketClient {
 
     return new Promise((resolve, reject) => {
       this.socket?.emit("original:result", payload, (response) => {
+        if (response.ok) {
+          resolve();
+          return;
+        }
+
+        reject(new Error(response.error));
+      });
+    });
+  }
+
+  sendOriginalFailure(payload: OriginalFailurePayload): Promise<void> {
+    if (!this.socket) {
+      throw new Error(NOT_CONNECTED_MESSAGE);
+    }
+
+    return new Promise((resolve, reject) => {
+      this.socket?.emit("original:failure", payload, (response) => {
         if (response.ok) {
           resolve();
           return;

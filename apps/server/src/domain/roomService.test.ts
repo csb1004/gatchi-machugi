@@ -235,6 +235,40 @@ describe("RoomService", () => {
     );
   });
 
+  it("returns to ready when the host extension reports original submission failure", async () => {
+    const service = new RoomService();
+    const { roomCode, hostParticipantId } = await service.createRoom({ title: "Room", visibility: "private", hostNickname: "Host" });
+    const player = service.joinParticipant({ roomCode, nickname: "Mina" });
+
+    service.updateQuizState({
+      roomCode,
+      quiz: {
+        ...service.getState(roomCode).quiz,
+        questionIndex: 1,
+        questionText: "Name the game",
+        questionType: "free-text"
+      }
+    });
+    service.submitAnswer({ roomCode, participantId: hostParticipantId, rawAnswer: "blue archive" });
+    service.submitAnswer({ roomCode, participantId: player.participant.id, rawAnswer: "wrong" });
+    const questionKey = service.getState(roomCode).fairPlay.questionKey ?? "";
+    service.requestOriginalSubmission({ roomCode, questionKey });
+
+    const recovered = service.failOriginalSubmission({
+      roomCode,
+      questionKey,
+      reason: "원본 사이트에 답을 자동 제출하지 못했습니다."
+    });
+
+    expect(recovered.fairPlay).toMatchObject({
+      submittedParticipantIds: [hostParticipantId, player.participant.id],
+      allRequiredSubmitted: true,
+      originalSubmitStatus: "ready",
+      lockReason: "원본 사이트에 답을 자동 제출하지 못했습니다."
+    });
+    expect(() => service.requestOriginalSubmission({ roomCode, questionKey })).not.toThrow();
+  });
+
   it("resets the round when only multiple-choice choices change", async () => {
     const service = new RoomService();
     const { roomCode, hostParticipantId } = await service.createRoom({ title: "Room", visibility: "private", hostNickname: "Host" });

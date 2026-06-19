@@ -1,5 +1,6 @@
 import type {
   AppPairingSettingsPayload,
+  OriginalFailurePayload,
   OriginalResultPayload,
   OriginalSubmitAllowedPayload,
   OriginalSubmitRequestPayload,
@@ -12,6 +13,7 @@ import {
   CONTENT_COMMAND_MESSAGE,
   CONTENT_FAIR_PLAY_MESSAGE,
   CONTENT_FRAME_READY_MESSAGE,
+  CONTENT_ORIGINAL_FAILURE_MESSAGE,
   CONTENT_ORIGINAL_REQUEST_SUBMIT_MESSAGE,
   CONTENT_ORIGINAL_RESULT_MESSAGE,
   CONTENT_ORIGINAL_SUBMIT_MESSAGE,
@@ -193,6 +195,14 @@ async function forwardOriginalResult(payload: OriginalResultPayload): Promise<vo
   }
 }
 
+async function forwardOriginalFailure(payload: OriginalFailurePayload): Promise<void> {
+  try {
+    await socketClient.sendOriginalFailure(payload);
+  } catch (error) {
+    console.error("원본 제출 실패 전달에 실패했습니다.", error);
+  }
+}
+
 chrome.runtime.onMessage.addListener((message: unknown, sender, sendResponse) => {
   if (typeof message === "object" && message !== null && "type" in message) {
     const messageType = (message as { type?: unknown }).type;
@@ -229,6 +239,16 @@ chrome.runtime.onMessage.addListener((message: unknown, sender, sendResponse) =>
     if (messageType === CONTENT_ORIGINAL_RESULT_MESSAGE) {
       if (bindMachugiFrame(sender)) {
         void forwardOriginalResult((message as unknown as { payload: OriginalResultPayload }).payload);
+        sendResponse({ ok: true });
+      } else {
+        sendResponse({ ok: false, error: "연결되지 않은 마추기아이오 화면입니다." });
+      }
+      return true;
+    }
+
+    if (messageType === CONTENT_ORIGINAL_FAILURE_MESSAGE) {
+      if (bindMachugiFrame(sender)) {
+        void forwardOriginalFailure((message as unknown as { payload: OriginalFailurePayload }).payload);
         sendResponse({ ok: true });
       } else {
         sendResponse({ ok: false, error: "연결되지 않은 마추기아이오 화면입니다." });

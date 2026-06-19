@@ -237,6 +237,26 @@ export class RoomService {
     return this.revealAnswers({ roomCode: input.roomCode, skippedParticipantIds: [] });
   }
 
+  failOriginalSubmission(input: { roomCode: string; questionKey: string; reason: string }): RoomState {
+    const room = this.requireRoom(input.roomCode);
+
+    if (!room.state.fairPlay.questionKey || input.questionKey !== room.state.fairPlay.questionKey) {
+      throw new Error("Question changed before original submission failure");
+    }
+
+    if (room.state.fairPlay.originalSubmitStatus !== "submitting") {
+      throw new Error("Original submission has not been authorized");
+    }
+
+    const submittedIds = submittedParticipantIds(room.state.submissions);
+    const complete = allRequiredSubmitted(room.state.fairPlay.requiredParticipantIds, room.state.submissions);
+    room.state.fairPlay.submittedParticipantIds = submittedIds;
+    room.state.fairPlay.allRequiredSubmitted = complete;
+    room.state.fairPlay.originalSubmitStatus = complete ? "ready" : "locked";
+    room.state.fairPlay.lockReason = complete ? input.reason : originalSubmissionLockReason;
+    return room.state;
+  }
+
   revealAnswers(input: { roomCode: string; skippedParticipantIds: string[] }): RoomState {
     const room = this.requireRoom(input.roomCode);
 

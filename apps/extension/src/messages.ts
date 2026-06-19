@@ -6,3 +6,4 @@ export const CONTENT_FAIR_PLAY_MESSAGE = "machugi-fair-play";
 export const CONTENT_ORIGINAL_REQUEST_SUBMIT_MESSAGE = "machugi-original-request-submit";
 export const CONTENT_ORIGINAL_SUBMIT_MESSAGE = "machugi-original-submit";
 export const CONTENT_ORIGINAL_RESULT_MESSAGE = "machugi-original-result";
+export const CONTENT_ORIGINAL_FAILURE_MESSAGE = "machugi-original-failure";

@@ -54,5 +54,12 @@ describe("MachugiSocketClient", () => {
         }
       })
     ).toThrow(NOT_CONNECTED_MESSAGE);
+    expect(() =>
+      client.sendOriginalFailure({
+        roomCode: "ABC123",
+        questionKey: "q1",
+        reason: "원본 사이트에 답을 자동 제출하지 못했습니다."
+      })
+    ).toThrow(NOT_CONNECTED_MESSAGE);
   });
 });

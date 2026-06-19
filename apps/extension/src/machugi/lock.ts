@@ -79,7 +79,11 @@ export function createOriginalSubmissionLock(
 
   return {
     updateRoomState(state) {
-      if (roomState?.fairPlay.questionKey !== state.fairPlay.questionKey || state.fairPlay.originalSubmitStatus !== "ready") {
+      if (
+        roomState?.fairPlay.questionKey !== state.fairPlay.questionKey ||
+        roomState.fairPlay.originalSubmitStatus !== state.fairPlay.originalSubmitStatus ||
+        state.fairPlay.originalSubmitStatus !== "ready"
+      ) {
         requestedQuestionKey = null;
       }
 

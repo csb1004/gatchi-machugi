@@ -11,6 +11,7 @@ import type {
   JoinRoomPayload,
   KickParticipantPayload,
   OriginalResultPayload,
+  OriginalFailurePayload,
   OriginalSubmitRequestPayload,
   QuizCommandPayload,
   RevealAnswerPayload,
@@ -58,6 +59,12 @@ const originalResultSchema = z.object({
   roomCode: z.string().trim().min(1).transform((value) => value.toUpperCase()),
   questionKey: z.string().trim().min(1),
   quiz: z.custom<OriginalResultPayload["quiz"]>((value) => typeof value === "object" && value !== null)
+});
+
+const originalFailureSchema = z.object({
+  roomCode: z.string().trim().min(1).transform((value) => value.toUpperCase()),
+  questionKey: z.string().trim().min(1),
+  reason: z.string().trim().min(1).max(500)
 });
 
 const submitAnswerSchema = z.object({
@@ -124,6 +131,13 @@ function requireHostExtensionSession(session: SocketSession, roomCode: string) {
   requireHostSession(session, roomCode);
   if (session.clientKind !== "extension") {
     throw new Error("Host extension authorization required");
+  }
+}
+
+function requireCurrentHostExtensionSession(session: SocketSession, socketId: string, roomCode: string, hostExtensionSocketIds: Map<string, string>) {
+  requireHostExtensionSession(session, roomCode);
+  if (hostExtensionSocketIds.get(roomCode) !== socketId) {
+    throw new Error("Current host extension authorization required");
   }
 }
 
@@ -298,7 +312,7 @@ export function createSocketServer(httpServer: HttpServer, { roomService }: { ro
       }
 
       try {
-        requireHostSession(session, parsed.data.roomCode);
+        requireCurrentHostExtensionSession(session, socket.id, parsed.data.roomCode, hostExtensionSocketIds);
         const state = roomService.updateQuizState(parsed.data);
         io.to(parsed.data.roomCode).emit("room:state", state);
         ack({ ok: true, data: undefined });
@@ -315,7 +329,7 @@ export function createSocketServer(httpServer: HttpServer, { roomService }: { ro
       }
 
       try {
-        requireHostExtensionSession(session, parsed.data.roomCode);
+        requireCurrentHostExtensionSession(session, socket.id, parsed.data.roomCode, hostExtensionSocketIds);
         const allowed = roomService.requestOriginalSubmission(parsed.data);
         socket.emit("original:submit-allowed", allowed);
         io.to(parsed.data.roomCode).emit("room:state", roomService.getState(parsed.data.roomCode));
@@ -333,13 +347,30 @@ export function createSocketServer(httpServer: HttpServer, { roomService }: { ro
       }
 
       try {
-        requireHostExtensionSession(session, parsed.data.roomCode);
+        requireCurrentHostExtensionSession(session, socket.id, parsed.data.roomCode, hostExtensionSocketIds);
         const state = roomService.applyOriginalResult(parsed.data);
         io.to(parsed.data.roomCode).emit("answer:revealed", state.revealedSubmissions);
         io.to(parsed.data.roomCode).emit("room:state", state);
         ack({ ok: true, data: undefined });
       } catch (error) {
         ackError(ack, error instanceof Error ? error.message : "Original result failed");
+      }
+    });
+
+    socket.on("original:failure", (payload: OriginalFailurePayload, ack: Ack<void>) => {
+      const parsed = originalFailureSchema.safeParse(payload);
+      if (!parsed.success) {
+        ackError(ack, "Invalid original failure payload");
+        return;
+      }
+
+      try {
+        requireCurrentHostExtensionSession(session, socket.id, parsed.data.roomCode, hostExtensionSocketIds);
+        const state = roomService.failOriginalSubmission(parsed.data);
+        io.to(parsed.data.roomCode).emit("room:state", state);
+        ack({ ok: true, data: undefined });
+      } catch (error) {
+        ackError(ack, error instanceof Error ? error.message : "Original failure failed");
       }
     });
 
@@ -494,7 +525,11 @@ export function createSocketServer(httpServer: HttpServer, { roomService }: { ro
       if (!session.roomCode) return;
 
       if (session.clientKind === "extension" && session.roomCode) {
+        const isCurrentExtension = hostExtensionSocketIds.get(session.roomCode) === socket.id;
         deleteHostExtensionSocketId(session.roomCode, socket.id);
+        if (!isCurrentExtension) {
+          return;
+        }
       }
 
       if (session.role === "host") {
