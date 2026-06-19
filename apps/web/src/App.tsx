@@ -1,7 +1,7 @@
-import { DoorOpen, RefreshCw, Users } from "lucide-react";
+import { Copy, DoorOpen, Plus, RefreshCw, Users } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import type { PublicRoomSummary } from "@gatchi/shared";
-import { fetchPublicRooms } from "./api";
+import { createRoom, fetchPublicRooms, type CreatedRoom } from "./api";
 import { HostControls } from "./host/HostControls";
 import { ExtensionSetup } from "./host/ExtensionSetup";
 import { RoomView } from "./room/RoomView";
@@ -10,6 +10,10 @@ import { useRoomSocket } from "./socket/useRoomSocket";
 export function App() {
   const [nickname, setNickname] = useState("");
   const [roomCode, setRoomCode] = useState("");
+  const [roomName, setRoomName] = useState("Machugi room");
+  const [isPublicRoom, setIsPublicRoom] = useState(true);
+  const [createdRoom, setCreatedRoom] = useState<CreatedRoom | null>(null);
+  const [createStatus, setCreateStatus] = useState<"idle" | "creating" | "failed">("idle");
   const [publicRooms, setPublicRooms] = useState<PublicRoomSummary[]>([]);
   const [roomsStatus, setRoomsStatus] = useState<"idle" | "loading" | "failed">("idle");
   const roomSocket = useRoomSocket();
@@ -26,6 +30,27 @@ export function App() {
       setRoomsStatus("idle");
     } catch {
       setRoomsStatus("failed");
+    }
+  }
+
+  async function handleCreateRoom() {
+    if (!nickname.trim() || !roomName.trim()) return;
+
+    setCreateStatus("creating");
+    setCreatedRoom(null);
+
+    try {
+      const created = await createRoom({
+        roomName: roomName.trim(),
+        public: isPublicRoom,
+        nickname: nickname.trim()
+      });
+      setCreatedRoom(created);
+      setRoomCode(created.roomCode);
+      setCreateStatus("idle");
+      await loadPublicRooms();
+    } catch {
+      setCreateStatus("failed");
     }
   }
 
@@ -67,6 +92,53 @@ export function App() {
         </header>
 
         {roomSocket.error ? <p className="status-text">{roomSocket.error}</p> : null}
+
+        <section className="create-room" aria-label="Create room">
+          <div className="section-heading">
+            <h2>Create room</h2>
+            <span>{createStatus === "creating" ? "Creating" : "Host setup"}</span>
+          </div>
+
+          <div className="create-form">
+            <label>
+              Room name
+              <input value={roomName} onChange={(event) => setRoomName(event.target.value)} maxLength={100} />
+            </label>
+            <label className="toggle-row">
+              <input type="checkbox" checked={isPublicRoom} onChange={(event) => setIsPublicRoom(event.target.checked)} />
+              Public room
+            </label>
+            <button
+              className="primary-button"
+              type="button"
+              disabled={!nickname.trim() || !roomName.trim() || createStatus === "creating"}
+              onClick={() => void handleCreateRoom()}
+            >
+              <Plus size={18} />
+              Create room
+            </button>
+          </div>
+
+          {createStatus === "failed" ? <p className="status-text">Could not create room.</p> : null}
+
+          {createdRoom ? (
+            <div className="host-token-panel" role="status">
+              <span>Room code</span>
+              <strong>{createdRoom.roomCode}</strong>
+              <span>Host token</span>
+              <code>{createdRoom.hostToken}</code>
+              <button
+                type="button"
+                onClick={() => {
+                  void navigator.clipboard?.writeText(createdRoom.hostToken);
+                }}
+              >
+                <Copy size={16} />
+                Copy token
+              </button>
+            </div>
+          ) : null}
+        </section>
 
         <form className="join-form">
           <label>

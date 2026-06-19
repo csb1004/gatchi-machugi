@@ -107,6 +107,89 @@ h2 {
   align-items: end;
 }
 
+.create-room {
+  border-top: 1px solid #e3e8f1;
+  margin-top: 20px;
+  padding-top: 18px;
+}
+
+.create-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 12px;
+  margin-top: 12px;
+  align-items: end;
+}
+
+.create-form label {
+  display: grid;
+  gap: 7px;
+  color: #34435a;
+  font-size: 0.9rem;
+  font-weight: 800;
+}
+
+.create-form input[type="text"],
+.create-form input:not([type]) {
+  min-width: 0;
+  height: 42px;
+  border: 1px solid #c9d3e4;
+  border-radius: 6px;
+  padding: 0 12px;
+  background: #ffffff;
+  color: #172033;
+}
+
+.toggle-row {
+  min-height: 42px;
+  display: inline-flex !important;
+  grid-template-columns: none !important;
+  align-items: center;
+  gap: 8px !important;
+}
+
+.toggle-row input {
+  width: 18px;
+  height: 18px;
+}
+
+.host-token-panel {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 8px 12px;
+  margin-top: 14px;
+  border: 1px solid #c9d3e4;
+  border-radius: 8px;
+  padding: 12px;
+  background: #fbfcff;
+}
+
+.host-token-panel span {
+  color: #667085;
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.host-token-panel code,
+.host-token-panel strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.host-token-panel button {
+  grid-column: 1 / -1;
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid #c9d3e4;
+  border-radius: 6px;
+  padding: 8px 10px;
+  background: #ffffff;
+  color: #235797;
+  font-weight: 800;
+}
+
 .join-form label {
   display: grid;
   gap: 7px;
@@ -203,6 +286,10 @@ h2 {
   }
 
   .join-form {
+    grid-template-columns: 1fr;
+  }
+
+  .create-form {
     grid-template-columns: 1fr;
   }
 }
