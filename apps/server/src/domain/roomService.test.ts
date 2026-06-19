@@ -437,6 +437,95 @@ describe("RoomService", () => {
     expect(revealed.revealedSubmissions.find((submission) => submission.participantId === player.participant.id)?.correct).toBe(false);
   });
 
+  it("does not require late participants after original submission starts", async () => {
+    const service = new RoomService();
+    const { roomCode, hostParticipantId } = await service.createRoom({ title: "Room", visibility: "private", hostNickname: "Host" });
+    const player = service.joinParticipant({ roomCode, nickname: "Mina" });
+
+    service.updateQuizState({
+      roomCode,
+      quiz: {
+        ...service.getState(roomCode).quiz,
+        questionIndex: 1,
+        questionText: "Name the game",
+        questionType: "free-text"
+      }
+    });
+    service.submitAnswer({ roomCode, participantId: hostParticipantId, rawAnswer: "blue archive" });
+    service.submitAnswer({ roomCode, participantId: player.participant.id, rawAnswer: "wrong" });
+    const questionKey = service.getState(roomCode).fairPlay.questionKey ?? "";
+    service.requestOriginalSubmission({ roomCode, questionKey });
+
+    const late = service.joinParticipant({ roomCode, nickname: "Late" });
+
+    expect(late.participant.connected).toBe(true);
+    expect(late.state.fairPlay.requiredParticipantIds).toEqual([hostParticipantId, player.participant.id]);
+    expect(() => service.submitAnswer({ roomCode, participantId: late.participant.id, rawAnswer: "blue archive" })).toThrow(
+      "Submissions are locked for original submission"
+    );
+
+    const revealed = service.applyOriginalResult({
+      roomCode,
+      questionKey,
+      quiz: {
+        ...service.getState(roomCode).quiz,
+        resultMessage: "correct",
+        answerCandidates: ["blue archive"],
+        canGoNext: true
+      }
+    });
+
+    expect(revealed.phase).toBe("revealed");
+    expect(revealed.fairPlay.originalSubmitStatus).toBe("result-opened");
+    expect(revealed.revealedSubmissions.map((submission) => submission.participantId)).toEqual([
+      hostParticipantId,
+      player.participant.id
+    ]);
+  });
+
+  it("does not mutate original result state when reveal readiness fails", async () => {
+    const service = new RoomService();
+    const { roomCode, hostParticipantId } = await service.createRoom({ title: "Room", visibility: "private", hostNickname: "Host" });
+    const player = service.joinParticipant({ roomCode, nickname: "Mina" });
+
+    service.updateQuizState({
+      roomCode,
+      quiz: {
+        ...service.getState(roomCode).quiz,
+        questionIndex: 1,
+        questionText: "Name the game",
+        questionType: "free-text"
+      }
+    });
+    service.submitAnswer({ roomCode, participantId: hostParticipantId, rawAnswer: "blue archive" });
+    const questionKey = service.getState(roomCode).fairPlay.questionKey ?? "";
+    service.getState(roomCode).fairPlay.originalSubmitStatus = "submitting";
+    const previousQuiz = service.getState(roomCode).quiz;
+    const previousLockReason = service.getState(roomCode).fairPlay.lockReason;
+
+    expect(() =>
+      service.applyOriginalResult({
+        roomCode,
+        questionKey,
+        quiz: {
+          ...previousQuiz,
+          resultMessage: "correct",
+          answerCandidates: ["blue archive"],
+          canGoNext: true
+        }
+      })
+    ).toThrow("All active participants must submit or be skipped before reveal");
+
+    const state = service.getState(roomCode);
+    expect(state.quiz.resultMessage).toBeNull();
+    expect(state.quiz.answerCandidates).toEqual([]);
+    expect(state.quiz.canGoNext).toBe(false);
+    expect(state.fairPlay.originalSubmitStatus).toBe("submitting");
+    expect(state.fairPlay.lockReason).toBe(previousLockReason);
+    expect(state.revealedSubmissions).toEqual([]);
+    expect(state.participants.find((participant) => participant.id === player.participant.id)?.connected).toBe(true);
+  });
+
   it("rejects original result before original submission authorization", async () => {
     const service = new RoomService();
     const { roomCode, hostParticipantId } = await service.createRoom({ title: "Room", visibility: "private", hostNickname: "Host" });

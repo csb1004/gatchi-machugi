@@ -228,6 +228,8 @@ export class RoomService {
       throw new Error("Original result does not match current question");
     }
 
+    this.requireRevealReady(room, []);
+
     room.state.quiz = input.quiz;
     room.state.fairPlay.originalSubmitStatus = "result-opened";
     room.state.fairPlay.lockReason = null;
@@ -245,12 +247,7 @@ export class RoomService {
       }
     }
 
-    const missingParticipants = room.state.participants.filter(
-      (participant) => participant.connected && !room.rawSubmissions.has(participant.id)
-    );
-    if (missingParticipants.length > 0) {
-      throw new Error("All active participants must submit or be skipped before reveal");
-    }
+    this.requireRevealReady(room, input.skippedParticipantIds);
 
     const previousCorrect = this.correctParticipantIds(room.state.revealedSubmissions);
     const nextRevealedSubmissions = this.revealedSubmissions(room);
@@ -444,12 +441,27 @@ export class RoomService {
   }
 
   private refreshFairPlayRequiredParticipants(room: StoredRoom): void {
-    if (!room.state.fairPlay.questionKey || room.state.fairPlay.originalSubmitStatus === "result-opened") {
+    if (
+      !room.state.fairPlay.questionKey ||
+      (room.state.fairPlay.originalSubmitStatus !== "locked" && room.state.fairPlay.originalSubmitStatus !== "ready")
+    ) {
       return;
     }
 
     room.state.fairPlay.requiredParticipantIds = requiredParticipantIds(room.state.participants);
     this.refreshFairPlaySubmissionState(room);
+  }
+
+  private requireRevealReady(room: StoredRoom, skippedParticipantIds: string[]): void {
+    const skippedIds = new Set(skippedParticipantIds);
+    const requiredIds = room.state.fairPlay.questionKey
+      ? room.state.fairPlay.requiredParticipantIds
+      : requiredParticipantIds(room.state.participants);
+    const missingRequiredIds = requiredIds.filter((participantId) => !room.rawSubmissions.has(participantId) && !skippedIds.has(participantId));
+
+    if (missingRequiredIds.length > 0) {
+      throw new Error("All active participants must submit or be skipped before reveal");
+    }
   }
 
   private publicSubmissionStatuses(room: StoredRoom) {
