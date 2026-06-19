@@ -53,10 +53,16 @@ describe("fairPlay helpers", () => {
       { participantId: "host", submitted: true, skipped: false },
       { participantId: "mina", submitted: true, skipped: false }
     ];
+    const statusesWithSkip: SubmissionStatus[] = [
+      { participantId: "host", submitted: true, skipped: false },
+      { participantId: "mina", submitted: false, skipped: true }
+    ];
 
     expect(required).toEqual(["host", "mina"]);
     expect(submittedParticipantIds(statuses)).toEqual(["host", "mina"]);
+    expect(submittedParticipantIds(statusesWithSkip)).toEqual(["host", "mina"]);
     expect(allRequiredSubmitted(required, statuses)).toBe(true);
+    expect(allRequiredSubmitted(required, statusesWithSkip)).toBe(true);
     expect(allRequiredSubmitted(required, statuses.slice(0, 1))).toBe(false);
   });
 });
