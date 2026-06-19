@@ -9,3 +9,5 @@ export const CONTENT_ORIGINAL_RESULT_MESSAGE = "machugi-original-result";
 export const CONTENT_ORIGINAL_FAILURE_MESSAGE = "machugi-original-failure";
 export const USE_CURRENT_TAB_AS_SOURCE_MESSAGE = "machugi-use-current-tab-as-source";
 export const CONTENT_SOURCE_MIRROR_MESSAGE = "machugi-source-mirror";
+export const CONTENT_SOURCE_ACTION_MESSAGE = "machugi-source-action";
+export const CONTENT_SOURCE_ACTION_FAILURE_MESSAGE = "machugi-source-action-failure";

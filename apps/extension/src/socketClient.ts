@@ -10,7 +10,10 @@ import type {
   OriginalSubmitRequestPayload,
   QuizCommandPayload,
   RoomState,
-  ServerToClientEvents
+  ServerToClientEvents,
+  SourceMirrorActionFailurePayload,
+  SourceMirrorActionPayload,
+  SourceMirrorPayload
 } from "@gatchi/shared";
 import { io, type Socket } from "socket.io-client";
 
@@ -170,6 +173,40 @@ export class MachugiSocketClient {
     });
   }
 
+  sendSourceMirror(payload: SourceMirrorPayload): Promise<void> {
+    if (!this.socket) {
+      throw new Error(NOT_CONNECTED_MESSAGE);
+    }
+
+    return new Promise((resolve, reject) => {
+      this.socket?.emit("source:mirror", payload, (response) => {
+        if (response.ok) {
+          resolve();
+          return;
+        }
+
+        reject(new Error(response.error));
+      });
+    });
+  }
+
+  sendSourceActionFailure(payload: SourceMirrorActionFailurePayload): Promise<void> {
+    if (!this.socket) {
+      throw new Error(NOT_CONNECTED_MESSAGE);
+    }
+
+    return new Promise((resolve, reject) => {
+      this.socket?.emit("source:action-failure", payload, (response) => {
+        if (response.ok) {
+          resolve();
+          return;
+        }
+
+        reject(new Error(response.error));
+      });
+    });
+  }
+
   requestOriginalSubmit(payload: OriginalSubmitRequestPayload): Promise<void> {
     if (!this.socket) {
       throw new Error(NOT_CONNECTED_MESSAGE);
@@ -229,6 +266,16 @@ export class MachugiSocketClient {
     const socket = this.socket;
     socket.on("quiz:command" as never, handler as never);
     return () => socket.off("quiz:command" as never, handler as never);
+  }
+
+  onSourceAction(handler: (payload: SourceMirrorActionPayload) => void): () => void {
+    if (!this.socket) {
+      throw new Error(NOT_CONNECTED_MESSAGE);
+    }
+
+    const socket = this.socket;
+    socket.on("source:action" as never, handler as never);
+    return () => socket.off("source:action" as never, handler as never);
   }
 
   onOriginalSubmitAllowed(handler: (payload: OriginalSubmitAllowedPayload) => void): () => void {

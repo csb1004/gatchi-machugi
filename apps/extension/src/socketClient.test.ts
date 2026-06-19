@@ -31,6 +31,7 @@ describe("MachugiSocketClient", () => {
 
     expect(() => client.onOriginalSubmitAllowed(vi.fn())).toThrow(NOT_CONNECTED_MESSAGE);
     expect(() => client.onRoomState(vi.fn())).toThrow(NOT_CONNECTED_MESSAGE);
+    expect(() => client.onSourceAction(vi.fn())).toThrow(NOT_CONNECTED_MESSAGE);
     expect(() =>
       client.sendSourceWindow({
         roomCode: "ABC123",
@@ -41,6 +42,26 @@ describe("MachugiSocketClient", () => {
           lastSeenAt: "2026-06-19T00:00:00.000Z",
           message: null
         }
+      })
+    ).toThrow(NOT_CONNECTED_MESSAGE);
+    expect(() =>
+      client.sendSourceMirror({
+        roomCode: "ABC123",
+        sourceMirror: {
+          kind: "home",
+          url: "https://machugi.io/",
+          title: "Machugi",
+          lastSeenAt: "2026-06-19T00:00:00.000Z",
+          query: ""
+        }
+      })
+    ).toThrow(NOT_CONNECTED_MESSAGE);
+    expect(() =>
+      client.sendSourceActionFailure({
+        roomCode: "ABC123",
+        actionId: "act-1",
+        action: { name: "search", query: "pokemon" },
+        reason: "검색창을 찾을 수 없습니다."
       })
     ).toThrow(NOT_CONNECTED_MESSAGE);
     expect(() => client.requestOriginalSubmit({ roomCode: "ABC123", questionKey: "q1" })).toThrow(NOT_CONNECTED_MESSAGE);

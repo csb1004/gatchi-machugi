@@ -7,6 +7,9 @@ import type {
   QuizCommandPayload,
   QuizState,
   RoomState,
+  SourceMirrorActionFailurePayload,
+  SourceMirrorActionPayload,
+  SourceMirrorState,
   SourceWindowState
 } from "@gatchi/shared";
 import { APP_PAIRING_SETTINGS_MESSAGE } from "@gatchi/shared";
@@ -19,6 +22,9 @@ import {
   CONTENT_ORIGINAL_RESULT_MESSAGE,
   CONTENT_ORIGINAL_SUBMIT_MESSAGE,
   CONTENT_REQUEST_STATE_MESSAGE,
+  CONTENT_SOURCE_ACTION_FAILURE_MESSAGE,
+  CONTENT_SOURCE_ACTION_MESSAGE,
+  CONTENT_SOURCE_MIRROR_MESSAGE,
   CONTENT_STATE_MESSAGE,
   USE_CURRENT_TAB_AS_SOURCE_MESSAGE
 } from "./messages.js";
@@ -84,6 +90,10 @@ function isQuizState(value: unknown): value is QuizState {
     Array.isArray((value as QuizState).choices) &&
     Array.isArray((value as QuizState).answerCandidates)
   );
+}
+
+function isSourceMirrorState(value: unknown): value is SourceMirrorState {
+  return typeof value === "object" && value !== null && "kind" in value;
 }
 
 function isMachugiUrl(url: string | null | undefined): boolean {
@@ -196,6 +206,27 @@ async function forwardSourceWindow(sourceWindow: SourceWindowState): Promise<voi
   }
 }
 
+async function forwardSourceMirror(sourceMirror: SourceMirrorState): Promise<void> {
+  if (!pairedRoomCode) return;
+
+  try {
+    await socketClient.sendSourceMirror({
+      roomCode: pairedRoomCode,
+      sourceMirror
+    });
+  } catch (error) {
+    console.error("원본 미러 상태 전달에 실패했습니다.", error);
+  }
+}
+
+async function forwardSourceActionFailure(payload: SourceMirrorActionFailurePayload): Promise<void> {
+  try {
+    await socketClient.sendSourceActionFailure(payload);
+  } catch (error) {
+    console.error("원본 미러 동작 실패 전달에 실패했습니다.", error);
+  }
+}
+
 async function announceSourceWindow(message: RuntimeMessage, sender: chrome.runtime.MessageSender): Promise<void> {
   await forwardSourceWindow(sourceWindowFromMetadata(message, sender));
 }
@@ -224,6 +255,9 @@ function registerPairedBridge(roomCode: string, appTabId: number | null) {
   unregisterBridgeHandlers = [
     socketClient.onQuizCommand((command) => {
       void sendCommandToPairedMachugiFrame(command);
+    }),
+    socketClient.onSourceAction((payload) => {
+      void sendSourceActionToPairedMachugiFrame(payload);
     }),
     socketClient.onOriginalSubmitAllowed((payload) => {
       void sendOriginalSubmitToPairedMachugiFrame(payload);
@@ -280,6 +314,55 @@ async function sendCommandToPairedMachugiFrame(command: QuizCommandPayload): Pro
     type: CONTENT_COMMAND_MESSAGE,
     command: command.command,
     values: command.values
+  });
+}
+
+function focusTab(tabId: number): Promise<void> {
+  return new Promise((resolve, reject) => {
+    chrome.tabs.update(tabId, { active: true }, () => {
+      if (chrome.runtime.lastError) {
+        reject(new Error(chrome.runtime.lastError.message));
+        return;
+      }
+
+      resolve();
+    });
+  });
+}
+
+async function sendSourceActionToPairedMachugiFrame(payload: SourceMirrorActionPayload): Promise<void> {
+  if (payload.action.name === "focusOriginalTab") {
+    const target = pairedMachugiFrame;
+    if (!target) {
+      await forwardSourceActionFailure({
+        ...payload,
+        reason: ORIGINAL_SOURCE_DISCONNECTED_MESSAGE
+      });
+      return;
+    }
+
+    await focusTab(target.tabId).catch((error) => {
+      void forwardSourceActionFailure({
+        ...payload,
+        reason: error instanceof Error ? error.message : "원본 탭을 열 수 없습니다."
+      });
+    });
+    return;
+  }
+
+  const delivered = await sendMessageToPairedMachugiFrame({
+    type: CONTENT_SOURCE_ACTION_MESSAGE,
+    payload
+  }).catch((error) => {
+    console.error("원본 창에 미러 동작을 전달하지 못했습니다.", error);
+    return false;
+  });
+
+  if (delivered) return;
+
+  await forwardSourceActionFailure({
+    ...payload,
+    reason: ORIGINAL_SOURCE_DISCONNECTED_MESSAGE
   });
 }
 
@@ -444,6 +527,32 @@ chrome.runtime.onMessage.addListener((message: unknown, sender, sendResponse) =>
         if (latestRoomState) {
           void sendFairPlayStateToPairedMachugiFrame(latestRoomState);
         }
+        sendResponse({ ok: true });
+      } else {
+        sendResponse({ ok: false, error: UNBOUND_SOURCE_MESSAGE });
+      }
+      return true;
+    }
+
+    if (messageType === CONTENT_SOURCE_MIRROR_MESSAGE) {
+      if (!isSourceMirrorState(message.payload)) {
+        sendResponse({ ok: false, error: "올바른 원본 미러 상태가 아닙니다." });
+        return true;
+      }
+
+      if (shouldAcceptOriginalEvent(sender) && bindMachugiFrame(sender)) {
+        void announceSourceWindow(message, sender);
+        void forwardSourceMirror(message.payload);
+        sendResponse({ ok: true });
+      } else {
+        sendResponse({ ok: false, error: UNBOUND_SOURCE_MESSAGE });
+      }
+      return true;
+    }
+
+    if (messageType === CONTENT_SOURCE_ACTION_FAILURE_MESSAGE) {
+      if (shouldAcceptOriginalEvent(sender)) {
+        void forwardSourceActionFailure(message.payload as SourceMirrorActionFailurePayload);
         sendResponse({ ok: true });
       } else {
         sendResponse({ ok: false, error: UNBOUND_SOURCE_MESSAGE });

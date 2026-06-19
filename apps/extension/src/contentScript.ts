@@ -1,6 +1,7 @@
-import type { OriginalSubmitAllowedPayload, QuizCommandName, QuizState, RoomState } from "@gatchi/shared";
+import type { OriginalSubmitAllowedPayload, QuizCommandName, QuizState, RoomState, SourceMirrorActionPayload } from "@gatchi/shared";
 import { runMachugiCommand, submitOriginalAnswer } from "./machugi/commands";
 import { extractQuizState } from "./machugi/extractor";
+import { runSourceMirrorAction } from "./machugi/sourceActions";
 import { extractSourceMirrorState } from "./machugi/sourceMirror";
 import { createOriginalSubmissionLock, type OriginalSubmissionLockController } from "./machugi/lock";
 
@@ -14,6 +15,8 @@ const CONTENT_ORIGINAL_SUBMIT_MESSAGE = "machugi-original-submit";
 const CONTENT_ORIGINAL_RESULT_MESSAGE = "machugi-original-result";
 const CONTENT_ORIGINAL_FAILURE_MESSAGE = "machugi-original-failure";
 const CONTENT_SOURCE_MIRROR_MESSAGE = "machugi-source-mirror";
+const CONTENT_SOURCE_ACTION_MESSAGE = "machugi-source-action";
+const CONTENT_SOURCE_ACTION_FAILURE_MESSAGE = "machugi-source-action-failure";
 
 const contentWindow = window as Window & { __gatchiMachugiContentScriptInstalled?: boolean };
 
@@ -56,6 +59,16 @@ function sendOriginalFailure(payload: { roomCode: string; questionKey: string; r
   chrome.runtime.sendMessage({
     type: CONTENT_ORIGINAL_FAILURE_MESSAGE,
     payload
+  });
+}
+
+function sendSourceActionFailure(payload: SourceMirrorActionPayload, reason: string) {
+  chrome.runtime.sendMessage({
+    type: CONTENT_SOURCE_ACTION_FAILURE_MESSAGE,
+    payload: {
+      ...payload,
+      reason
+    }
   });
 }
 
@@ -174,6 +187,17 @@ if (!contentWindow.__gatchiMachugiContentScriptInstalled) {
       const command = (message as { command?: QuizCommandName }).command;
       sendResponse({ ok: command ? runMachugiCommand(command) : false });
       window.setTimeout(sendState, 250);
+      return true;
+    }
+
+    if (messageType === CONTENT_SOURCE_ACTION_MESSAGE) {
+      const payload = (message as unknown as { payload: SourceMirrorActionPayload }).payload;
+      const result = runSourceMirrorAction(payload.action, document);
+      if (!result.ok) {
+        sendSourceActionFailure(payload, result.reason);
+      }
+      window.setTimeout(sendState, 250);
+      sendResponse(result);
       return true;
     }
 
