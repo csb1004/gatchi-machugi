@@ -60,4 +60,24 @@ describe("SourceMirrorView", () => {
     expect(screen.getByText("포켓몬 실루엣 맞추기")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "포켓몬 실루엣 맞추기 선택" })).not.toBeInTheDocument();
   });
+
+  it("shows Korean fallback actions for unsupported host states", () => {
+    render(
+      <SourceMirrorView
+        isHost
+        onAction={() => undefined}
+        state={{
+          kind: "unsupported",
+          url: "https://machugi.io/unknown",
+          title: "Unknown",
+          lastSeenAt: "2026-06-19T00:00:00.000Z",
+          reason: "원본 사이트의 현재 화면을 읽을 수 없습니다."
+        }}
+      />
+    );
+
+    expect(screen.getByText("이 화면은 아직 읽을 수 없습니다")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /다시 읽기/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /원본 탭 열기/ })).toBeInTheDocument();
+  });
 });
