@@ -5,8 +5,8 @@
   "packageManager": "pnpm@9.15.0",
   "scripts": {
     "build": "pnpm -r build",
-    "test": "pnpm -r test",
-    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm --filter @gatchi/shared build && pnpm -r test",
+    "typecheck": "pnpm --filter @gatchi/shared build && pnpm -r typecheck",
     "start": "pnpm --filter @gatchi/server start",
     "dev": "pnpm --filter @gatchi/server dev",
     "dev:web": "pnpm --filter @gatchi/web dev",
