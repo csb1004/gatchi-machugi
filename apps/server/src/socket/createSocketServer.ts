@@ -4,6 +4,7 @@ import type {
   AddAliasPayload,
   AdjustScorePayload,
   ClientToServerEvents,
+  ExtensionSourcePayload,
   ExtensionStatePayload,
   HostPairAck,
   HostPairPayload,
@@ -48,6 +49,17 @@ const hostPairSchema = z.object({
 const extensionStateSchema = z.object({
   roomCode: z.string().trim().min(1).transform((value) => value.toUpperCase()),
   quiz: z.custom<ExtensionStatePayload["quiz"]>((value) => typeof value === "object" && value !== null)
+});
+
+const extensionSourceSchema = z.object({
+  roomCode: z.string().trim().min(1).transform((value) => value.toUpperCase()),
+  sourceWindow: z.object({
+    status: z.enum(["disconnected", "connected", "unsupported"]),
+    url: z.string().nullable(),
+    title: z.string().nullable(),
+    lastSeenAt: z.string().nullable(),
+    message: z.string().nullable()
+  })
 });
 
 const originalSubmitRequestSchema = z.object({
@@ -318,6 +330,23 @@ export function createSocketServer(httpServer: HttpServer, { roomService }: { ro
         ack({ ok: true, data: undefined });
       } catch (error) {
         ackError(ack, error instanceof Error ? error.message : "State update failed");
+      }
+    });
+
+    socket.on("extension:source", (payload: ExtensionSourcePayload, ack: Ack<void>) => {
+      const parsed = extensionSourceSchema.safeParse(payload);
+      if (!parsed.success) {
+        ackError(ack, "Invalid extension source payload");
+        return;
+      }
+
+      try {
+        requireCurrentHostExtensionSession(session, socket.id, parsed.data.roomCode, hostExtensionSocketIds);
+        const state = roomService.updateSourceWindow(parsed.data);
+        io.to(parsed.data.roomCode).emit("room:state", state);
+        ack({ ok: true, data: undefined });
+      } catch (error) {
+        ackError(ack, error instanceof Error ? error.message : "Source update failed");
       }
     });
 

@@ -43,6 +43,16 @@ export interface QuizState {
   answerCandidates: string[];
 }
 
+export type SourceWindowStatus = "disconnected" | "connected" | "unsupported";
+
+export interface SourceWindowState {
+  status: SourceWindowStatus;
+  url: string | null;
+  title: string | null;
+  lastSeenAt: string | null;
+  message: string | null;
+}
+
 export interface RoomSettings {
   visibility: RoomVisibility;
   submissionVisibility: SubmissionVisibility;
@@ -81,6 +91,7 @@ export interface RoomState {
   submissions: SubmissionStatus[];
   revealedSubmissions: RevealedSubmission[];
   fairPlay: FairPlayState;
+  sourceWindow: SourceWindowState;
   hostExtensionConnected: boolean;
   chatMessageCount: number;
 }

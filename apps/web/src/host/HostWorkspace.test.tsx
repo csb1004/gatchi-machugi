@@ -31,6 +31,13 @@ function state(overrides: Partial<RoomState> = {}): RoomState {
     },
     submissions: [{ participantId: "host", submitted: true, skipped: false }],
     revealedSubmissions: [],
+    sourceWindow: {
+      status: "connected",
+      url: "https://machugi.io/",
+      title: "Machugi",
+      lastSeenAt: "2026-06-19T00:00:00.000Z",
+      message: null
+    },
     hostExtensionConnected: true,
     chatMessageCount: 0,
     fairPlay: {

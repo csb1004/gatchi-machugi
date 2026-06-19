@@ -41,6 +41,13 @@ function roomState(overrides: Partial<RoomState["fairPlay"]>): RoomState {
       ...overrides
     },
     hostExtensionConnected: true,
+    sourceWindow: {
+      status: "connected",
+      url: "https://machugi.io/",
+      title: "Machugi",
+      lastSeenAt: "2026-06-19T00:00:00.000Z",
+      message: null
+    },
     chatMessageCount: 0
   };
 }

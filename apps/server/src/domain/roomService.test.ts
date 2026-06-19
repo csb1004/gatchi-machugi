@@ -269,6 +269,37 @@ describe("RoomService", () => {
     expect(() => service.requestOriginalSubmission({ roomCode, questionKey })).not.toThrow();
   });
 
+  it("stores source-window connection state without resetting the current round", async () => {
+    const service = new RoomService();
+    const { roomCode } = await service.createRoom({ title: "Room", visibility: "private", hostNickname: "Host" });
+
+    service.updateQuizState({
+      roomCode,
+      quiz: {
+        ...service.getState(roomCode).quiz,
+        questionIndex: 1,
+        questionText: "Name the game",
+        questionType: "free-text"
+      }
+    });
+    const questionKey = service.getState(roomCode).fairPlay.questionKey;
+
+    const state = service.updateSourceWindow({
+      roomCode,
+      sourceWindow: {
+        status: "connected",
+        url: "https://machugi.io/quiz/123",
+        title: "Quiz",
+        lastSeenAt: "2026-06-19T00:00:00.000Z",
+        message: null
+      }
+    });
+
+    expect(state.sourceWindow.status).toBe("connected");
+    expect(state.sourceWindow.url).toBe("https://machugi.io/quiz/123");
+    expect(state.fairPlay.questionKey).toBe(questionKey);
+  });
+
   it("resets the round when only multiple-choice choices change", async () => {
     const service = new RoomService();
     const { roomCode, hostParticipantId } = await service.createRoom({ title: "Room", visibility: "private", hostNickname: "Host" });

@@ -3,6 +3,7 @@ import type { AddressInfo } from "node:net";
 import type {
   AddAliasPayload,
   ClientToServerEvents,
+  ExtensionSourcePayload,
   ExtensionStatePayload,
   HostPairPayload,
   JoinRoomPayload,
@@ -98,6 +99,15 @@ function emitExtensionState(
 ): Promise<{ ok: true; data: void } | { ok: false; error: string }> {
   return new Promise((resolve) => {
     socket.emit("extension:state", payload, resolve);
+  });
+}
+
+function emitExtensionSource(
+  socket: Socket<ServerToClientEvents, ClientToServerEvents>,
+  payload: ExtensionSourcePayload
+): Promise<{ ok: true; data: void } | { ok: false; error: string }> {
+  return new Promise((resolve) => {
+    socket.emit("extension:source", payload, resolve);
   });
 }
 
@@ -767,6 +777,64 @@ describe("answer socket events", () => {
     expect(staleRequestAck).toEqual({ ok: false, error: "Current host extension authorization required" });
     expect(staleResultAck).toEqual({ ok: false, error: "Current host extension authorization required" });
     expect(roomService.getState(created.data.roomCode).quiz.questionIndex).toBe(1);
+  });
+
+  it("rejects source-window updates from a superseded paired extension socket", async () => {
+    const roomService = new RoomService();
+    const app = createApp({ roomService });
+    const server = createServer(app);
+    createSocketServer(server, { roomService });
+    servers.push(server);
+
+    const port = await listen(server);
+    const baseUrl = `http://127.0.0.1:${port}`;
+    const created = await createRoom(baseUrl, { roomName: "Room", public: false, nickname: "Host" });
+
+    const firstExtensionSocket = await connectClient(baseUrl);
+    const secondExtensionSocket = await connectClient(baseUrl);
+    sockets.push(firstExtensionSocket, secondExtensionSocket);
+
+    const firstPair = await emitHostPair(firstExtensionSocket, {
+      roomCode: created.data.roomCode,
+      hostCode: created.data.hostCode
+    });
+    const secondPair = await emitHostPair(secondExtensionSocket, {
+      roomCode: created.data.roomCode,
+      hostCode: created.data.hostCode
+    });
+
+    expect(firstPair.ok).toBe(true);
+    expect(secondPair.ok).toBe(true);
+    if (!firstPair.ok || !secondPair.ok) throw new Error("setup failed");
+
+    const staleAck = await emitExtensionSource(firstExtensionSocket, {
+      roomCode: created.data.roomCode,
+      sourceWindow: {
+        status: "connected",
+        url: "https://machugi.io/stale",
+        title: "Stale source",
+        lastSeenAt: "2026-06-19T00:00:00.000Z",
+        message: null
+      }
+    });
+    const currentAck = await emitExtensionSource(secondExtensionSocket, {
+      roomCode: created.data.roomCode,
+      sourceWindow: {
+        status: "connected",
+        url: "https://machugi.io/current",
+        title: "Current source",
+        lastSeenAt: "2026-06-19T00:00:01.000Z",
+        message: null
+      }
+    });
+
+    expect(staleAck).toEqual({ ok: false, error: "Current host extension authorization required" });
+    expect(currentAck).toEqual({ ok: true, data: undefined });
+    expect(roomService.getState(created.data.roomCode).sourceWindow).toMatchObject({
+      status: "connected",
+      url: "https://machugi.io/current",
+      title: "Current source"
+    });
   });
 
   it("does not emit original submit to a paired extension socket after it rejoins as web", async () => {

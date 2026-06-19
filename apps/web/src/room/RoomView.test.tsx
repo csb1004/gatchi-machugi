@@ -38,6 +38,13 @@ const baseState: RoomState = {
     originalSubmitStatus: "locked",
     lockReason: "모든 참가자가 제출해야 원본 정답 제출이 가능합니다."
   },
+  sourceWindow: {
+    status: "connected",
+    url: "https://machugi.io/",
+    title: "Machugi",
+    lastSeenAt: "2026-06-19T00:00:00.000Z",
+    message: null
+  },
   hostExtensionConnected: true,
   chatMessageCount: 0
 };

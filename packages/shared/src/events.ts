@@ -1,4 +1,12 @@
-import type { PublicRoomSummary, QuestionType, QuizState, RevealedSubmission, RoomSettings, RoomState } from "./models.js";
+import type {
+  PublicRoomSummary,
+  QuestionType,
+  QuizState,
+  RevealedSubmission,
+  RoomSettings,
+  RoomState,
+  SourceWindowState
+} from "./models.js";
 
 export interface ServerToClientEvents {
   "room:state": (state: RoomState) => void;
@@ -21,6 +29,7 @@ export interface ClientToServerEvents {
   "quiz:select": (payload: QuizSelectPayload, ack: Ack<void>) => void;
   "quiz:command": (payload: QuizCommandPayload, ack: Ack<void>) => void;
   "extension:state": (payload: ExtensionStatePayload, ack: Ack<void>) => void;
+  "extension:source": (payload: ExtensionSourcePayload, ack: Ack<void>) => void;
   "answer:submit": (payload: SubmitAnswerPayload, ack: Ack<void>) => void;
   "answer:reveal": (payload: RevealAnswerPayload, ack: Ack<void>) => void;
   "answer:add-alias": (payload: AddAliasPayload, ack: Ack<void>) => void;
@@ -87,6 +96,11 @@ export interface QuizCommandPayload {
 export interface ExtensionStatePayload {
   roomCode: string;
   quiz: QuizState;
+}
+
+export interface ExtensionSourcePayload {
+  roomCode: string;
+  sourceWindow: SourceWindowState;
 }
 
 export interface OriginalSubmitAllowedPayload {

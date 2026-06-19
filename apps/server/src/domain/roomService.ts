@@ -11,7 +11,8 @@ import {
   type RevealedSubmission,
   type RoomSettings,
   type RoomState,
-  type RoomVisibility
+  type RoomVisibility,
+  type SourceWindowState
 } from "@gatchi/shared";
 import { customAlphabet, nanoid } from "nanoid";
 
@@ -164,6 +165,12 @@ export class RoomService {
       room.state.phase = "playing";
     }
 
+    return room.state;
+  }
+
+  updateSourceWindow(input: { roomCode: string; sourceWindow: SourceWindowState }): RoomState {
+    const room = this.requireRoom(input.roomCode);
+    room.state.sourceWindow = input.sourceWindow;
     return room.state;
   }
 
@@ -579,6 +586,13 @@ export class RoomService {
         allRequiredSubmitted: false,
         originalSubmitStatus: "idle",
         lockReason: null
+      },
+      sourceWindow: {
+        status: "disconnected",
+        url: null,
+        title: null,
+        lastSeenAt: null,
+        message: null
       },
       hostExtensionConnected: false,
       chatMessageCount: 0
