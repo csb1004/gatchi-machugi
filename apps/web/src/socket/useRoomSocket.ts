@@ -1,6 +1,7 @@
 import type {
   ChatMessagePayload,
   ClientToServerEvents,
+  JoinRoomPayload,
   QuizCommandName,
   RoomState,
   ServerToClientEvents
@@ -61,20 +62,32 @@ export function useRoomSocket() {
     };
   }, [socket]);
 
-  function joinRoom(input: { roomCode: string; nickname: string }) {
+  function joinRoom(input: { roomCode: string; nickname: string; participantId?: string; participantCode?: string }) {
     const roomCode = normalizeRoomCode(input.roomCode);
+    const payload: JoinRoomPayload = {
+      roomCode,
+      nickname: input.nickname.trim(),
+      ...(input.participantId ? { participantId: input.participantId } : {}),
+      ...(input.participantCode ? { participantCode: input.participantCode } : {})
+    };
+
     setError(null);
     socket.connect();
-    socket.emit("room:join", { roomCode, nickname: input.nickname.trim() }, (ack) => {
-      if (ack.ok) {
-        localStorage.setItem("participantId", ack.data.participantId);
-        setParticipantId(ack.data.participantId);
-        setState(ack.data.state);
-        return;
-      }
+    socket.emit(
+      "room:join",
+      payload,
+      (ack) => {
+        if (ack.ok) {
+          localStorage.setItem("participantId", ack.data.participantId);
+          localStorage.setItem("participantCode", ack.data.participantCode);
+          setParticipantId(ack.data.participantId);
+          setState(ack.data.state);
+          return;
+        }
 
-      setError(localizeSocketError(ack.error));
-    });
+        setError(localizeSocketError(ack.error));
+      }
+    );
   }
 
   function submitAnswer(rawAnswer: string) {

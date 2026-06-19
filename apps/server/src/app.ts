@@ -12,10 +12,9 @@ const createRoomSchema = z
     title: z.string().trim().min(1).max(100).optional(),
     public: z.boolean().optional(),
     visibility: z.enum(["public", "private"]).optional(),
-    nickname: z.string().trim().min(1).max(40).optional()
+    nickname: z.string().trim().min(1).max(40)
   })
-  .strict()
-  .partial();
+  .strict();
 
 function resolveVisibility(input: { public: boolean | undefined; visibility: RoomVisibility | undefined }): RoomVisibility {
   if (input.visibility) return input.visibility;
@@ -45,6 +44,7 @@ export function createApp({ roomService, staticDir }: { roomService: RoomService
 
     const created = await roomService.createRoom({
       title: parsed.data.roomName ?? parsed.data.title ?? "Untitled room",
+      hostNickname: parsed.data.nickname,
       visibility: resolveVisibility({
         public: parsed.data.public,
         visibility: parsed.data.visibility
@@ -53,7 +53,8 @@ export function createApp({ roomService, staticDir }: { roomService: RoomService
 
     response.status(201).json({
       roomCode: created.roomCode,
-      hostToken: created.hostToken
+      hostParticipantId: created.hostParticipantId,
+      hostCode: created.hostCode
     });
   });
 

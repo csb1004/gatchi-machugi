@@ -7,9 +7,7 @@ import { RoomService } from "./domain/roomService.js";
 import { createSocketServer } from "./socket/createSocketServer.js";
 
 const port = Number(process.env.PORT ?? 3000);
-const roomService = new RoomService({
-  hostTokenPepper: process.env.HOST_TOKEN_PEPPER ?? "development-host-pepper"
-});
+const roomService = new RoomService();
 const currentDir = dirname(fileURLToPath(import.meta.url));
 const staticDir = process.env.STATIC_DIR ?? resolve(currentDir, "../../web/dist");
 const app = createApp({ roomService, staticDir });

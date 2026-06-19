@@ -32,12 +32,13 @@ type HostPairGatewayAck = HostPairAck & { state: RoomState };
 const joinRoomSchema = z.object({
   roomCode: z.string().trim().min(1).transform((value) => value.toUpperCase()),
   nickname: z.string().trim().min(1).max(40),
-  participantId: z.string().trim().min(1).optional()
+  participantId: z.string().trim().min(1).optional(),
+  participantCode: z.string().trim().min(1).optional()
 });
 
 const hostPairSchema = z.object({
   roomCode: z.string().trim().min(1).transform((value) => value.toUpperCase()),
-  hostToken: z.string().trim().min(1)
+  hostCode: z.string().trim().min(1)
 });
 
 const extensionStateSchema = z.object({
@@ -155,28 +156,24 @@ export function createSocketServer(httpServer: HttpServer, { roomService }: { ro
 
       try {
         const participantId = session.participantId;
-        const joined = roomService.joinParticipant(
-          participantId
-            ? {
-                roomCode: parsed.data.roomCode,
-                nickname: parsed.data.nickname,
-                participantId
-              }
-            : {
-                roomCode: parsed.data.roomCode,
-                nickname: parsed.data.nickname
-              }
-        );
+        const trustedParticipantId = participantId ?? (parsed.data.participantCode ? parsed.data.participantId : undefined);
+        const joined = roomService.joinParticipant({
+          roomCode: parsed.data.roomCode,
+          nickname: parsed.data.nickname,
+          ...(trustedParticipantId ? { participantId: trustedParticipantId } : {}),
+          ...(parsed.data.participantCode ? { participantCode: parsed.data.participantCode } : {})
+        });
 
         socket.join(parsed.data.roomCode);
         session.roomCode = parsed.data.roomCode;
         session.participantId = joined.participant.id;
-        session.role = "participant";
+        session.role = joined.participant.role === "host" ? "host" : "participant";
 
         ack({
           ok: true,
           data: {
             participantId: joined.participant.id,
+            participantCode: joined.participantCode,
             state: joined.state
           }
         });
@@ -194,23 +191,22 @@ export function createSocketServer(httpServer: HttpServer, { roomService }: { ro
         return;
       }
 
-      const isValidHost = await roomService.verifyHost({
+      const isValidHost = roomService.verifyHost({
         roomCode: parsed.data.roomCode,
-        hostToken: parsed.data.hostToken
+        hostCode: parsed.data.hostCode
       });
 
       if (!isValidHost) {
-        ackError(ack, "Invalid host token");
+        ackError(ack, "Invalid host code");
         return;
       }
 
       try {
-        const joined = roomService.joinHostPlayer({
+        const joined = roomService.joinHostExtension({
           roomCode: parsed.data.roomCode,
-          nickname: "Host"
+          hostCode: parsed.data.hostCode
         });
         const state = joined.state;
-        state.hostExtensionConnected = true;
 
         socket.join(parsed.data.roomCode);
         session.roomCode = parsed.data.roomCode;
@@ -400,7 +396,7 @@ export function createSocketServer(httpServer: HttpServer, { roomService }: { ro
 
       if (session.role === "host") {
         try {
-          const state = markParticipantDisconnected(roomService, session) ?? roomService.getState(session.roomCode);
+          const state = roomService.expireRoom(session.roomCode);
           state.hostExtensionConnected = false;
           io.to(session.roomCode).emit("host:disconnected");
           io.to(session.roomCode).emit("room:state", state);

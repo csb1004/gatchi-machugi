@@ -165,7 +165,7 @@ h2 {
   height: 18px;
 }
 
-.host-token-panel {
+.host-code-panel {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   gap: 8px 12px;
@@ -176,19 +176,19 @@ h2 {
   background: #fbfcff;
 }
 
-.host-token-panel span {
+.host-code-panel span {
   color: #667085;
   font-size: 0.82rem;
   font-weight: 800;
 }
 
-.host-token-panel code,
-.host-token-panel strong {
+.host-code-panel code,
+.host-code-panel strong {
   min-width: 0;
   overflow-wrap: anywhere;
 }
 
-.host-token-panel button {
+.host-code-panel button {
   grid-column: 1 / -1;
   justify-self: start;
   display: inline-flex;

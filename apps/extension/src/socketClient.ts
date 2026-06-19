@@ -15,10 +15,10 @@ export const PAIRING_REQUEST_TYPE = "pair-host";
 export interface PairingSettings {
   serverUrl: string;
   roomCode: string;
-  hostToken: string;
+  hostCode: string;
 }
 
-export type StoredPairingSettings = Omit<PairingSettings, "hostToken">;
+export type StoredPairingSettings = Omit<PairingSettings, "hostCode">;
 
 export interface PairHostRequestMessage {
   type: typeof PAIRING_REQUEST_TYPE;
@@ -37,17 +37,24 @@ export function normalizeServerUrl(serverUrl: string) {
     throw new Error("서버 URL을 입력해주세요.");
   }
 
+  let url: URL;
   try {
-    return new URL(normalized).toString().replace(/\/$/, "");
+    url = new URL(normalized);
   } catch {
     throw new Error("올바른 서버 URL을 입력해주세요.");
   }
+
+  if (url.hostname === "machugi.io" || url.hostname.endsWith(".machugi.io")) {
+    throw new Error("원본 퀴즈 사이트가 아니라 가치 마추기 서버 URL을 입력해주세요.");
+  }
+
+  return url.toString().replace(/\/$/, "");
 }
 
-export function buildPairPayload({ roomCode, hostToken }: Pick<PairingSettings, "roomCode" | "hostToken">): HostPairPayload {
+export function buildPairPayload({ roomCode, hostCode }: Pick<PairingSettings, "roomCode" | "hostCode">): HostPairPayload {
   return {
     roomCode: roomCode.trim().toUpperCase(),
-    hostToken
+    hostCode: hostCode.trim().toUpperCase()
   };
 }
 
@@ -94,7 +101,7 @@ export class MachugiSocketClient {
     });
   }
 
-  async pair(payload: Pick<PairingSettings, "roomCode" | "hostToken">): Promise<HostPairGatewayAck> {
+  async pair(payload: Pick<PairingSettings, "roomCode" | "hostCode">): Promise<HostPairGatewayAck> {
     if (!this.socket) {
       throw new Error("소켓 클라이언트가 연결되지 않았습니다.");
     }

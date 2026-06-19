@@ -9,12 +9,13 @@ import {
   type RoomVisibility
 } from "@gatchi/shared";
 import { customAlphabet, nanoid } from "nanoid";
-import { createHostToken, hashHostToken, verifyHostToken } from "../security/hostToken.js";
 
 const createRoomCode = customAlphabet("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ", 6);
+const createParticipantCodeValue = customAlphabet("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ", 4);
 
 interface StoredRoom {
-  hostTokenHash: string;
+  hostParticipantId: string;
+  participantCodes: Map<string, string>;
   state: RoomState;
   aliases: string[];
   rawSubmissions: Map<string, { rawAnswer: string; skipped: boolean }>;
@@ -24,28 +25,38 @@ interface StoredRoom {
 
 export interface CreateRoomInput {
   title: string;
+  hostNickname: string;
   visibility: RoomVisibility;
 }
 
 export interface CreateRoomResult {
   roomCode: string;
-  hostToken: string;
+  hostParticipantId: string;
+  hostCode: string;
   state: RoomState;
 }
 
 export class RoomService {
   private rooms = new Map<string, StoredRoom>();
 
-  constructor(private readonly options: { hostTokenPepper: string }) {}
-
   async createRoom(input: CreateRoomInput): Promise<CreateRoomResult> {
     const roomCode = this.uniqueRoomCode();
-    const hostToken = createHostToken();
-    const hostTokenHash = await hashHostToken(hostToken, this.options.hostTokenPepper);
     const state = this.emptyState(roomCode, input);
+    const participantCodes = new Map<string, string>();
+    const hostParticipant: Participant = {
+      id: nanoid(12),
+      nickname: this.uniqueNickname([], input.hostNickname.trim() || "Host"),
+      role: "host",
+      connected: true,
+      score: 0
+    };
+    const hostCode = this.uniqueParticipantCode(participantCodes);
+    participantCodes.set(hostParticipant.id, hostCode);
+    state.participants.push(hostParticipant);
 
     this.rooms.set(roomCode, {
-      hostTokenHash,
+      hostParticipantId: hostParticipant.id,
+      participantCodes,
       state,
       aliases: [],
       rawSubmissions: new Map(),
@@ -53,16 +64,25 @@ export class RoomService {
       expiresAt: new Date(Date.now() + 12 * 60 * 60 * 1000)
     });
 
-    return { roomCode, hostToken, state };
+    return { roomCode, hostParticipantId: hostParticipant.id, hostCode, state };
   }
 
-  joinParticipant(input: { roomCode: string; nickname: string; participantId?: string }): { participant: Participant; state: RoomState } {
+  joinParticipant(input: {
+    roomCode: string;
+    nickname: string;
+    participantId?: string;
+    participantCode?: string;
+  }): { participant: Participant; participantCode: string; state: RoomState } {
     const room = this.requireRoom(input.roomCode);
     const existing = input.participantId ? room.state.participants.find((participant) => participant.id === input.participantId) : undefined;
 
     if (existing) {
+      const participantCode = this.requireParticipantCode(room, existing.id);
+      if (existing.role === "host" || input.participantCode) {
+        this.requireMatchingParticipantCode(room, existing.id, input.participantCode);
+      }
       existing.connected = true;
-      return { participant: existing, state: room.state };
+      return { participant: existing, participantCode, state: room.state };
     }
 
     const participant: Participant = {
@@ -73,17 +93,19 @@ export class RoomService {
       score: 0
     };
 
+    const participantCode = this.uniqueParticipantCode(room.participantCodes);
+    room.participantCodes.set(participant.id, participantCode);
     room.state.participants.push(participant);
-    return { participant, state: room.state };
+    return { participant, participantCode, state: room.state };
   }
 
-  joinHostPlayer(input: { roomCode: string; nickname: string }): { participant: Participant; state: RoomState } {
+  joinHostPlayer(input: { roomCode: string; nickname: string }): { participant: Participant; participantCode: string; state: RoomState } {
     const room = this.requireRoom(input.roomCode);
     const existing = room.state.participants.find((participant) => participant.role === "host");
 
     if (existing) {
       existing.connected = true;
-      return { participant: existing, state: room.state };
+      return { participant: existing, participantCode: this.requireParticipantCode(room, existing.id), state: room.state };
     }
 
     const participant: Participant = {
@@ -94,14 +116,26 @@ export class RoomService {
       score: 0
     };
 
+    const participantCode = this.uniqueParticipantCode(room.participantCodes);
+    room.hostParticipantId = participant.id;
+    room.participantCodes.set(participant.id, participantCode);
     room.state.participants.push(participant);
-    return { participant, state: room.state };
+    return { participant, participantCode, state: room.state };
   }
 
-  async verifyHost(input: { roomCode: string; hostToken: string }): Promise<boolean> {
+  verifyHost(input: { roomCode: string; hostCode: string }): boolean {
     const room = this.rooms.get(input.roomCode);
     if (!room) return false;
-    return verifyHostToken(input.hostToken, room.hostTokenHash, this.options.hostTokenPepper);
+    return this.normalizeParticipantCode(input.hostCode) === this.requireParticipantCode(room, room.hostParticipantId);
+  }
+
+  joinHostExtension(input: { roomCode: string; hostCode: string }): { participant: Participant; state: RoomState } {
+    const room = this.requireRoom(input.roomCode);
+    this.requireMatchingParticipantCode(room, room.hostParticipantId, input.hostCode);
+    const participant = this.requireParticipant(room, room.hostParticipantId);
+    participant.connected = true;
+    room.state.hostExtensionConnected = true;
+    return { participant, state: room.state };
   }
 
   getState(roomCode: string): RoomState {
@@ -263,6 +297,31 @@ export class RoomService {
     let code = createRoomCode();
     while (this.rooms.has(code)) code = createRoomCode();
     return code;
+  }
+
+  private uniqueParticipantCode(participantCodes: Map<string, string>): string {
+    const existing = new Set(participantCodes.values());
+    let code = this.normalizeParticipantCode(createParticipantCodeValue());
+    while (existing.has(code)) code = this.normalizeParticipantCode(createParticipantCodeValue());
+    return code;
+  }
+
+  private normalizeParticipantCode(code: string): string {
+    const normalized = code.trim().toUpperCase();
+    return normalized.startsWith("#") ? normalized : `#${normalized}`;
+  }
+
+  private requireParticipantCode(room: StoredRoom, participantId: string): string {
+    const participantCode = room.participantCodes.get(participantId);
+    if (!participantCode) throw new Error("Participant code missing");
+    return participantCode;
+  }
+
+  private requireMatchingParticipantCode(room: StoredRoom, participantId: string, participantCode: string | undefined): void {
+    if (!participantCode) throw new Error("Participant code required");
+    if (this.normalizeParticipantCode(participantCode) !== this.requireParticipantCode(room, participantId)) {
+      throw new Error("Invalid participant code");
+    }
   }
 
   private uniqueNickname(participants: Participant[], requested: string): string {

@@ -91,15 +91,15 @@
       <form id="pair-form">
         <label for="server-url">
           서버 URL
-          <input id="server-url" name="serverUrl" type="url" placeholder="https://api.machugi.io" required />
+          <input id="server-url" name="serverUrl" type="url" placeholder="https://your-app.up.railway.app" required />
         </label>
         <label for="room-code">
           방 코드
           <input id="room-code" name="roomCode" type="text" maxlength="12" autocapitalize="characters" required />
         </label>
-        <label for="host-token">
-          방장 토큰
-          <input id="host-token" name="hostToken" type="password" spellcheck="false" required />
+        <label for="host-code">
+          방장 코드
+          <input id="host-code" name="hostCode" type="text" maxlength="5" autocapitalize="characters" spellcheck="false" required />
         </label>
         <button id="pair-button" type="submit">확장 프로그램 연결</button>
       </form>

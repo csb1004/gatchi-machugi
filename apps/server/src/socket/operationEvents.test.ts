@@ -23,8 +23,8 @@ async function listen(server: HttpServer): Promise<number> {
 }
 
 async function createRoom(baseUrl: string) {
-  return await new Promise<{ roomCode: string; hostToken: string }>((resolve, reject) => {
-    const body = JSON.stringify({ roomName: "Room", public: false });
+  return await new Promise<{ roomCode: string; hostParticipantId: string; hostCode: string }>((resolve, reject) => {
+    const body = JSON.stringify({ roomName: "Room", public: false, nickname: "Host" });
     const url = new URL("/api/rooms", baseUrl);
     const req = request(
       url,
@@ -40,7 +40,7 @@ async function createRoom(baseUrl: string) {
         response.on("data", (chunk: Buffer) => chunks.push(chunk));
         response.on("end", () => {
           try {
-            resolve(JSON.parse(Buffer.concat(chunks).toString("utf8")) as { roomCode: string; hostToken: string });
+            resolve(JSON.parse(Buffer.concat(chunks).toString("utf8")) as { roomCode: string; hostParticipantId: string; hostCode: string });
           } catch (error) {
             reject(error);
           }
@@ -117,7 +117,7 @@ describe("operation socket events", () => {
   });
 
   it("broadcasts chat from the joined participant session", async () => {
-    const roomService = new RoomService({ hostTokenPepper: "pepper" });
+    const roomService = new RoomService();
     const app = createApp({ roomService });
     const server = createServer(app);
     createSocketServer(server, { roomService });
@@ -146,7 +146,7 @@ describe("operation socket events", () => {
   });
 
   it("rejects host-only operations from participant sockets", async () => {
-    const roomService = new RoomService({ hostTokenPepper: "pepper" });
+    const roomService = new RoomService();
     const app = createApp({ roomService });
     const server = createServer(app);
     createSocketServer(server, { roomService });

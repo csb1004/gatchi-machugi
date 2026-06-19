@@ -2,59 +2,72 @@ import { describe, expect, it } from "vitest";
 import { RoomService } from "./roomService.js";
 
 describe("RoomService", () => {
-  it("creates a room with a public room code and one-time host token", async () => {
-    const service = new RoomService({ hostTokenPepper: "pepper" });
-    const created = await service.createRoom({ title: "Friday quiz", visibility: "public" });
+  it("creates a room with a host participant and private host code", async () => {
+    const service = new RoomService();
+    const created = await service.createRoom({ title: "Friday quiz", visibility: "public", hostNickname: "Sangbeom" });
 
     expect(created.roomCode).toMatch(/^[A-Z0-9]{6}$/);
-    expect(created.hostToken.length).toBeGreaterThanOrEqual(32);
+    expect(created.hostCode).toMatch(/^#[A-Z0-9]{4}$/);
+    expect(created.state.participants).toEqual([
+      expect.objectContaining({
+        id: created.hostParticipantId,
+        nickname: "Sangbeom",
+        role: "host"
+      })
+    ]);
+    expect(JSON.stringify(created.state)).not.toContain(created.hostCode);
     expect(created.state.settings.title).toBe("Friday quiz");
     expect(created.state.settings.visibility).toBe("public");
   });
 
-  it("adds numeric suffixes for duplicate nicknames", async () => {
-    const service = new RoomService({ hostTokenPepper: "pepper" });
-    const { roomCode } = await service.createRoom({ title: "Room", visibility: "private" });
+  it("adds numeric suffixes for duplicate nicknames while issuing unique participant codes", async () => {
+    const service = new RoomService();
+    const { roomCode } = await service.createRoom({ title: "Room", visibility: "private", hostNickname: "Host" });
 
     const first = service.joinParticipant({ roomCode, nickname: "Mina" });
     const second = service.joinParticipant({ roomCode, nickname: "Mina" });
 
     expect(first.participant.nickname).toBe("Mina");
     expect(second.participant.nickname).toBe("Mina#2");
+    expect(first.participantCode).toMatch(/^#[A-Z0-9]{4}$/);
+    expect(second.participantCode).toMatch(/^#[A-Z0-9]{4}$/);
+    expect(second.participantCode).not.toBe(first.participantCode);
   });
 
-  it("verifies host token before granting host access", async () => {
-    const service = new RoomService({ hostTokenPepper: "pepper" });
-    const { roomCode, hostToken } = await service.createRoom({ title: "Room", visibility: "private" });
+  it("verifies host participant code before granting host access", async () => {
+    const service = new RoomService();
+    const { roomCode, hostCode } = await service.createRoom({ title: "Room", visibility: "private", hostNickname: "Host" });
 
-    await expect(service.verifyHost({ roomCode, hostToken })).resolves.toBe(true);
-    await expect(service.verifyHost({ roomCode, hostToken: "wrong" })).resolves.toBe(false);
+    expect(service.verifyHost({ roomCode, hostCode })).toBe(true);
+    expect(service.verifyHost({ roomCode, hostCode: "#NOPE" })).toBe(false);
   });
 
   it("keeps raw answers private before reveal while exposing only submission status", async () => {
-    const service = new RoomService({ hostTokenPepper: "pepper" });
-    const { roomCode } = await service.createRoom({ title: "Room", visibility: "private" });
-    const host = service.joinHostPlayer({ roomCode, nickname: "Host" });
+    const service = new RoomService();
+    const { roomCode, hostParticipantId } = await service.createRoom({ title: "Room", visibility: "private", hostNickname: "Host" });
+    const host = service.getState(roomCode).participants.find((participant) => participant.id === hostParticipantId);
     const player = service.joinParticipant({ roomCode, nickname: "Mina" });
 
-    service.submitAnswer({ roomCode, participantId: host.participant.id, rawAnswer: "blue archive" });
+    if (!host) throw new Error("missing host");
+    service.submitAnswer({ roomCode, participantId: host.id, rawAnswer: "blue archive" });
     service.submitAnswer({ roomCode, participantId: player.participant.id, rawAnswer: "wrong answer" });
 
     const state = service.getState(roomCode);
 
     expect(JSON.stringify(state)).not.toContain("rawAnswer");
     expect(state.submissions).toEqual([
-      { participantId: host.participant.id, submitted: true, skipped: false },
+      { participantId: host.id, submitted: true, skipped: false },
       { participantId: player.participant.id, submitted: true, skipped: false }
     ]);
     expect(state.revealedSubmissions).toEqual([]);
   });
 
   it("requires every active participant including the host to submit or be skipped before reveal", async () => {
-    const service = new RoomService({ hostTokenPepper: "pepper" });
-    const { roomCode } = await service.createRoom({ title: "Room", visibility: "private" });
-    const host = service.joinHostPlayer({ roomCode, nickname: "Host" });
+    const service = new RoomService();
+    const { roomCode, hostParticipantId } = await service.createRoom({ title: "Room", visibility: "private", hostNickname: "Host" });
+    const host = service.getState(roomCode).participants.find((participant) => participant.id === hostParticipantId);
     const player = service.joinParticipant({ roomCode, nickname: "Mina" });
+    if (!host) throw new Error("missing host");
 
     service.updateQuizState({
       roomCode,
@@ -65,7 +78,7 @@ describe("RoomService", () => {
         answerCandidates: ["blue archive"]
       }
     });
-    service.submitAnswer({ roomCode, participantId: host.participant.id, rawAnswer: "blue archive" });
+    service.submitAnswer({ roomCode, participantId: host.id, rawAnswer: "blue archive" });
 
     expect(() => service.revealAnswers({ roomCode, skippedParticipantIds: [] })).toThrow(
       "All active participants must submit or be skipped before reveal"
@@ -84,10 +97,11 @@ describe("RoomService", () => {
   });
 
   it("re-scores revealed submissions with trimmed aliases and space-insensitive matching", async () => {
-    const service = new RoomService({ hostTokenPepper: "pepper" });
-    const { roomCode } = await service.createRoom({ title: "Room", visibility: "private" });
-    const host = service.joinHostPlayer({ roomCode, nickname: "Host" });
+    const service = new RoomService();
+    const { roomCode, hostParticipantId } = await service.createRoom({ title: "Room", visibility: "private", hostNickname: "Host" });
+    const host = service.getState(roomCode).participants.find((participant) => participant.id === hostParticipantId);
     const player = service.joinParticipant({ roomCode, nickname: "Mina" });
+    if (!host) throw new Error("missing host");
 
     service.updateQuizState({
       roomCode,
@@ -98,7 +112,7 @@ describe("RoomService", () => {
         answerCandidates: ["blue archive"]
       }
     });
-    service.submitAnswer({ roomCode, participantId: host.participant.id, rawAnswer: "bluearchive" });
+    service.submitAnswer({ roomCode, participantId: host.id, rawAnswer: "bluearchive" });
     service.submitAnswer({ roomCode, participantId: player.participant.id, rawAnswer: "acceptedalias" });
     service.revealAnswers({ roomCode, skippedParticipantIds: [] });
 
@@ -111,10 +125,11 @@ describe("RoomService", () => {
   });
 
   it("rejects answer changes after reveal", async () => {
-    const service = new RoomService({ hostTokenPepper: "pepper" });
-    const { roomCode } = await service.createRoom({ title: "Room", visibility: "private" });
-    const host = service.joinHostPlayer({ roomCode, nickname: "Host" });
+    const service = new RoomService();
+    const { roomCode, hostParticipantId } = await service.createRoom({ title: "Room", visibility: "private", hostNickname: "Host" });
+    const host = service.getState(roomCode).participants.find((participant) => participant.id === hostParticipantId);
     const player = service.joinParticipant({ roomCode, nickname: "Mina" });
+    if (!host) throw new Error("missing host");
 
     service.updateQuizState({
       roomCode,
@@ -125,7 +140,7 @@ describe("RoomService", () => {
         answerCandidates: ["blue archive"]
       }
     });
-    service.submitAnswer({ roomCode, participantId: host.participant.id, rawAnswer: "blue archive" });
+    service.submitAnswer({ roomCode, participantId: host.id, rawAnswer: "blue archive" });
     service.submitAnswer({ roomCode, participantId: player.participant.id, rawAnswer: "wrong" });
     service.revealAnswers({ roomCode, skippedParticipantIds: [] });
 
@@ -135,8 +150,8 @@ describe("RoomService", () => {
   });
 
   it("adjusts scores, changes settings, kicks participants, and expires rooms", async () => {
-    const service = new RoomService({ hostTokenPepper: "pepper" });
-    const { roomCode } = await service.createRoom({ title: "Room", visibility: "public" });
+    const service = new RoomService();
+    const { roomCode } = await service.createRoom({ title: "Room", visibility: "public", hostNickname: "Host" });
     const player = service.joinParticipant({ roomCode, nickname: "Mina" });
 
     service.adjustScore({ roomCode, participantId: player.participant.id, delta: 3, reason: "manual correction" });
@@ -155,8 +170,8 @@ describe("RoomService", () => {
   });
 
   it("records chat message count for room state", async () => {
-    const service = new RoomService({ hostTokenPepper: "pepper" });
-    const { roomCode } = await service.createRoom({ title: "Room", visibility: "public" });
+    const service = new RoomService();
+    const { roomCode } = await service.createRoom({ title: "Room", visibility: "public", hostNickname: "Host" });
     const player = service.joinParticipant({ roomCode, nickname: "Mina" });
 
     const message = service.addChatMessage({

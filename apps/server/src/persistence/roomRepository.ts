@@ -6,7 +6,7 @@ export interface PersistRoomInput {
   title: string;
   visibility: RoomVisibility;
   phase: string;
-  hostTokenHash: string;
+  hostCodeHash: string;
   expiresAt: Date;
 }
 
@@ -20,7 +20,7 @@ export class RoomRepository {
         title: input.title,
         visibility: input.visibility,
         phase: input.phase,
-        hostTokenHash: input.hostTokenHash,
+        hostTokenHash: input.hostCodeHash,
         expiresAt: input.expiresAt
       }
     });

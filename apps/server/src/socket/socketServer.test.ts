@@ -26,12 +26,12 @@ async function createRoom(baseUrl: string, body: { roomName: string; public: boo
   const response = await fetch(`${baseUrl}/api/rooms`, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify(body)
+    body: JSON.stringify({ ...body, nickname: body.nickname ?? "Host" })
   });
 
   return {
     status: response.status,
-    data: (await response.json()) as { roomCode: string; hostToken: string }
+    data: (await response.json()) as { roomCode: string; hostParticipantId: string; hostCode: string }
   };
 }
 
@@ -50,7 +50,10 @@ function waitForEvent<EventName extends keyof ServerToClientEvents>(
 function emitJoin(
   socket: Socket<ServerToClientEvents, ClientToServerEvents>,
   payload: JoinRoomPayload
-): Promise<{ ok: true; data: { participantId: string; state: { roomCode: string; participants: { nickname: string }[] } } } | { ok: false; error: string }> {
+): Promise<
+  | { ok: true; data: { participantId: string; participantCode: string; state: { roomCode: string; participants: { nickname: string }[] } } }
+  | { ok: false; error: string }
+> {
   return new Promise((resolve) => {
     socket.emit("room:join", payload, resolve);
   });
@@ -117,7 +120,7 @@ describe("socket server", () => {
   });
 
   it("serves room endpoints and lets a participant join over sockets", async () => {
-    const roomService = new RoomService({ hostTokenPepper: "pepper" });
+    const roomService = new RoomService();
     const app = createApp({ roomService });
     const server = createServer(app);
     createSocketServer(server, { roomService });
@@ -133,7 +136,8 @@ describe("socket server", () => {
     const created = await createRoom(baseUrl, { roomName: "Friday quiz", public: true, nickname: "Host" });
     expect(created.status).toBe(201);
     expect(created.data.roomCode).toMatch(/^[A-Z0-9]{6}$/);
-    expect(created.data.hostToken.length).toBeGreaterThan(20);
+    expect(created.data.hostCode).toMatch(/^#[A-Z0-9]{4}$/);
+    expect(created.data.hostParticipantId).toEqual(expect.any(String));
 
     const roomsResponse = await fetch(`${baseUrl}/api/rooms/public`);
     const rooms = (await roomsResponse.json()) as PublicRoomSummary[];
@@ -143,7 +147,7 @@ describe("socket server", () => {
         roomCode: created.data.roomCode,
         title: "Friday quiz",
         visibility: "public",
-        participantCount: 0
+        participantCount: 1
       })
     ]);
 
@@ -162,17 +166,25 @@ describe("socket server", () => {
     }
 
     expect(joinAck.data.state.roomCode).toBe(created.data.roomCode);
+    expect(joinAck.data.participantCode).toMatch(/^#[A-Z0-9]{4}$/);
     expect(joinAck.data.state.participants).toEqual([
+      expect.objectContaining({
+        id: created.data.hostParticipantId,
+        nickname: "Host",
+        role: "host",
+        connected: true
+      }),
       expect.objectContaining({
         id: joinAck.data.participantId,
         nickname: "Mina",
+        role: "player",
         connected: true
       })
     ]);
 
     const broadcastState = await broadcastPromise;
-    expect(broadcastState.participants).toHaveLength(1);
-    expect(broadcastState.participants[0]).toEqual(
+    expect(broadcastState.participants).toHaveLength(2);
+    expect(broadcastState.participants[1]).toEqual(
       expect.objectContaining({
         id: joinAck.data.participantId,
         nickname: "Mina",
@@ -181,8 +193,8 @@ describe("socket server", () => {
     );
   });
 
-  it("pairs hosts with a valid token, rejects invalid tokens, and clears host state on disconnect", async () => {
-    const roomService = new RoomService({ hostTokenPepper: "pepper" });
+  it("pairs hosts with a valid participant code, rejects invalid codes, and expires the room on extension disconnect", async () => {
+    const roomService = new RoomService();
     const app = createApp({ roomService });
     const server = createServer(app);
     createSocketServer(server, { roomService });
@@ -206,11 +218,11 @@ describe("socket server", () => {
 
     const invalidAck = await emitHostPair(invalidHostSocket, {
       roomCode: created.data.roomCode,
-      hostToken: "wrong-token"
+      hostCode: "#NOPE"
     });
     expect(invalidAck).toEqual({
       ok: false,
-      error: "Invalid host token"
+      error: "Invalid host code"
     });
 
     const hostSocket = await connectClient(baseUrl);
@@ -221,7 +233,7 @@ describe("socket server", () => {
 
     const hostAck = await emitHostPair(hostSocket, {
       roomCode: created.data.roomCode,
-      hostToken: created.data.hostToken
+      hostCode: created.data.hostCode
     });
 
     expect(hostAck.ok).toBe(true);
@@ -241,6 +253,9 @@ describe("socket server", () => {
     hostSocket.disconnect();
 
     await disconnectedEvent;
-    expect((await disconnectedState).hostExtensionConnected).toBe(false);
+    const expiredState = await disconnectedState;
+    expect(expiredState.hostExtensionConnected).toBe(false);
+    expect(expiredState.phase).toBe("expired");
+    expect(roomService.listPublicRooms()).toEqual([]);
   });
 });

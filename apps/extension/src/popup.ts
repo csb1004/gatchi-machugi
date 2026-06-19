@@ -5,7 +5,7 @@ type PairFormElements = {
   form: HTMLFormElement;
   serverUrl: HTMLInputElement;
   roomCode: HTMLInputElement;
-  hostToken: HTMLInputElement;
+  hostCode: HTMLInputElement;
   submitButton: HTMLButtonElement;
   status: HTMLOutputElement;
 };
@@ -46,7 +46,7 @@ function getElements(): PairFormElements {
     form: document.querySelector("#pair-form") as HTMLFormElement,
     serverUrl: document.querySelector("#server-url") as HTMLInputElement,
     roomCode: document.querySelector("#room-code") as HTMLInputElement,
-    hostToken: document.querySelector("#host-token") as HTMLInputElement,
+    hostCode: document.querySelector("#host-code") as HTMLInputElement,
     submitButton: document.querySelector("#pair-button") as HTMLButtonElement,
     status: document.querySelector("#status") as HTMLOutputElement
   };
@@ -59,7 +59,7 @@ function setStatus(elements: PairFormElements, message: string, state: "idle" | 
 
 function localizeError(message: string) {
   const translations: Record<string, string> = {
-    "Invalid host token": "방장 토큰이 올바르지 않습니다.",
+    "Invalid host code": "방장 코드가 올바르지 않습니다.",
     "Invalid host pair payload": "방장 연결 정보가 올바르지 않습니다.",
     "Failed to pair host": "방장 연결에 실패했습니다.",
     "Room not found": "방을 찾을 수 없습니다.",
@@ -80,7 +80,7 @@ async function handleSubmit(elements: PairFormElements) {
   const payload: PairingSettings = {
     serverUrl: elements.serverUrl.value,
     roomCode: elements.roomCode.value,
-    hostToken: elements.hostToken.value
+    hostCode: elements.hostCode.value
   };
 
   elements.submitButton.disabled = true;
@@ -108,6 +108,9 @@ async function init() {
 
   elements.roomCode.addEventListener("input", () => {
     elements.roomCode.value = elements.roomCode.value.toUpperCase();
+  });
+  elements.hostCode.addEventListener("input", () => {
+    elements.hostCode.value = elements.hostCode.value.toUpperCase();
   });
 
   elements.form.addEventListener("submit", (event) => {

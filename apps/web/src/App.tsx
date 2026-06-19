@@ -21,6 +21,10 @@ export function App() {
   const serverUrl = window.location.origin;
   const extensionReleaseUrl = import.meta.env.VITE_GITHUB_EXTENSION_RELEASE_URL ?? "https://github.com/csb1004/gatchi-machugi/releases";
 
+  function buildPairingText(room: CreatedRoom) {
+    return [`서버 URL: ${serverUrl}`, `방 코드: ${room.roomCode}`, `방장 코드: ${room.hostCode}`].join("\n");
+  }
+
   useEffect(() => {
     void loadPublicRooms();
   }, []);
@@ -50,6 +54,12 @@ export function App() {
       setCreatedRoom(created);
       setRoomCode(created.roomCode);
       setCreateStatus("idle");
+      roomSocket.joinRoom({
+        roomCode: created.roomCode,
+        nickname: nickname.trim(),
+        participantId: created.hostParticipantId,
+        participantCode: created.hostCode
+      });
       await loadPublicRooms();
     } catch {
       setCreateStatus("failed");
@@ -64,6 +74,25 @@ export function App() {
         <div className="room-stack">
           {currentParticipant?.role === "host" ? (
             <>
+              {createdRoom ? (
+                <div className="host-code-panel" role="status" aria-label="확장 프로그램 연결 정보">
+                  <span>서버 URL</span>
+                  <code>{serverUrl}</code>
+                  <span>방 코드</span>
+                  <strong>{createdRoom.roomCode}</strong>
+                  <span>방장 코드</span>
+                  <code>{createdRoom.hostCode}</code>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      void navigator.clipboard?.writeText(buildPairingText(createdRoom));
+                    }}
+                  >
+                    <Copy size={16} />
+                    연결 정보 복사
+                  </button>
+                </div>
+              ) : null}
               <HostControls extensionConnected={roomSocket.state.hostExtensionConnected} onCommand={roomSocket.sendHostCommand} />
               <ExtensionSetup releaseUrl={extensionReleaseUrl} />
             </>
@@ -177,21 +206,21 @@ export function App() {
             {createStatus === "failed" ? <p className="status-text">방을 만들지 못했습니다.</p> : null}
 
             {createdRoom ? (
-              <div className="host-token-panel" role="status">
+              <div className="host-code-panel" role="status">
                 <span>서버 URL</span>
                 <code>{serverUrl}</code>
                 <span>방 코드</span>
                 <strong>{createdRoom.roomCode}</strong>
-                <span>방장 토큰</span>
-                <code>{createdRoom.hostToken}</code>
+                <span>방장 코드</span>
+                <code>{createdRoom.hostCode}</code>
                 <button
                   type="button"
                   onClick={() => {
-                    void navigator.clipboard?.writeText(createdRoom.hostToken);
+                    void navigator.clipboard?.writeText(buildPairingText(createdRoom));
                   }}
                 >
                   <Copy size={16} />
-                  토큰 복사
+                  연결 정보 복사
                 </button>
               </div>
             ) : null}
@@ -202,11 +231,11 @@ export function App() {
                 GitHub Releases에서 확장 프로그램 받기
               </a>
               <ol>
-                <li>방을 만들고 표시된 방장 토큰을 다른 사람에게 공유하지 마세요.</li>
+                <li>방을 만들고 표시된 방장 코드를 다른 사람에게 공유하지 마세요.</li>
                 <li>퀴즈를 진행할 브라우저 탭에서 machugi.io를 엽니다.</li>
                 <li>GitHub Releases에서 가치 마추기 확장 프로그램 zip을 내려받아 압축을 풉니다.</li>
                 <li>chrome://extensions에서 개발자 모드를 켜고 압축해제된 확장 프로그램을 로드합니다.</li>
-                <li>확장 popup에 서버 URL, 방 코드, 방장 토큰을 입력합니다.</li>
+                <li>확장 popup에 서버 URL, 방 코드, 방장 코드를 입력합니다.</li>
                 <li>확장이 연결된 뒤 참가자는 방 코드로 입장합니다.</li>
               </ol>
             </div>

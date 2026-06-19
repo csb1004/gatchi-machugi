@@ -35,16 +35,18 @@ export interface JoinRoomPayload {
   roomCode: string;
   nickname: string;
   participantId?: string;
+  participantCode?: string;
 }
 
 export interface JoinRoomAck {
   participantId: string;
+  participantCode: string;
   state: RoomState;
 }
 
 export interface HostPairPayload {
   roomCode: string;
-  hostToken: string;
+  hostCode: string;
 }
 
 export interface HostPairAck {

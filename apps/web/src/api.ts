@@ -8,7 +8,8 @@ export interface CreateRoomInput {
 
 export interface CreatedRoom {
   roomCode: string;
-  hostToken: string;
+  hostParticipantId: string;
+  hostCode: string;
 }
 
 export async function fetchPublicRooms(): Promise<PublicRoomSummary[]> {

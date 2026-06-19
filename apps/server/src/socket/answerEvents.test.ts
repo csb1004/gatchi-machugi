@@ -29,12 +29,12 @@ async function createRoom(baseUrl: string, body: { roomName: string; public: boo
   const response = await fetch(`${baseUrl}/api/rooms`, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify(body)
+    body: JSON.stringify({ ...body, nickname: body.nickname ?? "Host" })
   });
 
   return {
     status: response.status,
-    data: (await response.json()) as { roomCode: string; hostToken: string }
+    data: (await response.json()) as { roomCode: string; hostParticipantId: string; hostCode: string }
   };
 }
 
@@ -149,7 +149,7 @@ describe("answer socket events", () => {
   });
 
   it("prevents a normal participant from submitting an answer for someone else", async () => {
-    const roomService = new RoomService({ hostTokenPepper: "pepper" });
+    const roomService = new RoomService();
     const app = createApp({ roomService });
     const server = createServer(app);
     createSocketServer(server, { roomService });
@@ -185,7 +185,7 @@ describe("answer socket events", () => {
   });
 
   it("does not let a fresh socket claim another visible participant id on join", async () => {
-    const roomService = new RoomService({ hostTokenPepper: "pepper" });
+    const roomService = new RoomService();
     const app = createApp({ roomService });
     const server = createServer(app);
     createSocketServer(server, { roomService });
@@ -229,7 +229,7 @@ describe("answer socket events", () => {
   });
 
   it("rejects reveal, alias, and extension state changes from non-host sockets", async () => {
-    const roomService = new RoomService({ hostTokenPepper: "pepper" });
+    const roomService = new RoomService();
     const app = createApp({ roomService });
     const server = createServer(app);
     createSocketServer(server, { roomService });
@@ -269,7 +269,7 @@ describe("answer socket events", () => {
   });
 
   it("broadcasts room state without raw answers before reveal", async () => {
-    const roomService = new RoomService({ hostTokenPepper: "pepper" });
+    const roomService = new RoomService();
     const app = createApp({ roomService });
     const server = createServer(app);
     createSocketServer(server, { roomService });
@@ -310,7 +310,7 @@ describe("answer socket events", () => {
   });
 
   it("lets the host reveal after every required participant, including the host player, has submitted", async () => {
-    const roomService = new RoomService({ hostTokenPepper: "pepper" });
+    const roomService = new RoomService();
     const app = createApp({ roomService });
     const server = createServer(app);
     createSocketServer(server, { roomService });
@@ -326,7 +326,7 @@ describe("answer socket events", () => {
 
     const hostAck = await emitHostPair(hostSocket, {
       roomCode: created.data.roomCode,
-      hostToken: created.data.hostToken
+      hostCode: created.data.hostCode
     });
     expect(hostAck.ok).toBe(true);
     if (!hostAck.ok) {
@@ -392,7 +392,7 @@ describe("answer socket events", () => {
   });
 
   it("does not let a host socket submit for another participant", async () => {
-    const roomService = new RoomService({ hostTokenPepper: "pepper" });
+    const roomService = new RoomService();
     const app = createApp({ roomService });
     const server = createServer(app);
     createSocketServer(server, { roomService });
@@ -408,7 +408,7 @@ describe("answer socket events", () => {
 
     const hostAck = await emitHostPair(hostSocket, {
       roomCode: created.data.roomCode,
-      hostToken: created.data.hostToken
+      hostCode: created.data.hostCode
     });
     const joinAck = await emitJoin(participantSocket, {
       roomCode: created.data.roomCode,
