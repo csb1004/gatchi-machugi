@@ -1,6 +1,7 @@
 import type { OriginalSubmitAllowedPayload, QuizCommandName, QuizState, RoomState } from "@gatchi/shared";
 import { runMachugiCommand, submitOriginalAnswer } from "./machugi/commands";
 import { extractQuizState } from "./machugi/extractor";
+import { extractSourceMirrorState } from "./machugi/sourceMirror";
 import { createOriginalSubmissionLock, type OriginalSubmissionLockController } from "./machugi/lock";
 
 const CONTENT_STATE_MESSAGE = "machugi-state";
@@ -12,6 +13,7 @@ const CONTENT_ORIGINAL_REQUEST_SUBMIT_MESSAGE = "machugi-original-request-submit
 const CONTENT_ORIGINAL_SUBMIT_MESSAGE = "machugi-original-submit";
 const CONTENT_ORIGINAL_RESULT_MESSAGE = "machugi-original-result";
 const CONTENT_ORIGINAL_FAILURE_MESSAGE = "machugi-original-failure";
+const CONTENT_SOURCE_MIRROR_MESSAGE = "machugi-source-mirror";
 
 const contentWindow = window as Window & { __gatchiMachugiContentScriptInstalled?: boolean };
 
@@ -23,6 +25,16 @@ function sendState() {
     href: window.location.href,
     title: document.title,
     payload: extractQuizState(document)
+  });
+  sendSourceMirrorState();
+}
+
+function sendSourceMirrorState() {
+  chrome.runtime.sendMessage({
+    type: CONTENT_SOURCE_MIRROR_MESSAGE,
+    href: window.location.href,
+    title: document.title,
+    payload: extractSourceMirrorState(document)
   });
 }
 

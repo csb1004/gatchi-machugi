@@ -48,6 +48,28 @@ function roomState(overrides: Partial<RoomState["fairPlay"]>): RoomState {
       lastSeenAt: "2026-06-19T00:00:00.000Z",
       message: null
     },
+    sourceMirror: {
+      kind: "playing",
+      url: "https://machugi.io/",
+      title: "Machugi",
+      lastSeenAt: "2026-06-19T00:00:00.000Z",
+      quiz: {
+        quizTitle: "Quiz",
+        questionIndex: 1,
+        totalQuestions: 10,
+        questionType: "free-text",
+        questionText: "Question",
+        imageUrl: null,
+        audioUrl: null,
+        videoUrl: null,
+        choices: [],
+        timerSecondsRemaining: null,
+        canGoNext: false,
+        canGoPrevious: false,
+        resultMessage: null,
+        answerCandidates: []
+      }
+    },
     chatMessageCount: 0
   };
 }
