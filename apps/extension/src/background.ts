@@ -6,6 +6,7 @@ import {
   type QuizState
 } from "@gatchi/shared";
 import { CONTENT_COMMAND_MESSAGE, CONTENT_STATE_MESSAGE } from "./messages.js";
+import { CONTENT_REQUEST_STATE_MESSAGE } from "./messages.js";
 import { normalizePairingSettingsForStorage } from "./pairingSettings.js";
 import {
   MachugiSocketClient,
@@ -74,6 +75,26 @@ function registerPairedBridge(roomCode: string, tabId: number) {
   });
 }
 
+async function ensureMachugiContentScript(tabId: number): Promise<void> {
+  await chrome.scripting.executeScript({
+    target: { tabId },
+    files: ["contentScript.js"]
+  });
+}
+
+async function requestStateFromPairedMachugiTab(tabId: number): Promise<void> {
+  await new Promise<void>((resolve, reject) => {
+    chrome.tabs.sendMessage(tabId, { type: CONTENT_REQUEST_STATE_MESSAGE }, () => {
+      if (chrome.runtime.lastError) {
+        reject(new Error(chrome.runtime.lastError.message));
+        return;
+      }
+
+      resolve();
+    });
+  });
+}
+
 async function pairHost(payload: PairingSettings): Promise<PairHostResponse> {
   const settings = normalizePairingSettingsForStorage(payload);
 
@@ -85,6 +106,8 @@ async function pairHost(payload: PairingSettings): Promise<PairHostResponse> {
 
     const pairResult = await socketClient.connectAndPair(payload);
     registerPairedBridge(pairResult.roomCode, tabId);
+    await ensureMachugiContentScript(tabId);
+    await requestStateFromPairedMachugiTab(tabId);
     await savePairingSettings(settings);
     return {
       ok: true,

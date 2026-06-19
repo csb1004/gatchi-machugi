@@ -26,32 +26,53 @@ function absoluteUrl(value: string | null, root: Document): string | null {
   }
 }
 
+function titleFromDocument(root: Document): string | null {
+  const title = root.title.trim();
+  if (!title) return null;
+
+  return title.replace(/\s*-\s*마추기\s*아이오\s*$/, "").trim() || null;
+}
+
+function activeQuizRoot(root: Document): ParentNode {
+  return root.querySelector("[class*='QuizDetailPlaying_root']") ?? root;
+}
+
+function unique(values: Array<string | null>): string[] {
+  return Array.from(new Set(values.map((value) => value?.trim()).filter((value): value is string => Boolean(value))));
+}
+
 export function extractQuizState(root: Document): QuizState {
-  const choices = Array.from(root.querySelectorAll("[data-choice], button[role='option'], .choice, .answer-choice"))
+  const quizRoot = activeQuizRoot(root);
+  const choices = Array.from(quizRoot.querySelectorAll("[data-choice], button[role='option'], .choice, .answer-choice, [class*='Choice'] button"))
     .map((element, index) => ({
       id: element.getAttribute("data-choice-id") || String(index + 1),
       label: element.textContent?.trim() || ""
     }))
     .filter((choice) => choice.label.length > 0);
 
-  const imageUrl = absoluteUrl(attr("[data-question-image], img[data-question], main img", "src", root), root);
-  const audioUrl = absoluteUrl(attr("[data-question-audio], audio", "src", root), root);
-  const videoUrl = absoluteUrl(attr("[data-question-video], video", "src", root), root);
+  const imageUrl = absoluteUrl(attr("[data-question-image], img[data-question], img[class*='ImageQuizDisplay_root']", "src", quizRoot), root);
+  const audioUrl = absoluteUrl(attr("[data-question-audio], audio, [class*='AudioQuizDisplay'] audio", "src", quizRoot), root);
+  const videoUrl = absoluteUrl(attr("[data-question-video], video, [class*='VideoQuizDisplay'] video", "src", quizRoot), root);
+  const resultMessage = text("[data-result-message], [role='alert'], [class*='QuizDetailAnswerResult_questionResultCorrectLabel']", quizRoot);
+  const answerCandidates = unique([
+    text("[class*='QuizDetailAnswerResult_questionResultAnswer']", quizRoot),
+    ...Array.from(quizRoot.querySelectorAll("[data-answer-candidate]")).map((element) => element.textContent?.trim() ?? null)
+  ]);
 
   return {
-    quizTitle: text("[data-quiz-title], h1", root),
-    questionIndex: numberText("[data-question-index]", root),
-    totalQuestions: numberText("[data-question-total]", root),
+    quizTitle: text("[data-quiz-title], h1", root) ?? titleFromDocument(root),
+    questionIndex: numberText("[data-question-index]", quizRoot),
+    totalQuestions: numberText("[data-question-total]", quizRoot),
     questionType: choices.length > 0 ? "multiple-choice" : imageUrl ? "image" : audioUrl ? "audio" : videoUrl ? "video" : "free-text",
-    questionText: text("[data-question-text], [data-question], main p", root),
+    questionText: text("[data-question-text], [data-question], [class*='TextQuizDisplay']", quizRoot),
     imageUrl,
     audioUrl,
     videoUrl,
     choices,
-    timerSecondsRemaining: numberText("[data-timer], [aria-label*='timer' i]", root),
-    canGoNext: root.querySelector("[data-command='next'], button[aria-label*='next' i]") !== null,
-    canGoPrevious: root.querySelector("[data-command='previous'], button[aria-label*='previous' i]") !== null,
-    resultMessage: text("[data-result-message], [role='alert']", root),
-    answerCandidates: []
+    timerSecondsRemaining: numberText("[data-timer], [aria-label*='timer' i]", quizRoot),
+    canGoNext: quizRoot.querySelector("[data-command='next'], button[aria-label*='next' i], button[class*='NextButton_root']") !== null,
+    canGoPrevious: quizRoot.querySelector("[data-command='previous'], button[aria-label*='previous' i]") !== null,
+    resultMessage,
+    answerCandidates
   };
 }

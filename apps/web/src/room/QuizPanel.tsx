@@ -1,6 +1,9 @@
 import type { QuizState } from "@gatchi/shared";
 
 export function QuizPanel({ quiz }: { quiz: QuizState }) {
+  const hasMedia = Boolean(quiz.imageUrl || quiz.audioUrl || quiz.videoUrl);
+  const hasQuestionText = Boolean(quiz.questionText);
+
   return (
     <section className="quiz-panel" aria-label="퀴즈">
       <div className="section-heading">
@@ -12,7 +15,7 @@ export function QuizPanel({ quiz }: { quiz: QuizState }) {
         {quiz.imageUrl ? <img src={quiz.imageUrl} alt="" /> : null}
         {quiz.audioUrl ? <audio src={quiz.audioUrl} controls /> : null}
         {quiz.videoUrl ? <video src={quiz.videoUrl} controls /> : null}
-        <p>{quiz.questionText ?? "아직 방장 확장 프로그램에서 문제를 보내지 않았습니다."}</p>
+        {hasQuestionText || !hasMedia ? <p>{quiz.questionText ?? "아직 방장 확장 프로그램에서 문제를 보내지 않았습니다."}</p> : null}
       </div>
 
       {quiz.choices.length > 0 ? (
