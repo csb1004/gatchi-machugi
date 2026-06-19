@@ -393,6 +393,49 @@ describe("RoomService", () => {
     });
   });
 
+  it("marks the room ended when the source mirror reaches the game-end screen", async () => {
+    const service = new RoomService();
+    const created = await service.createRoom({
+      title: "마추기 방",
+      hostNickname: "Host",
+      visibility: "public"
+    });
+
+    service.updateSourceMirror({
+      roomCode: created.roomCode,
+      sourceMirror: {
+        kind: "playing",
+        url: "https://machugi.io/quiz/1/play",
+        title: "Pokemon",
+        lastSeenAt: "2026-06-19T00:00:00.000Z",
+        quiz: {
+          ...created.state.quiz,
+          quizTitle: "Pokemon",
+          questionIndex: 10,
+          totalQuestions: 10,
+          questionType: "free-text",
+          questionText: "Who is this?"
+        }
+      }
+    });
+
+    const ended = service.updateSourceMirror({
+      roomCode: created.roomCode,
+      sourceMirror: {
+        kind: "gameEnd",
+        url: "https://machugi.io/quiz/1/play",
+        title: "Pokemon",
+        lastSeenAt: "2026-06-19T00:00:01.000Z",
+        summaryText: "8개 맞히셨습니다",
+        percentileText: "당신은 상위 24%입니다",
+        results: []
+      }
+    });
+
+    expect(ended.phase).toBe("ended");
+    expect(ended.sourceMirror.kind).toBe("gameEnd");
+  });
+
   it("updates quiz and phase when mirror state becomes playable", async () => {
     const service = new RoomService();
     const created = await service.createRoom({

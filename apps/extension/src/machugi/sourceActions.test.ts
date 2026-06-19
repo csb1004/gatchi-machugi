@@ -114,6 +114,21 @@ describe("runSourceMirrorAction", () => {
     expect(click).toHaveBeenCalledTimes(1);
   });
 
+  it("falls back to the next button when host skip is pressed on a result screen", () => {
+    document.body.innerHTML = `
+      <div class="QuizDetailPlaying_root__abc">
+        <p>정답!</p>
+        <strong>디안시</strong>
+        <button class="NextButton_root__abc" type="button">›</button>
+      </div>
+    `;
+    const button = document.querySelector("button") as HTMLButtonElement;
+    const click = vi.spyOn(button, "click");
+
+    expect(runSourceMirrorAction({ name: "skip" }, document)).toEqual({ ok: true });
+    expect(click).toHaveBeenCalledTimes(1);
+  });
+
   it("builds a home URL that restores the last search query", () => {
     expect(createHomeUrl("pokemon")).toBe("https://machugi.io/?keyword=pokemon");
     expect(createHomeUrl("")).toBe("https://machugi.io/");

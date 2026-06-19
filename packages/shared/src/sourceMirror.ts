@@ -8,6 +8,7 @@ export type SourceMirrorKind =
   | "quizDetail"
   | "playing"
   | "result"
+  | "gameEnd"
   | "unsupported"
   | "error";
 
@@ -87,6 +88,15 @@ export type SourceMirrorState =
       title: string | null;
       lastSeenAt: string;
       quiz: QuizState;
+    }
+  | {
+      kind: "gameEnd";
+      url: string;
+      title: string | null;
+      lastSeenAt: string;
+      summaryText: string;
+      percentileText: string | null;
+      results: MirrorQuizResult[];
     }
   | {
       kind: "unsupported";

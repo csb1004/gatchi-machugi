@@ -274,6 +274,10 @@ export class RoomService {
       room.state.phase = "searching";
     }
 
+    if (sourceMirror.kind === "gameEnd") {
+      room.state.phase = "ended";
+    }
+
     return room.state;
   }
 

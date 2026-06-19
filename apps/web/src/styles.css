@@ -393,6 +393,7 @@ h2 {
 .room-main > .mirror-results,
 .room-main > .mirror-setup,
 .room-main > .mirror-unsupported,
+.room-main > .mirror-game-end,
 .room-main > .mirror-playable {
   min-width: 0;
 }
@@ -401,6 +402,7 @@ h2 {
 .room-main .mirror-results,
 .room-main .mirror-search,
 .room-main .mirror-setup,
+.room-main .mirror-game-end,
 .room-main .mirror-unsupported {
   box-shadow: 0 10px 30px rgba(22, 31, 48, 0.045);
 }
@@ -857,6 +859,7 @@ h2 {
 .mirror-search,
 .mirror-results,
 .mirror-setup,
+.mirror-game-end,
 .mirror-unsupported {
   border: 1px solid #d7e2f2;
   border-radius: 8px;
@@ -867,6 +870,42 @@ h2 {
 .mirror-results {
   display: grid;
   gap: 16px;
+}
+
+.mirror-game-end {
+  display: grid;
+  gap: 18px;
+}
+
+.game-end-summary {
+  display: grid;
+  gap: 12px;
+  justify-items: start;
+  border: 1px solid #dbe5f4;
+  border-radius: 8px;
+  background: #f8fbff;
+  padding: 18px;
+}
+
+.game-end-summary p,
+.game-end-summary strong {
+  margin: 0;
+}
+
+.game-end-summary p {
+  color: #0b1730;
+  font-size: 1.18rem;
+  font-weight: 900;
+}
+
+.game-end-summary strong {
+  color: #31506f;
+  font-size: 0.98rem;
+}
+
+.game-end-recommendations {
+  display: grid;
+  gap: 12px;
 }
 
 .mirror-results-heading {

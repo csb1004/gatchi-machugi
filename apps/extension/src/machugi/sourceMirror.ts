@@ -16,6 +16,8 @@ const resultSelector = [
 const playingSelector = "[class*='QuizDetailPlaying'], [data-question-text], [data-question-image], audio, video";
 const resultFeedbackSelector = "[class*='QuizDetailAnswerResult'], [role='alert'], [data-result-message]";
 const detailReadySelector = "[class*='QuizDetailReady_mainContainer'], [class*='QuizDetailReady_title'], [class*='QuizDetailReadyButtonGroup']";
+const gameEndSummaryPattern = /\d+\s*개\s*맞히셨습니다/;
+const gameEndPercentilePattern = /상위\s*\d+\s*%/;
 
 function now(): string {
   return new Date().toISOString();
@@ -45,6 +47,27 @@ function currentQuery(root: Document): string {
 
 function compactText(value: string | null | undefined): string {
   return (value ?? "").replace(/\s+/g, " ").trim();
+}
+
+function directText(element: Element): string {
+  return Array.from(element.childNodes)
+    .filter((node) => node.nodeType === Node.TEXT_NODE)
+    .map((node) => node.textContent?.trim() ?? "")
+    .join(" ")
+    .trim();
+}
+
+function firstMatchingText(root: ParentNode, pattern: RegExp): string | null {
+  const elements = Array.from(root.querySelectorAll("*"));
+  for (const element of elements) {
+    const directValue = compactText(directText(element));
+    if (directValue && pattern.test(directValue)) return directValue;
+
+    if (element.children.length > 0) continue;
+    const value = compactText(element.textContent);
+    if (pattern.test(value)) return value;
+  }
+  return null;
 }
 
 function firstText(root: Element, selectors: string[]): string {
@@ -211,6 +234,21 @@ function extractQuizDetail(root: Document): Extract<SourceMirrorState, { kind: "
   };
 }
 
+function extractGameEnd(root: Document): Extract<SourceMirrorState, { kind: "gameEnd" }> | null {
+  const summaryText = firstMatchingText(root.body, gameEndSummaryPattern);
+  if (!summaryText) return null;
+
+  return {
+    kind: "gameEnd",
+    url: root.location.href,
+    title: root.title || null,
+    lastSeenAt: now(),
+    summaryText,
+    percentileText: firstMatchingText(root.body, gameEndPercentilePattern),
+    results: extractResults(root)
+  };
+}
+
 function hasPlayableEvidence(root: Document): boolean {
   return Boolean(root.querySelector(playingSelector));
 }
@@ -237,6 +275,9 @@ export function extractSourceMirrorState(root: Document = document): SourceMirro
 
   const quizDetail = extractQuizDetail(root);
   if (quizDetail) return quizDetail;
+
+  const gameEnd = extractGameEnd(root);
+  if (gameEnd) return gameEnd;
 
   const query = currentQuery(root);
   const results = extractResults(root);

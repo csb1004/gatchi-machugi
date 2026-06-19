@@ -2,6 +2,7 @@ import { ArrowRight, Home, SkipForward } from "lucide-react";
 import { useRef } from "react";
 import type { SourceMirrorAction, SourceMirrorState } from "@gatchi/shared";
 import { QuizPanel } from "../room/QuizPanel";
+import { MirrorGameEndView } from "./MirrorGameEndView";
 import { MirrorResultsView } from "./MirrorResultsView";
 import { MirrorSearchView } from "./MirrorSearchView";
 import { MirrorSetupView } from "./MirrorSetupView";
@@ -48,6 +49,19 @@ export function SourceMirrorView(props: {
     return <MirrorSetupView quiz={props.state.quiz} settings={props.state.settings} isHost={props.isHost} onAction={sendSetupAction} />;
   }
 
+  if (props.state.kind === "gameEnd") {
+    return (
+      <MirrorGameEndView
+        summaryText={props.state.summaryText}
+        percentileText={props.state.percentileText}
+        results={props.state.results}
+        isHost={props.isHost}
+        onAction={sendAction}
+        onHome={focusHome}
+      />
+    );
+  }
+
   if (props.state.kind === "playing" || props.state.kind === "result") {
     return (
       <section className="mirror-playable" aria-label="마추기 진행 화면">
@@ -57,10 +71,12 @@ export function SourceMirrorView(props: {
               <Home size={17} />
               홈 화면
             </button>
-            <button type="button" onClick={() => sendAction({ name: "skip" })}>
-              <SkipForward size={17} />
-              건너뛰기
-            </button>
+            {props.state.kind === "playing" ? (
+              <button type="button" onClick={() => sendAction({ name: "skip" })}>
+                <SkipForward size={17} />
+                건너뛰기
+              </button>
+            ) : null}
             <button type="button" disabled={!props.state.quiz.canGoNext} onClick={() => sendAction({ name: "next" })}>
               <ArrowRight size={17} />
               다음 문제

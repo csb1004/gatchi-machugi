@@ -156,7 +156,12 @@ function runSkipSubmissionSourceCommand(action: Extract<SourceMirrorAction, { na
   const rawAnswer = action.rawAnswer?.trim() ? action.rawAnswer : ".";
   const runCommand = () => submitOriginalAnswer(rawAnswer, root);
   const ok = options?.runWithOriginalSubmitBypass ? options.runWithOriginalSubmitBypass(runCommand) : runCommand();
-  return ok ? { ok: true } : { ok: false, reason: "정답 입력칸을 찾을 수 없습니다." };
+  if (ok) return { ok: true };
+
+  const advanced = options?.runWithOriginalSubmitBypass
+    ? options.runWithOriginalSubmitBypass(() => runMachugiCommand("next", root))
+    : runMachugiCommand("next", root);
+  return advanced ? { ok: true } : { ok: false, reason: "정답 입력칸을 찾을 수 없습니다." };
 }
 
 export function runSourceMirrorAction(action: SourceMirrorAction, root: Document = document, options?: SourceMirrorActionOptions): ActionResult {

@@ -145,4 +145,42 @@ describe("extractSourceMirrorState", () => {
     expect(state.quiz.answerCandidates).toEqual(["디안시"]);
     expect(state.quiz.canGoNext).toBe(true);
   });
+
+  it("extracts the game-end summary screen instead of treating recommendations as search results", () => {
+    const root = setDocument(
+      "/quiz/123/play",
+      `
+      <main>
+        <section>
+          <article>8개 맞히셨습니다</article>
+          <article>당신은 상위 24%입니다</article>
+          <button>카톡 공유하기</button>
+          <button>이어 풀기</button>
+          <button>홈으로</button>
+        </section>
+        <aside>
+          <h2>오늘의 추천 퀴즈는?</h2>
+          <a class="RecommendedQuizCard_link__abc" href="/quiz/recommended-1">
+            <img src="/recommended.png" alt="포켓몬스터 타입 맞추기 NEW 썸네일">
+            <strong>포켓몬스터 타입 맞추기 NEW</strong>
+            <p>타입을 맞춰보세요</p>
+          </a>
+        </aside>
+      </main>
+    `,
+      "Pokemon - 마추기 아이오"
+    );
+
+    const state = extractSourceMirrorState(root);
+    expect(state.kind).toBe("gameEnd");
+    if (state.kind !== "gameEnd") throw new Error("expected gameEnd");
+    expect(state.summaryText).toBe("8개 맞히셨습니다");
+    expect(state.percentileText).toBe("당신은 상위 24%입니다");
+    expect(state.results).toEqual([
+      expect.objectContaining({
+        title: "포켓몬스터 타입 맞추기 NEW",
+        href: new URL("/quiz/recommended-1", document.location.href).toString()
+      })
+    ]);
+  });
 });
