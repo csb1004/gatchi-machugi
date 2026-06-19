@@ -10,6 +10,8 @@ import type {
   JoinRoomAck,
   JoinRoomPayload,
   KickParticipantPayload,
+  OriginalResultPayload,
+  OriginalSubmitRequestPayload,
   QuizCommandPayload,
   RevealAnswerPayload,
   RoomSettings,
@@ -25,6 +27,7 @@ interface SocketSession {
   roomCode?: string;
   participantId?: string;
   role?: "host" | "participant";
+  clientKind?: "web" | "extension";
 }
 
 type HostPairGatewayAck = HostPairAck & { state: RoomState };
@@ -44,6 +47,17 @@ const hostPairSchema = z.object({
 const extensionStateSchema = z.object({
   roomCode: z.string().trim().min(1).transform((value) => value.toUpperCase()),
   quiz: z.custom<ExtensionStatePayload["quiz"]>((value) => typeof value === "object" && value !== null)
+});
+
+const originalSubmitRequestSchema = z.object({
+  roomCode: z.string().trim().min(1).transform((value) => value.toUpperCase()),
+  questionKey: z.string().trim().min(1)
+});
+
+const originalResultSchema = z.object({
+  roomCode: z.string().trim().min(1).transform((value) => value.toUpperCase()),
+  questionKey: z.string().trim().min(1),
+  quiz: z.custom<OriginalResultPayload["quiz"]>((value) => typeof value === "object" && value !== null)
 });
 
 const submitAnswerSchema = z.object({
@@ -106,6 +120,13 @@ function requireHostSession(session: SocketSession, roomCode: string) {
   }
 }
 
+function requireHostExtensionSession(session: SocketSession, roomCode: string) {
+  requireHostSession(session, roomCode);
+  if (session.clientKind !== "extension") {
+    throw new Error("Host extension authorization required");
+  }
+}
+
 function requireParticipantSession(session: SocketSession, roomCode: string, participantId: string) {
   if (session.roomCode !== roomCode || session.participantId !== participantId) {
     throw new Error("Participant authorization required");
@@ -141,6 +162,24 @@ export function createSocketServer(httpServer: HttpServer, { roomService }: { ro
       credentials: true
     }
   });
+  const hostExtensionSocketIds = new Map<string, string>();
+
+  function emitOriginalSubmitIfReady(roomCode: string, state: RoomState) {
+    if (state.fairPlay.originalSubmitStatus !== "ready" || !state.fairPlay.questionKey) return;
+    const extensionSocketId = hostExtensionSocketIds.get(roomCode);
+    if (!extensionSocketId) return;
+
+    try {
+      const payload = roomService.requestOriginalSubmission({
+        roomCode,
+        questionKey: state.fairPlay.questionKey
+      });
+      io.to(extensionSocketId).emit("original:submit-allowed", payload);
+      io.to(roomCode).emit("room:state", roomService.getState(roomCode));
+    } catch {
+      return;
+    }
+  }
 
   io.on("connection", (socket) => {
     const session = socket.data as SocketSession;
@@ -166,6 +205,7 @@ export function createSocketServer(httpServer: HttpServer, { roomService }: { ro
         session.roomCode = parsed.data.roomCode;
         session.participantId = joined.participant.id;
         session.role = joined.participant.role === "host" ? "host" : "participant";
+        session.clientKind = "web";
 
         ack({
           ok: true,
@@ -210,6 +250,8 @@ export function createSocketServer(httpServer: HttpServer, { roomService }: { ro
         session.roomCode = parsed.data.roomCode;
         session.participantId = joined.participant.id;
         session.role = "host";
+        session.clientKind = "extension";
+        hostExtensionSocketIds.set(parsed.data.roomCode, socket.id);
 
         (ack as Ack<HostPairGatewayAck>)({
           ok: true,
@@ -240,6 +282,42 @@ export function createSocketServer(httpServer: HttpServer, { roomService }: { ro
         ack({ ok: true, data: undefined });
       } catch (error) {
         ackError(ack, error instanceof Error ? error.message : "State update failed");
+      }
+    });
+
+    socket.on("original:request-submit", (payload: OriginalSubmitRequestPayload, ack: Ack<void>) => {
+      const parsed = originalSubmitRequestSchema.safeParse(payload);
+      if (!parsed.success) {
+        ackError(ack, "Invalid original submit payload");
+        return;
+      }
+
+      try {
+        requireHostExtensionSession(session, parsed.data.roomCode);
+        const allowed = roomService.requestOriginalSubmission(parsed.data);
+        socket.emit("original:submit-allowed", allowed);
+        io.to(parsed.data.roomCode).emit("room:state", roomService.getState(parsed.data.roomCode));
+        ack({ ok: true, data: undefined });
+      } catch (error) {
+        ackError(ack, error instanceof Error ? error.message : "Original submit request failed");
+      }
+    });
+
+    socket.on("original:result", (payload: OriginalResultPayload, ack: Ack<void>) => {
+      const parsed = originalResultSchema.safeParse(payload);
+      if (!parsed.success) {
+        ackError(ack, "Invalid original result payload");
+        return;
+      }
+
+      try {
+        requireHostExtensionSession(session, parsed.data.roomCode);
+        const state = roomService.applyOriginalResult(parsed.data);
+        io.to(parsed.data.roomCode).emit("answer:revealed", state.revealedSubmissions);
+        io.to(parsed.data.roomCode).emit("room:state", state);
+        ack({ ok: true, data: undefined });
+      } catch (error) {
+        ackError(ack, error instanceof Error ? error.message : "Original result failed");
       }
     });
 
@@ -276,6 +354,7 @@ export function createSocketServer(httpServer: HttpServer, { roomService }: { ro
 
         const state = roomService.submitAnswer(parsed.data);
         io.to(parsed.data.roomCode).emit("room:state", state);
+        emitOriginalSubmitIfReady(parsed.data.roomCode, state);
         ack({ ok: true, data: undefined });
       } catch (error) {
         ackError(ack, error instanceof Error ? error.message : "Answer submit failed");
@@ -391,6 +470,10 @@ export function createSocketServer(httpServer: HttpServer, { roomService }: { ro
 
     socket.on("disconnect", () => {
       if (!session.roomCode) return;
+
+      if (session.clientKind === "extension" && session.roomCode) {
+        hostExtensionSocketIds.delete(session.roomCode);
+      }
 
       if (session.role === "host") {
         try {
