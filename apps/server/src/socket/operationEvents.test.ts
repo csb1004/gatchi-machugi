@@ -4,6 +4,7 @@ import type {
   ChatMessagePayload,
   ClientToServerEvents,
   JoinRoomPayload,
+  OriginalResultPayload,
   SendChatPayload,
   ServerToClientEvents
 } from "@gatchi/shared";
@@ -82,6 +83,15 @@ function emitChat(
 ): Promise<{ ok: true; data: void } | { ok: false; error: string }> {
   return new Promise((resolve) => {
     socket.emit("chat:send", payload, resolve);
+  });
+}
+
+function emitOriginalResult(
+  socket: Socket<ServerToClientEvents, ClientToServerEvents>,
+  payload: OriginalResultPayload
+): Promise<{ ok: true; data: void } | { ok: false; error: string }> {
+  return new Promise((resolve) => {
+    socket.emit("original:result", payload, ((response: unknown) => resolve(response as never)) as never);
   });
 }
 
@@ -171,5 +181,51 @@ describe("operation socket events", () => {
     });
 
     expect(ack).toEqual({ ok: false, error: "Host authorization required" });
+  });
+
+  it("rejects original result from a host web socket", async () => {
+    const roomService = new RoomService();
+    const app = createApp({ roomService });
+    const server = createServer(app);
+    createSocketServer(server, { roomService });
+    servers.push(server);
+
+    const port = await listen(server);
+    const baseUrl = `http://127.0.0.1:${port}`;
+    const room = await createRoom(baseUrl);
+    const hostWebSocket = await connectClient(baseUrl);
+    sockets.push(hostWebSocket);
+
+    const joined = await emitJoin(hostWebSocket, {
+      roomCode: room.roomCode,
+      nickname: "Host",
+      participantId: room.hostParticipantId,
+      participantCode: room.hostCode
+    });
+    expect(joined.ok).toBe(true);
+    if (!joined.ok) throw new Error(joined.error);
+
+    const response = await emitOriginalResult(hostWebSocket, {
+      roomCode: room.roomCode,
+      questionKey: "not-authorized",
+      quiz: {
+        quizTitle: "Quiz",
+        questionIndex: 1,
+        totalQuestions: 10,
+        questionType: "free-text",
+        questionText: "Name the game",
+        imageUrl: null,
+        audioUrl: null,
+        videoUrl: null,
+        choices: [],
+        timerSecondsRemaining: null,
+        canGoNext: true,
+        canGoPrevious: false,
+        resultMessage: "correct",
+        answerCandidates: ["blue archive"]
+      }
+    });
+
+    expect(response).toEqual({ ok: false, error: "Host extension authorization required" });
   });
 });

@@ -4,15 +4,17 @@ import type { QuizState } from "@gatchi/shared";
 
 export function AnswerPanel({
   disabled,
+  submitted = false,
   quiz,
   onSubmitAnswer
 }: {
   disabled: boolean;
+  submitted?: boolean;
   quiz: QuizState;
   onSubmitAnswer: (rawAnswer: string) => void;
 }) {
   const [answer, setAnswer] = useState("");
-  const canSubmit = !disabled && answer.trim().length > 0;
+  const canSubmit = !disabled && !submitted && answer.trim().length > 0;
 
   return (
     <section className="answer-panel" aria-label="답변">
@@ -21,7 +23,7 @@ export function AnswerPanel({
         <input
           value={answer}
           onChange={(event) => setAnswer(event.target.value)}
-          disabled={disabled}
+          disabled={disabled || submitted}
           placeholder={quiz.questionType === "ox" ? "O / X" : ""}
         />
       </label>
@@ -35,7 +37,7 @@ export function AnswerPanel({
         }}
       >
         <Send size={18} />
-        제출
+        {submitted ? "제출 완료" : "제출"}
       </button>
     </section>
   );

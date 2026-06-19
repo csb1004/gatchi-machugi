@@ -1,3 +1,4 @@
+import { USE_CURRENT_TAB_AS_SOURCE_MESSAGE } from "./messages.js";
 import type { PairHostResponse, PairingSettings, StoredPairingSettings } from "./socketClient.js";
 import { PAIRING_REQUEST_TYPE, PAIRING_STORAGE_KEY } from "./socketClient.js";
 
@@ -6,8 +7,11 @@ type PairFormElements = {
   serverUrl: HTMLElement;
   roomCode: HTMLElement;
   submitButton: HTMLButtonElement;
+  sourceButton: HTMLButtonElement;
   status: HTMLOutputElement;
 };
+
+type SourceResponse = { ok: true } | { ok: false; error: string };
 
 async function readStoredPairing(): Promise<StoredPairingSettings | null> {
   return await new Promise((resolve, reject) => {
@@ -40,12 +44,31 @@ async function sendPairRequest(payload: PairingSettings): Promise<PairHostRespon
   });
 }
 
+async function sendUseCurrentTabAsSourceRequest(): Promise<SourceResponse> {
+  return await new Promise((resolve, reject) => {
+    chrome.runtime.sendMessage({ type: USE_CURRENT_TAB_AS_SOURCE_MESSAGE }, (response: SourceResponse | undefined) => {
+      if (chrome.runtime.lastError) {
+        reject(new Error(chrome.runtime.lastError.message));
+        return;
+      }
+
+      if (!response) {
+        reject(new Error("백그라운드 서비스 워커가 응답하지 않았습니다."));
+        return;
+      }
+
+      resolve(response);
+    });
+  });
+}
+
 function getElements(): PairFormElements {
   return {
     form: document.querySelector("#pair-form") as HTMLFormElement,
     serverUrl: document.querySelector("#server-url") as HTMLElement,
     roomCode: document.querySelector("#room-code") as HTMLElement,
     submitButton: document.querySelector("#pair-button") as HTMLButtonElement,
+    sourceButton: document.querySelector("#source-button") as HTMLButtonElement,
     status: document.querySelector("#status") as HTMLOutputElement
   };
 }
@@ -70,6 +93,7 @@ function localizeError(message: string) {
 function fillForm(elements: PairFormElements, stored: StoredPairingSettings | null) {
   if (!stored) {
     elements.submitButton.disabled = true;
+    elements.sourceButton.disabled = true;
     setStatus(elements, "가치 마추기 방장 화면에서 연결 정보를 먼저 저장해주세요.", "error");
     return;
   }
@@ -77,6 +101,7 @@ function fillForm(elements: PairFormElements, stored: StoredPairingSettings | nu
   elements.serverUrl.textContent = stored.serverUrl;
   elements.roomCode.textContent = stored.roomCode;
   elements.submitButton.disabled = false;
+  elements.sourceButton.disabled = false;
   setStatus(elements, `${stored.roomCode} 방 연결 정보를 불러왔습니다.`, "success");
 }
 
@@ -103,11 +128,31 @@ async function handleSubmit(elements: PairFormElements, stored: StoredPairingSet
     }
 
     elements.roomCode.textContent = response.data.roomCode;
-    setStatus(elements, `${response.data.roomCode} 방에 연결되었습니다.`, "success");
+    elements.sourceButton.disabled = false;
+    setStatus(elements, `${response.data.roomCode} 방에 연결했습니다.`, "success");
   } catch (error) {
     setStatus(elements, localizeError(error instanceof Error ? error.message : "연결에 실패했습니다."), "error");
   } finally {
     elements.submitButton.disabled = false;
+  }
+}
+
+async function handleUseCurrentTabAsSource(elements: PairFormElements) {
+  elements.sourceButton.disabled = true;
+  setStatus(elements, "현재 탭을 원본 창으로 지정하는 중...");
+
+  try {
+    const response = await sendUseCurrentTabAsSourceRequest();
+    if (!response.ok) {
+      setStatus(elements, localizeError(response.error), "error");
+      return;
+    }
+
+    setStatus(elements, "현재 마추기아이오 탭을 원본 창으로 지정했습니다.", "success");
+  } catch (error) {
+    setStatus(elements, localizeError(error instanceof Error ? error.message : "원본 창 지정에 실패했습니다."), "error");
+  } finally {
+    elements.sourceButton.disabled = false;
   }
 }
 
@@ -119,6 +164,10 @@ async function init() {
   elements.form.addEventListener("submit", (event) => {
     event.preventDefault();
     void handleSubmit(elements, stored);
+  });
+
+  elements.sourceButton.addEventListener("click", () => {
+    void handleUseCurrentTabAsSource(elements);
   });
 }
 

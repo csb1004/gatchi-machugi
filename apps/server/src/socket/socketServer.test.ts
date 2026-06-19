@@ -2,10 +2,13 @@ import { createServer, type Server as HttpServer } from "node:http";
 import type { AddressInfo } from "node:net";
 import type {
   ClientToServerEvents,
+  ExtensionStatePayload,
   HostPairPayload,
   JoinRoomPayload,
   PublicRoomSummary,
-  ServerToClientEvents
+  ServerToClientEvents,
+  SourceMirrorActionPayload,
+  SubmitAnswerPayload
 } from "@gatchi/shared";
 import { afterEach, describe, expect, it } from "vitest";
 import { io as createClient, type Socket } from "socket.io-client";
@@ -90,6 +93,33 @@ async function connectClient(baseUrl: string): Promise<Socket<ServerToClientEven
   });
 
   return socket;
+}
+
+function emitExtensionState(
+  socket: Socket<ServerToClientEvents, ClientToServerEvents>,
+  payload: ExtensionStatePayload
+): Promise<{ ok: true; data: void } | { ok: false; error: string }> {
+  return new Promise((resolve) => {
+    socket.emit("extension:state", payload, resolve);
+  });
+}
+
+function emitAnswerSubmit(
+  socket: Socket<ServerToClientEvents, ClientToServerEvents>,
+  payload: SubmitAnswerPayload
+): Promise<{ ok: true; data: void } | { ok: false; error: string }> {
+  return new Promise((resolve) => {
+    socket.emit("answer:submit", payload, resolve);
+  });
+}
+
+function emitSourceMirrorAction(
+  socket: Socket<ServerToClientEvents, ClientToServerEvents>,
+  payload: SourceMirrorActionPayload
+): Promise<{ ok: true; data: void } | { ok: false; error: string }> {
+  return new Promise((resolve) => {
+    socket.emit("source:action", payload, resolve);
+  });
 }
 
 describe("socket server", () => {
@@ -193,6 +223,72 @@ describe("socket server", () => {
     );
   });
 
+  it("refreshes fair play when a participant disconnects during a locked question", async () => {
+    const roomService = new RoomService();
+    const app = createApp({ roomService });
+    const server = createServer(app);
+    createSocketServer(server, { roomService });
+    servers.push(server);
+
+    const port = await listen(server);
+    const baseUrl = `http://127.0.0.1:${port}`;
+
+    const created = await createRoom(baseUrl, { roomName: "Private room", public: false });
+    const participantSocket = await connectClient(baseUrl);
+    sockets.push(participantSocket);
+
+    const joinAck = await emitJoin(participantSocket, {
+      roomCode: created.data.roomCode,
+      nickname: "Mina"
+    });
+    expect(joinAck.ok).toBe(true);
+    if (!joinAck.ok) {
+      throw new Error(joinAck.error);
+    }
+
+    const hostSocket = await connectClient(baseUrl);
+    sockets.push(hostSocket);
+
+    const hostAck = await emitHostPair(hostSocket, {
+      roomCode: created.data.roomCode,
+      hostCode: created.data.hostCode
+    });
+    expect(hostAck.ok).toBe(true);
+    if (!hostAck.ok) {
+      throw new Error(hostAck.error);
+    }
+
+    const extensionAck = await emitExtensionState(hostSocket, {
+      roomCode: created.data.roomCode,
+      quiz: {
+        ...roomService.getState(created.data.roomCode).quiz,
+        questionIndex: 1,
+        questionText: "Name the game",
+        questionType: "free-text"
+      }
+    });
+    expect(extensionAck.ok).toBe(true);
+
+    const submitAck = await emitAnswerSubmit(hostSocket, {
+      roomCode: created.data.roomCode,
+      participantId: created.data.hostParticipantId,
+      rawAnswer: "blue archive"
+    });
+    expect(submitAck.ok).toBe(true);
+
+    const disconnectedStatePromise = waitForEvent(hostSocket, "room:state");
+    participantSocket.disconnect();
+
+    const disconnectedState = await disconnectedStatePromise;
+    expect(disconnectedState.participants.find((participant) => participant.id === joinAck.data.participantId)?.connected).toBe(false);
+    expect(disconnectedState.fairPlay).toMatchObject({
+      requiredParticipantIds: [created.data.hostParticipantId],
+      submittedParticipantIds: [created.data.hostParticipantId],
+      allRequiredSubmitted: true,
+      originalSubmitStatus: "ready"
+    });
+  });
+
   it("pairs hosts with a valid participant code, rejects invalid codes, and expires the room on extension disconnect", async () => {
     const roomService = new RoomService();
     const app = createApp({ roomService });
@@ -257,5 +353,65 @@ describe("socket server", () => {
     expect(expiredState.hostExtensionConnected).toBe(false);
     expect(expiredState.phase).toBe("expired");
     expect(roomService.listPublicRooms()).toEqual([]);
+  });
+
+  it("forwards source mirror actions only from the host web session to the current extension", async () => {
+    const roomService = new RoomService();
+    const app = createApp({ roomService });
+    const server = createServer(app);
+    createSocketServer(server, { roomService });
+    servers.push(server);
+
+    const port = await listen(server);
+    const baseUrl = `http://127.0.0.1:${port}`;
+    const created = await createRoom(baseUrl, { roomName: "Mirror room", public: false });
+
+    const participantSocket = await connectClient(baseUrl);
+    sockets.push(participantSocket);
+    const joinAck = await emitJoin(participantSocket, {
+      roomCode: created.data.roomCode,
+      nickname: "Mina"
+    });
+    expect(joinAck.ok).toBe(true);
+
+    const extensionSocket = await connectClient(baseUrl);
+    sockets.push(extensionSocket);
+    const hostAck = await emitHostPair(extensionSocket, {
+      roomCode: created.data.roomCode,
+      hostCode: created.data.hostCode
+    });
+    expect(hostAck.ok).toBe(true);
+
+    const hostWebSocket = await connectClient(baseUrl);
+    sockets.push(hostWebSocket);
+    const hostJoinAck = await emitJoin(hostWebSocket, {
+      roomCode: created.data.roomCode,
+      nickname: "Host",
+      participantId: created.data.hostParticipantId,
+      participantCode: created.data.hostCode
+    });
+    expect(hostJoinAck.ok).toBe(true);
+
+    const action: SourceMirrorActionPayload = {
+      roomCode: created.data.roomCode,
+      actionId: "act-1",
+      action: { name: "search", query: "pokemon" }
+    };
+
+    const forwarded = waitForEvent(extensionSocket, "source:action");
+    await expect(emitSourceMirrorAction(participantSocket, action)).resolves.toEqual({
+      ok: false,
+      error: "Host authorization required"
+    });
+    await expect(emitSourceMirrorAction(extensionSocket, action)).resolves.toEqual({
+      ok: false,
+      error: "Host web authorization required"
+    });
+
+    await expect(emitSourceMirrorAction(hostWebSocket, action)).resolves.toEqual({
+      ok: true,
+      data: undefined
+    });
+    await expect(forwarded).resolves.toEqual(action);
   });
 });

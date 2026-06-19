@@ -1,16 +1,25 @@
 import type {
   ClientToServerEvents,
+  ExtensionSourcePayload,
   ExtensionStatePayload,
   HostPairAck,
   HostPairPayload,
+  OriginalFailurePayload,
+  OriginalResultPayload,
+  OriginalSubmitAllowedPayload,
+  OriginalSubmitRequestPayload,
   QuizCommandPayload,
   RoomState,
-  ServerToClientEvents
+  ServerToClientEvents,
+  SourceMirrorActionFailurePayload,
+  SourceMirrorActionPayload,
+  SourceMirrorPayload
 } from "@gatchi/shared";
 import { io, type Socket } from "socket.io-client";
 
 export const PAIRING_STORAGE_KEY = "pairingSettings";
 export const PAIRING_REQUEST_TYPE = "pair-host";
+export const NOT_CONNECTED_MESSAGE = "소켓 클라이언트가 연결되지 않았습니다.";
 
 export interface PairingSettings {
   serverUrl: string;
@@ -108,7 +117,7 @@ export class MachugiSocketClient {
 
   async pair(payload: Pick<PairingSettings, "roomCode" | "hostCode">): Promise<HostPairGatewayAck> {
     if (!this.socket) {
-      throw new Error("소켓 클라이언트가 연결되지 않았습니다.");
+      throw new Error(NOT_CONNECTED_MESSAGE);
     }
 
     const pairPayload = buildPairPayload(payload);
@@ -132,7 +141,7 @@ export class MachugiSocketClient {
 
   sendExtensionState(payload: ExtensionStatePayload): Promise<void> {
     if (!this.socket) {
-      throw new Error("소켓 클라이언트가 연결되지 않았습니다.");
+      throw new Error(NOT_CONNECTED_MESSAGE);
     }
 
     return new Promise((resolve, reject) => {
@@ -147,12 +156,146 @@ export class MachugiSocketClient {
     });
   }
 
-  onQuizCommand(handler: (payload: QuizCommandPayload) => void) {
+  sendSourceWindow(payload: ExtensionSourcePayload): Promise<void> {
     if (!this.socket) {
-      throw new Error("소켓 클라이언트가 연결되지 않았습니다.");
+      throw new Error(NOT_CONNECTED_MESSAGE);
     }
 
-    this.socket.on("quiz:command" as never, handler as never);
+    return new Promise((resolve, reject) => {
+      this.socket?.emit("extension:source", payload, (response) => {
+        if (response.ok) {
+          resolve();
+          return;
+        }
+
+        reject(new Error(response.error));
+      });
+    });
+  }
+
+  sendSourceMirror(payload: SourceMirrorPayload): Promise<void> {
+    if (!this.socket) {
+      throw new Error(NOT_CONNECTED_MESSAGE);
+    }
+
+    return new Promise((resolve, reject) => {
+      this.socket?.emit("source:mirror", payload, (response) => {
+        if (response.ok) {
+          resolve();
+          return;
+        }
+
+        reject(new Error(response.error));
+      });
+    });
+  }
+
+  sendSourceActionFailure(payload: SourceMirrorActionFailurePayload): Promise<void> {
+    if (!this.socket) {
+      throw new Error(NOT_CONNECTED_MESSAGE);
+    }
+
+    return new Promise((resolve, reject) => {
+      this.socket?.emit("source:action-failure", payload, (response) => {
+        if (response.ok) {
+          resolve();
+          return;
+        }
+
+        reject(new Error(response.error));
+      });
+    });
+  }
+
+  requestOriginalSubmit(payload: OriginalSubmitRequestPayload): Promise<void> {
+    if (!this.socket) {
+      throw new Error(NOT_CONNECTED_MESSAGE);
+    }
+
+    return new Promise((resolve, reject) => {
+      this.socket?.emit("original:request-submit", payload, (response) => {
+        if (response.ok) {
+          resolve();
+          return;
+        }
+
+        reject(new Error(response.error));
+      });
+    });
+  }
+
+  sendOriginalResult(payload: OriginalResultPayload): Promise<void> {
+    if (!this.socket) {
+      throw new Error(NOT_CONNECTED_MESSAGE);
+    }
+
+    return new Promise((resolve, reject) => {
+      this.socket?.emit("original:result", payload, (response) => {
+        if (response.ok) {
+          resolve();
+          return;
+        }
+
+        reject(new Error(response.error));
+      });
+    });
+  }
+
+  sendOriginalFailure(payload: OriginalFailurePayload): Promise<void> {
+    if (!this.socket) {
+      throw new Error(NOT_CONNECTED_MESSAGE);
+    }
+
+    return new Promise((resolve, reject) => {
+      this.socket?.emit("original:failure", payload, (response) => {
+        if (response.ok) {
+          resolve();
+          return;
+        }
+
+        reject(new Error(response.error));
+      });
+    });
+  }
+
+  onQuizCommand(handler: (payload: QuizCommandPayload) => void): () => void {
+    if (!this.socket) {
+      throw new Error(NOT_CONNECTED_MESSAGE);
+    }
+
+    const socket = this.socket;
+    socket.on("quiz:command" as never, handler as never);
+    return () => socket.off("quiz:command" as never, handler as never);
+  }
+
+  onSourceAction(handler: (payload: SourceMirrorActionPayload) => void): () => void {
+    if (!this.socket) {
+      throw new Error(NOT_CONNECTED_MESSAGE);
+    }
+
+    const socket = this.socket;
+    socket.on("source:action" as never, handler as never);
+    return () => socket.off("source:action" as never, handler as never);
+  }
+
+  onOriginalSubmitAllowed(handler: (payload: OriginalSubmitAllowedPayload) => void): () => void {
+    if (!this.socket) {
+      throw new Error(NOT_CONNECTED_MESSAGE);
+    }
+
+    const socket = this.socket;
+    socket.on("original:submit-allowed" as never, handler as never);
+    return () => socket.off("original:submit-allowed" as never, handler as never);
+  }
+
+  onRoomState(handler: (state: RoomState) => void): () => void {
+    if (!this.socket) {
+      throw new Error(NOT_CONNECTED_MESSAGE);
+    }
+
+    const socket = this.socket;
+    socket.on("room:state" as never, handler as never);
+    return () => socket.off("room:state" as never, handler as never);
   }
 
   disconnect() {

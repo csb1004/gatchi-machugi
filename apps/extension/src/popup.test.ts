@@ -11,5 +11,6 @@ describe("popup markup", () => {
     expect(popupHtml).not.toContain('name="roomCode"');
     expect(popupHtml).not.toContain('name="serverUrl"');
     expect(popupHtml).toContain("방 코드와 방장 코드는 방장 화면에서 자동 저장됩니다.");
+    expect(popupHtml).toContain('id="source-button"');
   });
 });

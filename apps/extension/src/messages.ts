@@ -1,3 +1,13 @@
 export const CONTENT_STATE_MESSAGE = "machugi-state";
 export const CONTENT_COMMAND_MESSAGE = "machugi-command";
 export const CONTENT_REQUEST_STATE_MESSAGE = "machugi-request-state";
+export const CONTENT_FRAME_READY_MESSAGE = "machugi-frame-ready";
+export const CONTENT_FAIR_PLAY_MESSAGE = "machugi-fair-play";
+export const CONTENT_ORIGINAL_REQUEST_SUBMIT_MESSAGE = "machugi-original-request-submit";
+export const CONTENT_ORIGINAL_SUBMIT_MESSAGE = "machugi-original-submit";
+export const CONTENT_ORIGINAL_RESULT_MESSAGE = "machugi-original-result";
+export const CONTENT_ORIGINAL_FAILURE_MESSAGE = "machugi-original-failure";
+export const USE_CURRENT_TAB_AS_SOURCE_MESSAGE = "machugi-use-current-tab-as-source";
+export const CONTENT_SOURCE_MIRROR_MESSAGE = "machugi-source-mirror";
+export const CONTENT_SOURCE_ACTION_MESSAGE = "machugi-source-action";
+export const CONTENT_SOURCE_ACTION_FAILURE_MESSAGE = "machugi-source-action-failure";

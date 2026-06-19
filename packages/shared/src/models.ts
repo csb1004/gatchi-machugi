@@ -1,3 +1,5 @@
+import type { SourceMirrorState } from "./sourceMirror.js";
+
 export type RoomVisibility = "public" | "private";
 export type RoomPhase = "lobby" | "searching" | "ready" | "playing" | "revealed" | "ended" | "expired";
 export type ParticipantRole = "host" | "player";
@@ -43,6 +45,16 @@ export interface QuizState {
   answerCandidates: string[];
 }
 
+export type SourceWindowStatus = "disconnected" | "connected" | "unsupported";
+
+export interface SourceWindowState {
+  status: SourceWindowStatus;
+  url: string | null;
+  title: string | null;
+  lastSeenAt: string | null;
+  message: string | null;
+}
+
 export interface RoomSettings {
   visibility: RoomVisibility;
   submissionVisibility: SubmissionVisibility;
@@ -61,6 +73,17 @@ export interface RevealedSubmission extends SubmissionStatus {
   correct: boolean;
 }
 
+export type OriginalSubmitStatus = "idle" | "locked" | "ready" | "submitting" | "result-opened" | "unsupported";
+
+export interface FairPlayState {
+  questionKey: string | null;
+  requiredParticipantIds: string[];
+  submittedParticipantIds: string[];
+  allRequiredSubmitted: boolean;
+  originalSubmitStatus: OriginalSubmitStatus;
+  lockReason: string | null;
+}
+
 export interface RoomState {
   roomCode: string;
   phase: RoomPhase;
@@ -69,6 +92,9 @@ export interface RoomState {
   quiz: QuizState;
   submissions: SubmissionStatus[];
   revealedSubmissions: RevealedSubmission[];
+  fairPlay: FairPlayState;
+  sourceWindow: SourceWindowState;
+  sourceMirror: SourceMirrorState;
   hostExtensionConnected: boolean;
   chatMessageCount: number;
 }

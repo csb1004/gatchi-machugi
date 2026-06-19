@@ -24,8 +24,8 @@ describe("App", () => {
     expect(screen.getByLabelText("방 이름")).toBeInTheDocument();
     expect(screen.getByText("방 코드는 방을 만들면 자동으로 생성됩니다.")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "방 만들기" })).toBeDisabled();
-    expect(screen.getByText("퀴즈를 진행할 브라우저 탭에서 machugi.io를 엽니다.")).toBeInTheDocument();
-    expect(screen.getByText("확장 프로그램을 새로 설치하거나 업데이트했다면 방장 화면을 새로고침한 뒤 다시 저장합니다.")).toBeInTheDocument();
+    expect(screen.getByText("방장 화면에서 마추기아이오 원본 화면을 열고 퀴즈를 고릅니다.")).toBeInTheDocument();
+    expect(screen.getByText("확장을 새로 설치하거나 업데이트했다면 방장 화면에서 다시 저장합니다.")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "GitHub Releases에서 확장 프로그램 받기" })).toHaveAttribute(
       "href",
       "https://github.com/csb1004/gatchi-machugi/releases"

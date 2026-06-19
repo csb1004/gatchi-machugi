@@ -1,17 +1,27 @@
 import {
+  allRequiredSubmitted,
+  createQuestionKey,
+  requiredParticipantIds,
   scoreSubmissions,
+  submittedParticipantIds,
   type ChatMessagePayload,
+  type OriginalSubmitAllowedPayload,
   type Participant,
   type QuizState,
   type RevealedSubmission,
   type RoomSettings,
   type RoomState,
-  type RoomVisibility
+  type RoomVisibility,
+  type SourceMirrorState,
+  type SourceWindowState,
+  createDisconnectedSourceMirror,
+  quizFromSourceMirror
 } from "@gatchi/shared";
 import { customAlphabet, nanoid } from "nanoid";
 
 const createRoomCode = customAlphabet("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ", 6);
 const createParticipantCodeValue = customAlphabet("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ", 4);
+const originalSubmissionLockReason = "모든 참가자가 제출해야 원본 정답 제출이 가능합니다.";
 
 interface StoredRoom {
   hostParticipantId: string;
@@ -82,6 +92,7 @@ export class RoomService {
         this.requireMatchingParticipantCode(room, existing.id, input.participantCode);
       }
       existing.connected = true;
+      this.refreshFairPlayRequiredParticipants(room);
       return { participant: existing, participantCode, state: room.state };
     }
 
@@ -96,6 +107,7 @@ export class RoomService {
     const participantCode = this.uniqueParticipantCode(room.participantCodes);
     room.participantCodes.set(participant.id, participantCode);
     room.state.participants.push(participant);
+    this.refreshFairPlayRequiredParticipants(room);
     return { participant, participantCode, state: room.state };
   }
 
@@ -105,6 +117,7 @@ export class RoomService {
 
     if (existing) {
       existing.connected = true;
+      this.refreshFairPlayRequiredParticipants(room);
       return { participant: existing, participantCode: this.requireParticipantCode(room, existing.id), state: room.state };
     }
 
@@ -120,6 +133,7 @@ export class RoomService {
     room.hostParticipantId = participant.id;
     room.participantCodes.set(participant.id, participantCode);
     room.state.participants.push(participant);
+    this.refreshFairPlayRequiredParticipants(room);
     return { participant, participantCode, state: room.state };
   }
 
@@ -135,6 +149,7 @@ export class RoomService {
     const participant = this.requireParticipant(room, room.hostParticipantId);
     participant.connected = true;
     room.state.hostExtensionConnected = true;
+    this.refreshFairPlayRequiredParticipants(room);
     return { participant, state: room.state };
   }
 
@@ -156,10 +171,44 @@ export class RoomService {
     return room.state;
   }
 
+  updateSourceWindow(input: { roomCode: string; sourceWindow: SourceWindowState }): RoomState {
+    const room = this.requireRoom(input.roomCode);
+    room.state.sourceWindow = input.sourceWindow;
+    return room.state;
+  }
+
+  updateSourceMirror(input: { roomCode: string; sourceMirror: SourceMirrorState }): RoomState {
+    const room = this.requireRoom(input.roomCode);
+    const sourceMirror = this.publicSourceMirror(room, input.sourceMirror);
+    room.state.sourceMirror = sourceMirror;
+
+    const quiz = quizFromSourceMirror(sourceMirror);
+    if (quiz && sourceMirror.kind === "playing") {
+      return this.updateQuizState({
+        roomCode: input.roomCode,
+        quiz
+      });
+    }
+
+    if (quiz && sourceMirror.kind === "result" && room.state.fairPlay.originalSubmitStatus === "result-opened") {
+      room.state.quiz = quiz;
+      return room.state;
+    }
+
+    if (sourceMirror.kind === "home" || sourceMirror.kind === "searchResults" || sourceMirror.kind === "quizDetail") {
+      room.state.phase = "searching";
+    }
+
+    return room.state;
+  }
+
   submitAnswer(input: { roomCode: string; participantId: string; rawAnswer: string }): RoomState {
     const room = this.requireRoom(input.roomCode);
     if (room.state.phase === "revealed" || room.state.phase === "ended" || room.state.phase === "expired") {
       throw new Error("Submissions are closed for this question");
+    }
+    if (room.state.fairPlay.originalSubmitStatus === "submitting") {
+      throw new Error("Submissions are locked for original submission");
     }
 
     this.requireParticipant(room, input.participantId);
@@ -169,7 +218,77 @@ export class RoomService {
       skipped: false
     });
     room.state.submissions = this.publicSubmissionStatuses(room);
+    this.refreshFairPlaySubmissionState(room);
 
+    return room.state;
+  }
+
+  requestOriginalSubmission(input: { roomCode: string; questionKey: string }): OriginalSubmitAllowedPayload {
+    const room = this.requireRoom(input.roomCode);
+
+    if (!room.state.fairPlay.questionKey || input.questionKey !== room.state.fairPlay.questionKey) {
+      throw new Error("Question changed before original submission");
+    }
+
+    if (room.state.fairPlay.originalSubmitStatus !== "ready") {
+      throw new Error("Original submission is still locked");
+    }
+
+    const hostSubmission = room.rawSubmissions.get(room.hostParticipantId);
+    if (!hostSubmission || hostSubmission.skipped) {
+      throw new Error("Host answer is required before original submission");
+    }
+
+    room.state.fairPlay.originalSubmitStatus = "submitting";
+
+    return {
+      roomCode: input.roomCode,
+      questionKey: input.questionKey,
+      hostRawAnswer: hostSubmission.rawAnswer
+    };
+  }
+
+  applyOriginalResult(input: { roomCode: string; questionKey: string; quiz: QuizState }): RoomState {
+    const room = this.requireRoom(input.roomCode);
+
+    if (!room.state.fairPlay.questionKey || input.questionKey !== room.state.fairPlay.questionKey) {
+      throw new Error("Question changed before original result");
+    }
+
+    if (room.state.fairPlay.originalSubmitStatus !== "submitting") {
+      throw new Error("Original submission has not been authorized");
+    }
+
+    if (createQuestionKey(input.quiz) !== input.questionKey) {
+      throw new Error("Original result does not match current question");
+    }
+
+    this.requireRevealReady(room, []);
+
+    room.state.quiz = input.quiz;
+    room.state.fairPlay.originalSubmitStatus = "result-opened";
+    room.state.fairPlay.lockReason = null;
+
+    return this.revealAnswers({ roomCode: input.roomCode, skippedParticipantIds: [] });
+  }
+
+  failOriginalSubmission(input: { roomCode: string; questionKey: string; reason: string }): RoomState {
+    const room = this.requireRoom(input.roomCode);
+
+    if (!room.state.fairPlay.questionKey || input.questionKey !== room.state.fairPlay.questionKey) {
+      throw new Error("Question changed before original submission failure");
+    }
+
+    if (room.state.fairPlay.originalSubmitStatus !== "submitting") {
+      throw new Error("Original submission has not been authorized");
+    }
+
+    const submittedIds = submittedParticipantIds(room.state.submissions);
+    const complete = allRequiredSubmitted(room.state.fairPlay.requiredParticipantIds, room.state.submissions);
+    room.state.fairPlay.submittedParticipantIds = submittedIds;
+    room.state.fairPlay.allRequiredSubmitted = complete;
+    room.state.fairPlay.originalSubmitStatus = complete ? "ready" : "locked";
+    room.state.fairPlay.lockReason = complete ? input.reason : originalSubmissionLockReason;
     return room.state;
   }
 
@@ -183,12 +302,7 @@ export class RoomService {
       }
     }
 
-    const missingParticipants = room.state.participants.filter(
-      (participant) => participant.connected && !room.rawSubmissions.has(participant.id)
-    );
-    if (missingParticipants.length > 0) {
-      throw new Error("All active participants must submit or be skipped before reveal");
-    }
+    this.requireRevealReady(room, input.skippedParticipantIds);
 
     const previousCorrect = this.correctParticipantIds(room.state.revealedSubmissions);
     const nextRevealedSubmissions = this.revealedSubmissions(room);
@@ -262,6 +376,15 @@ export class RoomService {
     const room = this.requireRoom(input.roomCode);
     const participant = this.requireParticipant(room, input.participantId);
     participant.connected = false;
+    this.refreshFairPlayRequiredParticipants(room);
+    return room.state;
+  }
+
+  disconnectParticipant(input: { roomCode: string; participantId: string }): RoomState {
+    const room = this.requireRoom(input.roomCode);
+    const participant = this.requireParticipant(room, input.participantId);
+    participant.connected = false;
+    this.refreshFairPlayRequiredParticipants(room);
     return room.state;
   }
 
@@ -340,14 +463,7 @@ export class RoomService {
   }
 
   private shouldResetRound(previousQuiz: QuizState, nextQuiz: QuizState): boolean {
-    return (
-      previousQuiz.questionIndex !== nextQuiz.questionIndex ||
-      previousQuiz.questionText !== nextQuiz.questionText ||
-      previousQuiz.questionType !== nextQuiz.questionType ||
-      previousQuiz.imageUrl !== nextQuiz.imageUrl ||
-      previousQuiz.audioUrl !== nextQuiz.audioUrl ||
-      previousQuiz.videoUrl !== nextQuiz.videoUrl
-    );
+    return createQuestionKey(previousQuiz) !== createQuestionKey(nextQuiz);
   }
 
   private resetRound(room: StoredRoom): void {
@@ -355,6 +471,52 @@ export class RoomService {
     room.rawSubmissions.clear();
     room.state.submissions = [];
     room.state.revealedSubmissions = [];
+    const questionKey = createQuestionKey(room.state.quiz);
+    const requiredIds = requiredParticipantIds(room.state.participants);
+    room.state.fairPlay = {
+      questionKey,
+      requiredParticipantIds: requiredIds,
+      submittedParticipantIds: [],
+      allRequiredSubmitted: false,
+      originalSubmitStatus: questionKey ? "locked" : "idle",
+      lockReason: questionKey ? originalSubmissionLockReason : null
+    };
+  }
+
+  private refreshFairPlaySubmissionState(room: StoredRoom): void {
+    const submittedIds = submittedParticipantIds(room.state.submissions);
+    const complete = allRequiredSubmitted(room.state.fairPlay.requiredParticipantIds, room.state.submissions);
+    room.state.fairPlay.submittedParticipantIds = submittedIds;
+    room.state.fairPlay.allRequiredSubmitted = complete;
+
+    if (room.state.fairPlay.originalSubmitStatus === "locked" || room.state.fairPlay.originalSubmitStatus === "ready") {
+      room.state.fairPlay.originalSubmitStatus = complete ? "ready" : "locked";
+      room.state.fairPlay.lockReason = complete ? null : originalSubmissionLockReason;
+    }
+  }
+
+  private refreshFairPlayRequiredParticipants(room: StoredRoom): void {
+    if (
+      !room.state.fairPlay.questionKey ||
+      (room.state.fairPlay.originalSubmitStatus !== "locked" && room.state.fairPlay.originalSubmitStatus !== "ready")
+    ) {
+      return;
+    }
+
+    room.state.fairPlay.requiredParticipantIds = requiredParticipantIds(room.state.participants);
+    this.refreshFairPlaySubmissionState(room);
+  }
+
+  private requireRevealReady(room: StoredRoom, skippedParticipantIds: string[]): void {
+    const skippedIds = new Set(skippedParticipantIds);
+    const requiredIds = room.state.fairPlay.questionKey
+      ? room.state.fairPlay.requiredParticipantIds
+      : requiredParticipantIds(room.state.participants);
+    const missingRequiredIds = requiredIds.filter((participantId) => !room.rawSubmissions.has(participantId) && !skippedIds.has(participantId));
+
+    if (missingRequiredIds.length > 0) {
+      throw new Error("All active participants must submit or be skipped before reveal");
+    }
   }
 
   private publicSubmissionStatuses(room: StoredRoom) {
@@ -445,8 +607,52 @@ export class RoomService {
       },
       submissions: [],
       revealedSubmissions: [],
+      fairPlay: {
+        questionKey: null,
+        requiredParticipantIds: [],
+        submittedParticipantIds: [],
+        allRequiredSubmitted: false,
+        originalSubmitStatus: "idle",
+        lockReason: null
+      },
+      sourceWindow: {
+        status: "disconnected",
+        url: null,
+        title: null,
+        lastSeenAt: null,
+        message: null
+      },
+      sourceMirror: createDisconnectedSourceMirror("원본 탭을 연결해 주세요."),
       hostExtensionConnected: false,
       chatMessageCount: 0
+    };
+  }
+
+  private publicSourceMirror(room: StoredRoom, sourceMirror: SourceMirrorState): SourceMirrorState {
+    if (
+      (sourceMirror.kind !== "playing" && sourceMirror.kind !== "result") ||
+      room.state.fairPlay.originalSubmitStatus === "result-opened"
+    ) {
+      return sourceMirror;
+    }
+
+    const quiz = {
+      ...sourceMirror.quiz,
+      resultMessage: null,
+      answerCandidates: []
+    };
+
+    if (sourceMirror.kind === "playing") {
+      return {
+        ...sourceMirror,
+        quiz
+      };
+    }
+
+    return {
+      ...sourceMirror,
+      kind: "playing",
+      quiz
     };
   }
 }

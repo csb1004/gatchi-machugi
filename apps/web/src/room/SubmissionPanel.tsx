@@ -17,7 +17,9 @@ export function SubmissionPanel({ state }: { state: RoomState }) {
           return (
             <div className="status-row" key={participant.id}>
               <span>{participant.nickname}</span>
-              <strong>{participant.nickname} {status}</strong>
+              <strong>
+                {participant.nickname} {status}
+              </strong>
             </div>
           );
         })}

@@ -4,7 +4,8 @@ import type {
   JoinRoomPayload,
   QuizCommandName,
   RoomState,
-  ServerToClientEvents
+  ServerToClientEvents,
+  SourceMirrorAction
 } from "@gatchi/shared";
 import { useEffect, useMemo, useState } from "react";
 import { io, type Socket } from "socket.io-client";
@@ -36,6 +37,10 @@ function localizeSocketError(message: string) {
   return translations[message] ?? message;
 }
 
+function createActionId() {
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
 export function useRoomSocket() {
   const [state, setState] = useState<RoomState | null>(null);
   const [participantId, setParticipantId] = useState<string | null>(() => localStorage.getItem("participantId"));
@@ -52,12 +57,18 @@ export function useRoomSocket() {
       setChatMessages((messages) => [...messages, message]);
     }
 
+    function handleSourceActionFailure(payload: { reason: string }) {
+      setError(payload.reason);
+    }
+
     socket.on("room:state", handleState);
     socket.on("chat:message", handleChat);
+    socket.on("source:action-failure", handleSourceActionFailure);
 
     return () => {
       socket.off("room:state", handleState);
       socket.off("chat:message", handleChat);
+      socket.off("source:action-failure", handleSourceActionFailure);
       socket.disconnect();
     };
   }, [socket]);
@@ -114,6 +125,22 @@ export function useRoomSocket() {
     });
   }
 
+  function sendSourceAction(action: SourceMirrorAction) {
+    if (!state) return;
+
+    socket.emit(
+      "source:action",
+      {
+        roomCode: state.roomCode,
+        actionId: createActionId(),
+        action
+      },
+      (ack) => {
+        if (!ack.ok) setError(localizeSocketError(ack.error));
+      }
+    );
+  }
+
   return {
     state,
     participantId,
@@ -122,6 +149,7 @@ export function useRoomSocket() {
     joinRoom,
     submitAnswer,
     sendChat,
-    sendHostCommand
+    sendHostCommand,
+    sendSourceAction
   };
 }

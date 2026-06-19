@@ -4,17 +4,24 @@ import type {
   AddAliasPayload,
   AdjustScorePayload,
   ClientToServerEvents,
+  ExtensionSourcePayload,
   ExtensionStatePayload,
   HostPairAck,
   HostPairPayload,
   JoinRoomAck,
   JoinRoomPayload,
   KickParticipantPayload,
+  OriginalResultPayload,
+  OriginalFailurePayload,
+  OriginalSubmitRequestPayload,
   QuizCommandPayload,
   RevealAnswerPayload,
   RoomSettings,
   RoomState,
   SendChatPayload,
+  SourceMirrorActionFailurePayload,
+  SourceMirrorActionPayload,
+  SourceMirrorPayload,
   SubmitAnswerPayload
 } from "@gatchi/shared";
 import { Server } from "socket.io";
@@ -25,6 +32,7 @@ interface SocketSession {
   roomCode?: string;
   participantId?: string;
   role?: "host" | "participant";
+  clientKind?: "web" | "extension";
 }
 
 type HostPairGatewayAck = HostPairAck & { state: RoomState };
@@ -44,6 +52,52 @@ const hostPairSchema = z.object({
 const extensionStateSchema = z.object({
   roomCode: z.string().trim().min(1).transform((value) => value.toUpperCase()),
   quiz: z.custom<ExtensionStatePayload["quiz"]>((value) => typeof value === "object" && value !== null)
+});
+
+const extensionSourceSchema = z.object({
+  roomCode: z.string().trim().min(1).transform((value) => value.toUpperCase()),
+  sourceWindow: z.object({
+    status: z.enum(["disconnected", "connected", "unsupported"]),
+    url: z.string().nullable(),
+    title: z.string().nullable(),
+    lastSeenAt: z.string().nullable(),
+    message: z.string().nullable()
+  })
+});
+
+const sourceMirrorActionSchema = z.object({
+  roomCode: z.string().trim().min(1).transform((value) => value.toUpperCase()),
+  actionId: z.string().trim().min(1).max(80),
+  action: z.custom<SourceMirrorActionPayload["action"]>((value) => typeof value === "object" && value !== null)
+});
+
+const sourceMirrorSchema = z.object({
+  roomCode: z.string().trim().min(1).transform((value) => value.toUpperCase()),
+  sourceMirror: z.custom<SourceMirrorPayload["sourceMirror"]>((value) => typeof value === "object" && value !== null)
+});
+
+const sourceMirrorFailureSchema = z.object({
+  roomCode: z.string().trim().min(1).transform((value) => value.toUpperCase()),
+  actionId: z.string().trim().min(1).max(80),
+  action: z.custom<SourceMirrorActionFailurePayload["action"]>((value) => typeof value === "object" && value !== null),
+  reason: z.string().trim().min(1).max(500)
+});
+
+const originalSubmitRequestSchema = z.object({
+  roomCode: z.string().trim().min(1).transform((value) => value.toUpperCase()),
+  questionKey: z.string().trim().min(1)
+});
+
+const originalResultSchema = z.object({
+  roomCode: z.string().trim().min(1).transform((value) => value.toUpperCase()),
+  questionKey: z.string().trim().min(1),
+  quiz: z.custom<OriginalResultPayload["quiz"]>((value) => typeof value === "object" && value !== null)
+});
+
+const originalFailureSchema = z.object({
+  roomCode: z.string().trim().min(1).transform((value) => value.toUpperCase()),
+  questionKey: z.string().trim().min(1),
+  reason: z.string().trim().min(1).max(500)
 });
 
 const submitAnswerSchema = z.object({
@@ -106,6 +160,27 @@ function requireHostSession(session: SocketSession, roomCode: string) {
   }
 }
 
+function requireHostExtensionSession(session: SocketSession, roomCode: string) {
+  requireHostSession(session, roomCode);
+  if (session.clientKind !== "extension") {
+    throw new Error("Host extension authorization required");
+  }
+}
+
+function requireHostWebSession(session: SocketSession, roomCode: string) {
+  requireHostSession(session, roomCode);
+  if (session.clientKind !== "web") {
+    throw new Error("Host web authorization required");
+  }
+}
+
+function requireCurrentHostExtensionSession(session: SocketSession, socketId: string, roomCode: string, hostExtensionSocketIds: Map<string, string>) {
+  requireHostExtensionSession(session, roomCode);
+  if (hostExtensionSocketIds.get(roomCode) !== socketId) {
+    throw new Error("Current host extension authorization required");
+  }
+}
+
 function requireParticipantSession(session: SocketSession, roomCode: string, participantId: string) {
   if (session.roomCode !== roomCode || session.participantId !== participantId) {
     throw new Error("Participant authorization required");
@@ -125,12 +200,10 @@ function markParticipantDisconnected(roomService: RoomService, socket: SocketSes
   if (!socket.roomCode || !socket.participantId) return null;
 
   try {
-    const state = roomService.getState(socket.roomCode);
-    const participant = state.participants.find((entry) => entry.id === socket.participantId);
-    if (!participant) return null;
-
-    participant.connected = false;
-    return state;
+    return roomService.disconnectParticipant({
+      roomCode: socket.roomCode,
+      participantId: socket.participantId
+    });
   } catch {
     return null;
   }
@@ -143,6 +216,42 @@ export function createSocketServer(httpServer: HttpServer, { roomService }: { ro
       credentials: true
     }
   });
+  const hostExtensionSocketIds = new Map<string, string>();
+
+  function deleteHostExtensionSocketId(roomCode: string, socketId: string) {
+    if (hostExtensionSocketIds.get(roomCode) === socketId) {
+      hostExtensionSocketIds.delete(roomCode);
+    }
+  }
+
+  function emitOriginalSubmitIfReady(roomCode: string, state: RoomState) {
+    if (state.fairPlay.originalSubmitStatus !== "ready" || !state.fairPlay.questionKey) return;
+    if (state.sourceWindow.status !== "connected") return;
+    const extensionSocketId = hostExtensionSocketIds.get(roomCode);
+    if (!extensionSocketId) return;
+    const extensionSocket = io.sockets.sockets.get(extensionSocketId);
+    const extensionSession = extensionSocket?.data as SocketSession | undefined;
+    if (
+      !extensionSocket?.connected ||
+      extensionSession?.roomCode !== roomCode ||
+      extensionSession.role !== "host" ||
+      extensionSession.clientKind !== "extension"
+    ) {
+      deleteHostExtensionSocketId(roomCode, extensionSocketId);
+      return;
+    }
+
+    try {
+      const payload = roomService.requestOriginalSubmission({
+        roomCode,
+        questionKey: state.fairPlay.questionKey
+      });
+      io.to(extensionSocketId).emit("original:submit-allowed", payload);
+      io.to(roomCode).emit("room:state", roomService.getState(roomCode));
+    } catch {
+      return;
+    }
+  }
 
   io.on("connection", (socket) => {
     const session = socket.data as SocketSession;
@@ -155,6 +264,7 @@ export function createSocketServer(httpServer: HttpServer, { roomService }: { ro
       }
 
       try {
+        const previousRoomCode = session.roomCode;
         const participantId = session.participantId;
         const trustedParticipantId = participantId ?? (parsed.data.participantCode ? parsed.data.participantId : undefined);
         const joined = roomService.joinParticipant({
@@ -165,9 +275,17 @@ export function createSocketServer(httpServer: HttpServer, { roomService }: { ro
         });
 
         socket.join(parsed.data.roomCode);
+        if (previousRoomCode && previousRoomCode !== parsed.data.roomCode) {
+          socket.leave(previousRoomCode);
+        }
+        if (previousRoomCode) {
+          deleteHostExtensionSocketId(previousRoomCode, socket.id);
+        }
+        deleteHostExtensionSocketId(parsed.data.roomCode, socket.id);
         session.roomCode = parsed.data.roomCode;
         session.participantId = joined.participant.id;
         session.role = joined.participant.role === "host" ? "host" : "participant";
+        session.clientKind = "web";
 
         ack({
           ok: true,
@@ -202,16 +320,27 @@ export function createSocketServer(httpServer: HttpServer, { roomService }: { ro
       }
 
       try {
+        const previousRoomCode = session.roomCode;
         const joined = roomService.joinHostExtension({
           roomCode: parsed.data.roomCode,
           hostCode: parsed.data.hostCode
         });
         const state = joined.state;
+        const previousExtensionSocketId = hostExtensionSocketIds.get(parsed.data.roomCode);
+        if (previousExtensionSocketId && previousExtensionSocketId !== socket.id) {
+          io.sockets.sockets.get(previousExtensionSocketId)?.leave(parsed.data.roomCode);
+        }
 
         socket.join(parsed.data.roomCode);
+        if (previousRoomCode && previousRoomCode !== parsed.data.roomCode) {
+          socket.leave(previousRoomCode);
+          deleteHostExtensionSocketId(previousRoomCode, socket.id);
+        }
         session.roomCode = parsed.data.roomCode;
         session.participantId = joined.participant.id;
         session.role = "host";
+        session.clientKind = "extension";
+        hostExtensionSocketIds.set(parsed.data.roomCode, socket.id);
 
         (ack as Ack<HostPairGatewayAck>)({
           ok: true,
@@ -236,12 +365,138 @@ export function createSocketServer(httpServer: HttpServer, { roomService }: { ro
       }
 
       try {
-        requireHostSession(session, parsed.data.roomCode);
+        requireCurrentHostExtensionSession(session, socket.id, parsed.data.roomCode, hostExtensionSocketIds);
         const state = roomService.updateQuizState(parsed.data);
         io.to(parsed.data.roomCode).emit("room:state", state);
         ack({ ok: true, data: undefined });
       } catch (error) {
         ackError(ack, error instanceof Error ? error.message : "State update failed");
+      }
+    });
+
+    socket.on("extension:source", (payload: ExtensionSourcePayload, ack: Ack<void>) => {
+      const parsed = extensionSourceSchema.safeParse(payload);
+      if (!parsed.success) {
+        ackError(ack, "Invalid extension source payload");
+        return;
+      }
+
+      try {
+        requireCurrentHostExtensionSession(session, socket.id, parsed.data.roomCode, hostExtensionSocketIds);
+        const state = roomService.updateSourceWindow(parsed.data);
+        io.to(parsed.data.roomCode).emit("room:state", state);
+        ack({ ok: true, data: undefined });
+        emitOriginalSubmitIfReady(parsed.data.roomCode, state);
+      } catch (error) {
+        ackError(ack, error instanceof Error ? error.message : "Source update failed");
+      }
+    });
+
+    socket.on("source:mirror", (payload: SourceMirrorPayload, ack: Ack<void>) => {
+      const parsed = sourceMirrorSchema.safeParse(payload);
+      if (!parsed.success) {
+        ackError(ack, "Invalid source mirror payload");
+        return;
+      }
+
+      try {
+        requireCurrentHostExtensionSession(session, socket.id, parsed.data.roomCode, hostExtensionSocketIds);
+        const state = roomService.updateSourceMirror(parsed.data);
+        io.to(parsed.data.roomCode).emit("room:state", state);
+        ack({ ok: true, data: undefined });
+        emitOriginalSubmitIfReady(parsed.data.roomCode, state);
+      } catch (error) {
+        ackError(ack, error instanceof Error ? error.message : "Source mirror update failed");
+      }
+    });
+
+    socket.on("source:action", (payload: SourceMirrorActionPayload, ack: Ack<void>) => {
+      const parsed = sourceMirrorActionSchema.safeParse(payload);
+      if (!parsed.success) {
+        ackError(ack, "Invalid source action payload");
+        return;
+      }
+
+      try {
+        requireHostWebSession(session, parsed.data.roomCode);
+        const extensionSocketId = hostExtensionSocketIds.get(parsed.data.roomCode);
+        if (!extensionSocketId) {
+          throw new Error("Host extension is not connected");
+        }
+
+        io.to(extensionSocketId).emit("source:action", parsed.data);
+        ack({ ok: true, data: undefined });
+      } catch (error) {
+        ackError(ack, error instanceof Error ? error.message : "Source action failed");
+      }
+    });
+
+    socket.on("source:action-failure", (payload: SourceMirrorActionFailurePayload, ack: Ack<void>) => {
+      const parsed = sourceMirrorFailureSchema.safeParse(payload);
+      if (!parsed.success) {
+        ackError(ack, "Invalid source action failure payload");
+        return;
+      }
+
+      try {
+        requireCurrentHostExtensionSession(session, socket.id, parsed.data.roomCode, hostExtensionSocketIds);
+        io.to(parsed.data.roomCode).emit("source:action-failure", parsed.data);
+        ack({ ok: true, data: undefined });
+      } catch (error) {
+        ackError(ack, error instanceof Error ? error.message : "Source action failure failed");
+      }
+    });
+
+    socket.on("original:request-submit", (payload: OriginalSubmitRequestPayload, ack: Ack<void>) => {
+      const parsed = originalSubmitRequestSchema.safeParse(payload);
+      if (!parsed.success) {
+        ackError(ack, "Invalid original submit payload");
+        return;
+      }
+
+      try {
+        requireCurrentHostExtensionSession(session, socket.id, parsed.data.roomCode, hostExtensionSocketIds);
+        const allowed = roomService.requestOriginalSubmission(parsed.data);
+        socket.emit("original:submit-allowed", allowed);
+        io.to(parsed.data.roomCode).emit("room:state", roomService.getState(parsed.data.roomCode));
+        ack({ ok: true, data: undefined });
+      } catch (error) {
+        ackError(ack, error instanceof Error ? error.message : "Original submit request failed");
+      }
+    });
+
+    socket.on("original:result", (payload: OriginalResultPayload, ack: Ack<void>) => {
+      const parsed = originalResultSchema.safeParse(payload);
+      if (!parsed.success) {
+        ackError(ack, "Invalid original result payload");
+        return;
+      }
+
+      try {
+        requireCurrentHostExtensionSession(session, socket.id, parsed.data.roomCode, hostExtensionSocketIds);
+        const state = roomService.applyOriginalResult(parsed.data);
+        io.to(parsed.data.roomCode).emit("answer:revealed", state.revealedSubmissions);
+        io.to(parsed.data.roomCode).emit("room:state", state);
+        ack({ ok: true, data: undefined });
+      } catch (error) {
+        ackError(ack, error instanceof Error ? error.message : "Original result failed");
+      }
+    });
+
+    socket.on("original:failure", (payload: OriginalFailurePayload, ack: Ack<void>) => {
+      const parsed = originalFailureSchema.safeParse(payload);
+      if (!parsed.success) {
+        ackError(ack, "Invalid original failure payload");
+        return;
+      }
+
+      try {
+        requireCurrentHostExtensionSession(session, socket.id, parsed.data.roomCode, hostExtensionSocketIds);
+        const state = roomService.failOriginalSubmission(parsed.data);
+        io.to(parsed.data.roomCode).emit("room:state", state);
+        ack({ ok: true, data: undefined });
+      } catch (error) {
+        ackError(ack, error instanceof Error ? error.message : "Original failure failed");
       }
     });
 
@@ -254,7 +509,10 @@ export function createSocketServer(httpServer: HttpServer, { roomService }: { ro
 
       try {
         requireHostSession(session, parsed.data.roomCode);
-        io.to(parsed.data.roomCode).emit("quiz:command", parsed.data);
+        const extensionSocketId = hostExtensionSocketIds.get(parsed.data.roomCode);
+        if (extensionSocketId) {
+          io.to(extensionSocketId).emit("quiz:command", parsed.data);
+        }
         ack({ ok: true, data: undefined });
       } catch (error) {
         ackError(ack, error instanceof Error ? error.message : "Quiz command failed");
@@ -278,6 +536,7 @@ export function createSocketServer(httpServer: HttpServer, { roomService }: { ro
 
         const state = roomService.submitAnswer(parsed.data);
         io.to(parsed.data.roomCode).emit("room:state", state);
+        emitOriginalSubmitIfReady(parsed.data.roomCode, state);
         ack({ ok: true, data: undefined });
       } catch (error) {
         ackError(ack, error instanceof Error ? error.message : "Answer submit failed");
@@ -393,6 +652,14 @@ export function createSocketServer(httpServer: HttpServer, { roomService }: { ro
 
     socket.on("disconnect", () => {
       if (!session.roomCode) return;
+
+      if (session.clientKind === "extension" && session.roomCode) {
+        const isCurrentExtension = hostExtensionSocketIds.get(session.roomCode) === socket.id;
+        deleteHostExtensionSocketId(session.roomCode, socket.id);
+        if (!isCurrentExtension) {
+          return;
+        }
+      }
 
       if (session.role === "host") {
         try {

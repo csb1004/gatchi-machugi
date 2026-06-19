@@ -1,4 +1,17 @@
-import type { PublicRoomSummary, QuestionType, QuizState, RevealedSubmission, RoomSettings, RoomState } from "./models.js";
+import type {
+  PublicRoomSummary,
+  QuestionType,
+  QuizState,
+  RevealedSubmission,
+  RoomSettings,
+  RoomState,
+  SourceWindowState
+} from "./models.js";
+import type {
+  SourceMirrorActionFailurePayload,
+  SourceMirrorActionPayload,
+  SourceMirrorState
+} from "./sourceMirror.js";
 
 export interface ServerToClientEvents {
   "room:state": (state: RoomState) => void;
@@ -11,6 +24,9 @@ export interface ServerToClientEvents {
   "chat:message": (message: ChatMessagePayload) => void;
   "chat:system": (message: SystemMessagePayload) => void;
   "quiz:command": (payload: QuizCommandPayload) => void;
+  "source:action": (payload: SourceMirrorActionPayload) => void;
+  "source:action-failure": (payload: SourceMirrorActionFailurePayload) => void;
+  "original:submit-allowed": (payload: OriginalSubmitAllowedPayload) => void;
 }
 
 export interface ClientToServerEvents {
@@ -20,9 +36,16 @@ export interface ClientToServerEvents {
   "quiz:select": (payload: QuizSelectPayload, ack: Ack<void>) => void;
   "quiz:command": (payload: QuizCommandPayload, ack: Ack<void>) => void;
   "extension:state": (payload: ExtensionStatePayload, ack: Ack<void>) => void;
+  "extension:source": (payload: ExtensionSourcePayload, ack: Ack<void>) => void;
+  "source:action": (payload: SourceMirrorActionPayload, ack: Ack<void>) => void;
+  "source:mirror": (payload: SourceMirrorPayload, ack: Ack<void>) => void;
+  "source:action-failure": (payload: SourceMirrorActionFailurePayload, ack: Ack<void>) => void;
   "answer:submit": (payload: SubmitAnswerPayload, ack: Ack<void>) => void;
   "answer:reveal": (payload: RevealAnswerPayload, ack: Ack<void>) => void;
   "answer:add-alias": (payload: AddAliasPayload, ack: Ack<void>) => void;
+  "original:request-submit": (payload: OriginalSubmitRequestPayload, ack: Ack<void>) => void;
+  "original:result": (payload: OriginalResultPayload, ack: Ack<void>) => void;
+  "original:failure": (payload: OriginalFailurePayload, ack: Ack<void>) => void;
   "score:adjust": (payload: AdjustScorePayload, ack: Ack<void>) => void;
   "chat:send": (payload: SendChatPayload, ack: Ack<void>) => void;
   "room:update-settings": (payload: UpdateSettingsPayload, ack: Ack<void>) => void;
@@ -83,6 +106,39 @@ export interface QuizCommandPayload {
 export interface ExtensionStatePayload {
   roomCode: string;
   quiz: QuizState;
+}
+
+export interface ExtensionSourcePayload {
+  roomCode: string;
+  sourceWindow: SourceWindowState;
+}
+
+export interface SourceMirrorPayload {
+  roomCode: string;
+  sourceMirror: SourceMirrorState;
+}
+
+export interface OriginalSubmitAllowedPayload {
+  roomCode: string;
+  questionKey: string;
+  hostRawAnswer: string;
+}
+
+export interface OriginalSubmitRequestPayload {
+  roomCode: string;
+  questionKey: string;
+}
+
+export interface OriginalResultPayload {
+  roomCode: string;
+  questionKey: string;
+  quiz: QuizState;
+}
+
+export interface OriginalFailurePayload {
+  roomCode: string;
+  questionKey: string;
+  reason: string;
 }
 
 export interface ExtensionErrorPayload {
