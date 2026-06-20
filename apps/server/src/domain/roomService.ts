@@ -637,9 +637,12 @@ export class RoomService {
 
   private ensureHostSkipSubmission(room: StoredRoom): string {
     const existing = room.rawSubmissions.get(room.hostParticipantId);
-    const hostRawAnswer = existing && !existing.skipped && existing.rawAnswer.trim() ? existing.rawAnswer : ".";
-    room.rawSubmissions.set(room.hostParticipantId, { rawAnswer: hostRawAnswer, skipped: false });
-    return hostRawAnswer;
+    if (existing && !existing.skipped && existing.rawAnswer.trim()) {
+      return existing.rawAnswer;
+    }
+
+    room.rawSubmissions.set(room.hostParticipantId, { rawAnswer: "", skipped: true });
+    return ".";
   }
 
   private skipMissingRequiredParticipants(room: StoredRoom): void {

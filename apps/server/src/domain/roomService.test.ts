@@ -238,7 +238,7 @@ describe("RoomService", () => {
       hostRawAnswer: "."
     });
     expect(service.getState(roomCode).submissions).toEqual([
-      { participantId: hostParticipantId, submitted: true, skipped: false },
+      { participantId: hostParticipantId, submitted: false, skipped: true },
       { participantId: answeredPlayer.participant.id, submitted: true, skipped: false },
       { participantId: missingPlayer.participant.id, submitted: false, skipped: true }
     ]);
@@ -256,7 +256,7 @@ describe("RoomService", () => {
     });
 
     expect(revealed.revealedSubmissions).toEqual([
-      { participantId: hostParticipantId, submitted: true, skipped: false, rawAnswer: ".", correct: false },
+      { participantId: hostParticipantId, submitted: false, skipped: true, rawAnswer: "", correct: false },
       { participantId: answeredPlayer.participant.id, submitted: true, skipped: false, rawAnswer: "diancie", correct: true },
       { participantId: missingPlayer.participant.id, submitted: false, skipped: true, rawAnswer: "", correct: false }
     ]);
