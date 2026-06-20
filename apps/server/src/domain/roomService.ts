@@ -188,8 +188,8 @@ export class RoomService {
     }
 
     const previousQuiz = room.state.quiz;
-    const shouldResetRound = this.shouldResetRound(previousQuiz, input.quiz);
-    const quiz = shouldResetRound ? input.quiz : this.quizForContinuingRound(previousQuiz, input.quiz);
+    const shouldResetRound = this.shouldResetRound(room, previousQuiz, input.quiz);
+    const quiz = shouldResetRound ? input.quiz : this.quizForContinuingRound(room, previousQuiz, input.quiz);
 
     room.state.quiz = quiz;
 
@@ -569,12 +569,31 @@ export class RoomService {
     return participant;
   }
 
-  private shouldResetRound(previousQuiz: QuizState, nextQuiz: QuizState): boolean {
+  private shouldResetRound(room: StoredRoom, previousQuiz: QuizState, nextQuiz: QuizState): boolean {
+    if (this.shouldPreserveRoundWhileAwaitingOriginalResult(room, previousQuiz, nextQuiz)) {
+      return false;
+    }
+
     if (this.isSameNoOrdinalQuestionUpdate(previousQuiz, nextQuiz)) {
       return false;
     }
 
     return createQuestionKey(previousQuiz) !== createQuestionKey(nextQuiz);
+  }
+
+  private shouldPreserveRoundWhileAwaitingOriginalResult(room: StoredRoom, previousQuiz: QuizState, nextQuiz: QuizState): boolean {
+    const status = room.state.fairPlay.originalSubmitStatus;
+    if (status !== "ready" && status !== "submitting") return false;
+    if (!room.state.fairPlay.questionKey) return false;
+    if (hasOriginalResult(nextQuiz) && status !== "ready") return false;
+    if (!this.hasVisiblePromptIdentity(previousQuiz)) return false;
+    if (!hasOriginalResult(nextQuiz) && !nextQuiz.canGoNext) return false;
+    if (createQuestionKey(previousQuiz) !== room.state.fairPlay.questionKey) return false;
+    return createOriginalResultCompatibilityKey(previousQuiz) === createOriginalResultCompatibilityKey(nextQuiz);
+  }
+
+  private hasVisiblePromptIdentity(quiz: QuizState): boolean {
+    return Boolean(quiz.questionIndex !== null || quiz.questionText || quiz.imageUrl || quiz.audioUrl || quiz.videoUrl);
   }
 
   private isSameNoOrdinalQuestionUpdate(previousQuiz: QuizState, nextQuiz: QuizState): boolean {
@@ -594,20 +613,24 @@ export class RoomService {
     return false;
   }
 
-  private quizForContinuingRound(previousQuiz: QuizState, nextQuiz: QuizState): QuizState {
-    if (!this.isSameNoOrdinalQuestionUpdate(previousQuiz, nextQuiz)) return nextQuiz;
+  private quizForContinuingRound(room: StoredRoom, previousQuiz: QuizState, nextQuiz: QuizState): QuizState {
+    const preservingOriginalWait = this.shouldPreserveRoundWhileAwaitingOriginalResult(room, previousQuiz, nextQuiz);
+    if (!preservingOriginalWait && !this.isSameNoOrdinalQuestionUpdate(previousQuiz, nextQuiz)) return nextQuiz;
 
     return {
       ...nextQuiz,
       questionType:
-        nextQuiz.questionType === "unknown" || nextQuiz.questionType === "free-text"
+        preservingOriginalWait || nextQuiz.questionType === "unknown" || nextQuiz.questionType === "free-text"
           ? previousQuiz.questionType
           : nextQuiz.questionType,
-      questionText: nextQuiz.questionText ?? previousQuiz.questionText,
-      imageUrl: nextQuiz.imageUrl ?? previousQuiz.imageUrl,
-      audioUrl: nextQuiz.audioUrl ?? previousQuiz.audioUrl,
-      videoUrl: nextQuiz.videoUrl ?? previousQuiz.videoUrl,
-      choices: nextQuiz.choices.length > 0 ? nextQuiz.choices : previousQuiz.choices
+      questionText: preservingOriginalWait ? previousQuiz.questionText : nextQuiz.questionText ?? previousQuiz.questionText,
+      imageUrl: preservingOriginalWait ? previousQuiz.imageUrl : nextQuiz.imageUrl ?? previousQuiz.imageUrl,
+      audioUrl: preservingOriginalWait ? previousQuiz.audioUrl : nextQuiz.audioUrl ?? previousQuiz.audioUrl,
+      videoUrl: preservingOriginalWait ? previousQuiz.videoUrl : nextQuiz.videoUrl ?? previousQuiz.videoUrl,
+      choices: preservingOriginalWait || nextQuiz.choices.length === 0 ? previousQuiz.choices : nextQuiz.choices,
+      canGoNext: preservingOriginalWait ? previousQuiz.canGoNext : nextQuiz.canGoNext,
+      resultMessage: preservingOriginalWait ? previousQuiz.resultMessage : nextQuiz.resultMessage,
+      answerCandidates: preservingOriginalWait ? previousQuiz.answerCandidates : nextQuiz.answerCandidates
     };
   }
 

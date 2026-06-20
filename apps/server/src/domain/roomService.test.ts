@@ -574,6 +574,193 @@ describe("RoomService", () => {
     expect(service.getState(roomCode).fairPlay.originalSubmitStatus).toBe("ready");
   });
 
+  it("keeps no-ordinal audio rounds while waiting to submit the original answer result", async () => {
+    const service = new RoomService();
+    const { roomCode, hostParticipantId } = await service.createRoom({ title: "Room", visibility: "private", hostNickname: "Host" });
+    const player = service.joinParticipant({ roomCode, nickname: "Mina" });
+
+    const playingQuiz = {
+      ...service.getState(roomCode).quiz,
+      quizTitle: "5초 듣고 노래 맞추기",
+      questionIndex: null,
+      totalQuestions: null,
+      questionType: "audio" as const,
+      audioUrl: "https://www.youtube-nocookie.com/embed/question-audio?start=20&end=25"
+    };
+    service.updateSourceMirror({
+      roomCode,
+      sourceMirror: {
+        kind: "playing",
+        url: "https://machugi.io/quiz/audio/play",
+        title: "5초 듣고 노래 맞추기",
+        lastSeenAt: "2026-06-19T00:00:00.000Z",
+        quiz: playingQuiz
+      }
+    });
+    service.submitAnswer({ roomCode, participantId: hostParticipantId, rawAnswer: "경원" });
+    service.submitAnswer({ roomCode, participantId: player.participant.id, rawAnswer: "다른 답" });
+    const questionKey = service.getState(roomCode).fairPlay.questionKey ?? "";
+    expect(service.getState(roomCode).fairPlay.originalSubmitStatus).toBe("ready");
+
+    const waiting = service.updateSourceMirror({
+      roomCode,
+      sourceMirror: {
+        kind: "playing",
+        url: "https://machugi.io/quiz/audio/play",
+        title: "5초 듣고 노래 맞추기",
+        lastSeenAt: "2026-06-19T00:00:01.000Z",
+        quiz: {
+          ...playingQuiz,
+          audioUrl: "https://www.youtube-nocookie.com/embed/result-audio",
+          canGoNext: true
+        }
+      }
+    });
+
+    expect(waiting.phase).toBe("playing");
+    expect(waiting.fairPlay.questionKey).toBe(questionKey);
+    expect(waiting.fairPlay.originalSubmitStatus).toBe("ready");
+    expect(waiting.quiz.audioUrl).toBe("https://www.youtube-nocookie.com/embed/question-audio?start=20&end=25");
+    expect(waiting.submissions).toEqual([
+      { participantId: hostParticipantId, submitted: true, skipped: false },
+      { participantId: player.participant.id, submitted: true, skipped: false }
+    ]);
+  });
+
+  it("starts a new no-ordinal audio round when a fresh prompt arrives while original submission is ready", async () => {
+    const service = new RoomService();
+    const { roomCode, hostParticipantId } = await service.createRoom({ title: "Room", visibility: "private", hostNickname: "Host" });
+    const player = service.joinParticipant({ roomCode, nickname: "Mina" });
+
+    const playingQuiz = {
+      ...service.getState(roomCode).quiz,
+      quizTitle: "same audio set",
+      questionIndex: null,
+      totalQuestions: null,
+      questionType: "audio" as const,
+      audioUrl: "https://www.youtube-nocookie.com/embed/question-1?start=20&end=25",
+      canGoNext: false
+    };
+    service.updateSourceMirror({
+      roomCode,
+      sourceMirror: {
+        kind: "playing",
+        url: "https://machugi.io/quiz/audio/play",
+        title: "same audio set",
+        lastSeenAt: "2026-06-19T00:00:00.000Z",
+        quiz: playingQuiz
+      }
+    });
+    service.submitAnswer({ roomCode, participantId: hostParticipantId, rawAnswer: "first" });
+    service.submitAnswer({ roomCode, participantId: player.participant.id, rawAnswer: "other" });
+    const questionKey = service.getState(roomCode).fairPlay.questionKey ?? "";
+    expect(service.getState(roomCode).fairPlay.originalSubmitStatus).toBe("ready");
+
+    const nextRound = service.updateSourceMirror({
+      roomCode,
+      sourceMirror: {
+        kind: "playing",
+        url: "https://machugi.io/quiz/audio/play",
+        title: "same audio set",
+        lastSeenAt: "2026-06-19T00:00:01.000Z",
+        quiz: {
+          ...playingQuiz,
+          audioUrl: "https://www.youtube-nocookie.com/embed/question-2?start=30&end=35",
+          canGoNext: false
+        }
+      }
+    });
+
+    expect(nextRound.fairPlay.questionKey).not.toBe(questionKey);
+    expect(nextRound.quiz.audioUrl).toBe("https://www.youtube-nocookie.com/embed/question-2?start=30&end=35");
+    expect(nextRound.submissions).toEqual([]);
+    expect(nextRound.fairPlay.originalSubmitStatus).toBe("locked");
+  });
+
+  it("keeps a ready no-ordinal round when raw quiz state reports the original result first", async () => {
+    const service = new RoomService();
+    const { roomCode, hostParticipantId } = await service.createRoom({ title: "Room", visibility: "private", hostNickname: "Host" });
+    const player = service.joinParticipant({ roomCode, nickname: "Mina" });
+
+    const playingQuiz = {
+      ...service.getState(roomCode).quiz,
+      quizTitle: "same audio set",
+      questionIndex: null,
+      totalQuestions: null,
+      questionType: "audio" as const,
+      audioUrl: "https://www.youtube-nocookie.com/embed/question-audio?start=20&end=25",
+      canGoNext: false
+    };
+    service.updateQuizState({ roomCode, quiz: playingQuiz });
+    service.submitAnswer({ roomCode, participantId: hostParticipantId, rawAnswer: "first" });
+    service.submitAnswer({ roomCode, participantId: player.participant.id, rawAnswer: "other" });
+    const questionKey = service.getState(roomCode).fairPlay.questionKey ?? "";
+    expect(service.getState(roomCode).fairPlay.originalSubmitStatus).toBe("ready");
+
+    const waiting = service.updateQuizState({
+      roomCode,
+      quiz: {
+        ...playingQuiz,
+        audioUrl: "https://www.youtube-nocookie.com/embed/result-audio",
+        canGoNext: true,
+        resultMessage: "Correct!",
+        answerCandidates: ["first"]
+      }
+    });
+
+    expect(waiting.phase).toBe("playing");
+    expect(waiting.fairPlay.questionKey).toBe(questionKey);
+    expect(waiting.fairPlay.originalSubmitStatus).toBe("ready");
+    expect(waiting.quiz.audioUrl).toBe("https://www.youtube-nocookie.com/embed/question-audio?start=20&end=25");
+    expect(waiting.quiz.resultMessage).toBeNull();
+    expect(waiting.quiz.answerCandidates).toEqual([]);
+    expect(waiting.submissions).toEqual([
+      { participantId: hostParticipantId, submitted: true, skipped: false },
+      { participantId: player.participant.id, submitted: true, skipped: false }
+    ]);
+  });
+
+  it("preserves question text while waiting on an original result transition", async () => {
+    const service = new RoomService();
+    const { roomCode, hostParticipantId } = await service.createRoom({ title: "Room", visibility: "private", hostNickname: "Host" });
+    const player = service.joinParticipant({ roomCode, nickname: "Mina" });
+
+    const playingQuiz = {
+      ...service.getState(roomCode).quiz,
+      quizTitle: "same image set",
+      questionIndex: null,
+      totalQuestions: null,
+      questionType: "image" as const,
+      questionText: "Who is hidden?",
+      imageUrl: "https://images.machugi.io/question.png",
+      canGoNext: false
+    };
+    service.updateQuizState({ roomCode, quiz: playingQuiz });
+    service.submitAnswer({ roomCode, participantId: hostParticipantId, rawAnswer: "answer" });
+    service.submitAnswer({ roomCode, participantId: player.participant.id, rawAnswer: "other" });
+    const questionKey = service.getState(roomCode).fairPlay.questionKey ?? "";
+
+    const waiting = service.updateSourceMirror({
+      roomCode,
+      sourceMirror: {
+        kind: "playing",
+        url: "https://machugi.io/quiz/image/play",
+        title: "same image set",
+        lastSeenAt: "2026-06-19T00:00:01.000Z",
+        quiz: {
+          ...playingQuiz,
+          questionText: "The answer is visible now",
+          imageUrl: "https://images.machugi.io/answer.png",
+          canGoNext: true
+        }
+      }
+    });
+
+    expect(waiting.fairPlay.questionKey).toBe(questionKey);
+    expect(waiting.quiz.questionText).toBe("Who is hidden?");
+    expect(waiting.quiz.imageUrl).toBe("https://images.machugi.io/question.png");
+  });
+
   it("keeps no-ordinal choice answers when the original site swaps choices for a plain image result", async () => {
     const service = new RoomService();
     const { roomCode, hostParticipantId } = await service.createRoom({ title: "Room", visibility: "private", hostNickname: "Host" });
@@ -629,6 +816,66 @@ describe("RoomService", () => {
     expect(revealed.revealedSubmissions).toEqual([
       { participantId: hostParticipantId, submitted: true, skipped: false, rawAnswer: "가능", correct: true },
       { participantId: player.participant.id, submitted: true, skipped: false, rawAnswer: "불가능", correct: false }
+    ]);
+  });
+
+  it("keeps no-ordinal choice rounds while waiting to submit the original answer result", async () => {
+    const service = new RoomService();
+    const { roomCode, hostParticipantId } = await service.createRoom({ title: "Room", visibility: "private", hostNickname: "Host" });
+    const player = service.joinParticipant({ roomCode, nickname: "Mina" });
+
+    const playingQuiz = {
+      ...service.getState(roomCode).quiz,
+      quizTitle: "가능충 테스트",
+      questionIndex: null,
+      totalQuestions: null,
+      questionType: "multiple-choice" as const,
+      imageUrl: "https://images.machugi.io/question.png",
+      choices: [
+        { id: "1", label: "불가능" },
+        { id: "2", label: "가능" }
+      ]
+    };
+    service.updateSourceMirror({
+      roomCode,
+      sourceMirror: {
+        kind: "playing",
+        url: "https://machugi.io/quiz/choice/play",
+        title: "가능충 테스트",
+        lastSeenAt: "2026-06-19T00:00:00.000Z",
+        quiz: playingQuiz
+      }
+    });
+    service.submitAnswer({ roomCode, participantId: hostParticipantId, rawAnswer: "가능" });
+    service.submitAnswer({ roomCode, participantId: player.participant.id, rawAnswer: "불가능" });
+    const questionKey = service.getState(roomCode).fairPlay.questionKey ?? "";
+    expect(service.getState(roomCode).fairPlay.originalSubmitStatus).toBe("ready");
+
+    const waiting = service.updateSourceMirror({
+      roomCode,
+      sourceMirror: {
+        kind: "playing",
+        url: "https://machugi.io/quiz/choice/play",
+        title: "가능충 테스트",
+        lastSeenAt: "2026-06-19T00:00:01.000Z",
+        quiz: {
+          ...playingQuiz,
+          questionType: "image" as const,
+          imageUrl: "https://images.machugi.io/answer.png",
+          choices: [],
+          canGoNext: true
+        }
+      }
+    });
+
+    expect(waiting.phase).toBe("playing");
+    expect(waiting.fairPlay.questionKey).toBe(questionKey);
+    expect(waiting.fairPlay.originalSubmitStatus).toBe("ready");
+    expect(waiting.quiz.imageUrl).toBe("https://images.machugi.io/question.png");
+    expect(waiting.quiz.choices).toEqual(playingQuiz.choices);
+    expect(waiting.submissions).toEqual([
+      { participantId: hostParticipantId, submitted: true, skipped: false },
+      { participantId: player.participant.id, submitted: true, skipped: false }
     ]);
   });
 

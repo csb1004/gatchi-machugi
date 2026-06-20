@@ -239,7 +239,7 @@ describe("RoomView", () => {
     expect(onSubmitAnswer).toHaveBeenCalledWith("수정 답");
   });
 
-  it("locks submitted answers once every required participant has submitted", () => {
+  it("hides the answer form once every required participant has submitted", () => {
     render(
       <RoomView
         state={{
@@ -261,8 +261,33 @@ describe("RoomView", () => {
       />
     );
 
-    expect(screen.getByRole("textbox", { name: "답변" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "제출 완료" })).toBeDisabled();
+    expect(screen.queryByRole("form", { name: "답변" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("textbox", { name: "답변" })).not.toBeInTheDocument();
+  });
+
+  it("hides the answer form when all submitted is the only lock cause", () => {
+    render(
+      <RoomView
+        state={{
+          ...baseState,
+          submissions: [
+            { participantId: "host", submitted: true, skipped: false },
+            { participantId: "p1", submitted: true, skipped: false }
+          ],
+          fairPlay: {
+            ...baseState.fairPlay,
+            submittedParticipantIds: ["host", "p1"],
+            allRequiredSubmitted: true,
+            originalSubmitStatus: "locked"
+          }
+        }}
+        currentParticipantId="host"
+        onSubmitAnswer={() => undefined}
+        onSourceAction={() => undefined}
+      />
+    );
+
+    expect(document.querySelector(".answer-panel")).not.toBeInTheDocument();
   });
 
   it("does not show the room code as the empty chat placeholder", () => {

@@ -51,7 +51,7 @@ describe("QuizPanel", () => {
       />
     );
 
-    expect(screen.getByRole("button", { name: "재생" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "일시정지" })).toBeInTheDocument();
     expect(document.querySelector(".youtube-audio-frame")?.getAttribute("src")).toContain("youtube-nocookie.com/embed/seoefKzVDOk");
     expect(document.querySelector(".question-embed")).not.toBeInTheDocument();
     expect(document.querySelector("audio")).not.toBeInTheDocument();
@@ -72,6 +72,30 @@ describe("QuizPanel", () => {
     const src = document.querySelector(".youtube-audio-frame")?.getAttribute("src") ?? "";
     expect(src).toContain("enablejsapi=1");
     expect(src).toContain("playsinline=1");
+    expect(src).toContain("autoplay=1");
+  });
+
+  it("commands the hidden YouTube player to seek and play", () => {
+    render(
+      <QuizPanel
+        quiz={{
+          ...baseQuiz,
+          questionType: "audio",
+          imageUrl: null,
+          audioUrl: "https://www.youtube-nocookie.com/embed/seoefKzVDOk?start=10&end=15"
+        }}
+      />
+    );
+
+    const iframe = document.querySelector(".youtube-audio-frame") as HTMLIFrameElement | null;
+    expect(iframe?.contentWindow).toBeTruthy();
+    const postMessage = vi.spyOn(iframe?.contentWindow as Window, "postMessage");
+
+    fireEvent.load(iframe as HTMLIFrameElement);
+
+    const messages = postMessage.mock.calls.map(([message]) => String(message));
+    expect(messages.some((message) => message.includes('"func":"seekTo"') && message.includes("[10,true]"))).toBe(true);
+    expect(messages.some((message) => message.includes('"func":"playVideo"'))).toBe(true);
   });
 
   it("shows audio playback as a progress bar without explanatory copy", () => {
@@ -106,9 +130,6 @@ describe("QuizPanel", () => {
         />
       );
 
-      act(() => {
-        fireEvent.click(screen.getByRole("button", { name: "재생" }));
-      });
       act(() => {
         vi.advanceTimersByTime(5000);
       });
@@ -157,6 +178,6 @@ describe("QuizPanel", () => {
     );
 
     expect(screen.getByTitle("정답 음원").getAttribute("src")).toContain("youtube-nocookie.com/embed/seoefKzVDOk");
-    expect(screen.queryByRole("button", { name: "재생" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "일시정지" })).not.toBeInTheDocument();
   });
 });

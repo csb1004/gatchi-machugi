@@ -161,6 +161,7 @@ export function RoomView(props: {
     props.state.fairPlay.allRequiredSubmitted ||
     props.state.fairPlay.originalSubmitStatus === "ready" ||
     props.state.fairPlay.originalSubmitStatus === "submitting";
+  const showAnswerPanel = props.state.phase === "playing" && !answerLocked && Boolean(currentParticipant?.connected);
 
   useEffect(() => {
     if (!isHost || props.state.phase !== "revealed" || !props.state.quiz.canGoNext) return;
@@ -200,13 +201,15 @@ export function RoomView(props: {
         <PersonalResultPanel state={props.state} participantId={props.currentParticipantId} />
         <PublicRevealPanel state={props.state} participantId={props.currentParticipantId} />
         <HostAliasPanel isHost={Boolean(isHost)} state={props.state} onAddAlias={props.onAddAlias} />
-        <AnswerPanel
-          disabled={!currentParticipant?.connected || answerLocked}
-          submitted={Boolean(currentSubmission)}
-          quiz={props.state.quiz}
-          resetKey={props.state.fairPlay.questionKey}
-          onSubmitAnswer={props.onSubmitAnswer}
-        />
+        {showAnswerPanel ? (
+          <AnswerPanel
+            disabled={false}
+            submitted={Boolean(currentSubmission)}
+            quiz={props.state.quiz}
+            resetKey={props.state.fairPlay.questionKey}
+            onSubmitAnswer={props.onSubmitAnswer}
+          />
+        ) : null}
       </div>
       <aside className="room-side" aria-label="방 활동">
         <SubmissionPanel state={props.state} />

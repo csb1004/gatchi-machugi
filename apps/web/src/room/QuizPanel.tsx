@@ -10,7 +10,7 @@ function isResultQuiz(quiz: QuizState): boolean {
   return Boolean(quiz.resultMessage || quiz.answerCandidates.length > 0);
 }
 
-function youtubeApiSrc(src: string): string {
+function youtubeApiSrc(src: string, options: { autoplay?: boolean } = {}): string {
   try {
     const url = new URL(src, window.location.href);
     if (/youtu\.be$/i.test(url.hostname)) {
@@ -30,6 +30,9 @@ function youtubeApiSrc(src: string): string {
 
     url.searchParams.set("enablejsapi", "1");
     url.searchParams.set("playsinline", "1");
+    if (options.autoplay) {
+      url.searchParams.set("autoplay", "1");
+    }
     if (window.location.origin && window.location.origin !== "null") {
       url.searchParams.set("origin", window.location.origin);
     }
@@ -65,9 +68,9 @@ function formatSeconds(value: number): string {
 
 function YoutubeAudioOnlyPlayer({ src }: { src: string }) {
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
-  const [isPlaying, setIsPlaying] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(true);
   const [elapsed, setElapsed] = useState(0);
-  const apiSrc = useMemo(() => youtubeApiSrc(src), [src]);
+  const apiSrc = useMemo(() => youtubeApiSrc(src, { autoplay: true }), [src]);
   const timing = useMemo(() => clipTiming(src), [src]);
   const isEnded = elapsed >= timing.duration;
   const progress = Math.min(100, (elapsed / timing.duration) * 100);
@@ -91,7 +94,7 @@ function YoutubeAudioOnlyPlayer({ src }: { src: string }) {
 
   useEffect(() => {
     setElapsed(0);
-    setIsPlaying(false);
+    setIsPlaying(true);
     sendCommand("seekTo", [timing.start, true]);
   }, [apiSrc, timing.start]);
 
