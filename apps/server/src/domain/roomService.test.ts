@@ -465,6 +465,118 @@ describe("RoomService", () => {
     ]);
   });
 
+  it("reveals no-ordinal audio answers when the original site swaps audio for a YouTube result", async () => {
+    const service = new RoomService();
+    const { roomCode, hostParticipantId } = await service.createRoom({ title: "Room", visibility: "private", hostNickname: "Host" });
+    const player = service.joinParticipant({ roomCode, nickname: "Mina" });
+
+    const playingQuiz = {
+      ...service.getState(roomCode).quiz,
+      quizTitle: "Bonggu OST",
+      questionIndex: null,
+      totalQuestions: null,
+      questionType: "audio" as const,
+      audioUrl: "https://www.youtube-nocookie.com/embed/question-audio"
+    };
+    service.updateSourceMirror({
+      roomCode,
+      sourceMirror: {
+        kind: "playing",
+        url: "https://machugi.io/quiz/audio/play",
+        title: "Bonggu OST",
+        lastSeenAt: "2026-06-19T00:00:00.000Z",
+        quiz: playingQuiz
+      }
+    });
+    service.submitAnswer({ roomCode, participantId: hostParticipantId, rawAnswer: "경원" });
+    service.submitAnswer({ roomCode, participantId: player.participant.id, rawAnswer: "다른 답" });
+    const questionKey = service.getState(roomCode).fairPlay.questionKey ?? "";
+    service.requestOriginalSubmission({ roomCode, questionKey });
+
+    const revealed = service.updateSourceMirror({
+      roomCode,
+      sourceMirror: {
+        kind: "result",
+        url: "https://machugi.io/quiz/audio/play",
+        title: "Bonggu OST",
+        lastSeenAt: "2026-06-19T00:00:01.000Z",
+        quiz: {
+          ...playingQuiz,
+          audioUrl: null,
+          videoUrl: "https://www.youtube-nocookie.com/embed/result-video",
+          resultMessage: "정답!",
+          answerCandidates: ["경원"],
+          canGoNext: true
+        }
+      }
+    });
+
+    expect(revealed.phase).toBe("revealed");
+    expect(revealed.fairPlay.questionKey).toBe(questionKey);
+    expect(revealed.revealedSubmissions).toEqual([
+      { participantId: hostParticipantId, submitted: true, skipped: false, rawAnswer: "경원", correct: true },
+      { participantId: player.participant.id, submitted: true, skipped: false, rawAnswer: "다른 답", correct: false }
+    ]);
+  });
+
+  it("keeps no-ordinal choice answers when the original site swaps choices for a plain image result", async () => {
+    const service = new RoomService();
+    const { roomCode, hostParticipantId } = await service.createRoom({ title: "Room", visibility: "private", hostNickname: "Host" });
+    const player = service.joinParticipant({ roomCode, nickname: "Mina" });
+
+    const playingQuiz = {
+      ...service.getState(roomCode).quiz,
+      quizTitle: "가능충 테스트",
+      questionIndex: null,
+      totalQuestions: null,
+      questionType: "multiple-choice" as const,
+      imageUrl: "https://images.machugi.io/possible.png",
+      choices: [
+        { id: "1", label: "불가능" },
+        { id: "2", label: "가능" }
+      ]
+    };
+    service.updateSourceMirror({
+      roomCode,
+      sourceMirror: {
+        kind: "playing",
+        url: "https://machugi.io/quiz/choice/play",
+        title: "가능충 테스트",
+        lastSeenAt: "2026-06-19T00:00:00.000Z",
+        quiz: playingQuiz
+      }
+    });
+    service.submitAnswer({ roomCode, participantId: hostParticipantId, rawAnswer: "가능" });
+    service.submitAnswer({ roomCode, participantId: player.participant.id, rawAnswer: "불가능" });
+    const questionKey = service.getState(roomCode).fairPlay.questionKey ?? "";
+    service.requestOriginalSubmission({ roomCode, questionKey });
+
+    const revealed = service.updateSourceMirror({
+      roomCode,
+      sourceMirror: {
+        kind: "result",
+        url: "https://machugi.io/quiz/choice/play",
+        title: "가능충 테스트",
+        lastSeenAt: "2026-06-19T00:00:01.000Z",
+        quiz: {
+          ...playingQuiz,
+          questionType: "image",
+          choices: [],
+          resultMessage: "정답!",
+          answerCandidates: ["가능"],
+          canGoNext: true
+        }
+      }
+    });
+
+    expect(revealed.phase).toBe("revealed");
+    expect(revealed.fairPlay.questionKey).toBe(questionKey);
+    expect(revealed.revealedSubmissions).toEqual([
+      { participantId: hostParticipantId, submitted: true, skipped: false, rawAnswer: "가능", correct: true },
+      { participantId: player.participant.id, submitted: true, skipped: false, rawAnswer: "불가능", correct: false }
+    ]);
+  });
+
   it("returns to ready when the host extension reports original submission failure", async () => {
     const service = new RoomService();
     const { roomCode, hostParticipantId } = await service.createRoom({ title: "Room", visibility: "private", hostNickname: "Host" });

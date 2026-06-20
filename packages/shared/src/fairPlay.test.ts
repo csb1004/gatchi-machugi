@@ -137,6 +137,29 @@ describe("fairPlay helpers", () => {
     expect(first).toBe(second);
   });
 
+  it("matches original result screens without an exposed question ordinal by quiz title", () => {
+    const first = createOriginalResultCompatibilityKey(
+      createQuizState({
+        quizTitle: "Bonggu OST",
+        questionType: "audio",
+        audioUrl: "https://www.youtube-nocookie.com/embed/question-audio"
+      })
+    );
+
+    const second = createOriginalResultCompatibilityKey(
+      createQuizState({
+        quizTitle: "Bonggu OST",
+        questionType: "audio",
+        audioUrl: null,
+        videoUrl: "https://www.youtube-nocookie.com/embed/result-video",
+        resultMessage: "오답!",
+        answerCandidates: ["경원"]
+      })
+    );
+
+    expect(first).toBe(second);
+  });
+
   it("falls back to choices when there is no stable visible prompt identity", () => {
     const first = createQuestionKey(
       createQuizState({

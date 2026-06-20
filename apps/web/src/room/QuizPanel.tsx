@@ -1,18 +1,48 @@
 import { Pause, Play, Volume2 } from "lucide-react";
-import { useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { QuizState } from "@gatchi/shared";
 
 function isEmbedUrl(url: string | null): url is string {
-  return Boolean(url && /(?:youtube(?:-nocookie)?\.com\/embed|youtu\.be)/i.test(url));
+  return Boolean(url && /(?:youtube(?:-nocookie)?\.com\/embed|youtube\.com\/watch|youtu\.be)/i.test(url));
 }
 
 function isResultQuiz(quiz: QuizState): boolean {
   return Boolean(quiz.resultMessage || quiz.answerCandidates.length > 0);
 }
 
+function youtubeApiSrc(src: string): string {
+  try {
+    const url = new URL(src, window.location.href);
+    if (/youtu\.be$/i.test(url.hostname)) {
+      const videoId = url.pathname.split("/").filter(Boolean)[0];
+      if (videoId) {
+        url.hostname = "www.youtube-nocookie.com";
+        url.pathname = `/embed/${videoId}`;
+      }
+    } else if (/youtube\.com$/i.test(url.hostname) && url.pathname === "/watch") {
+      const videoId = url.searchParams.get("v");
+      if (videoId) {
+        url.hostname = "www.youtube-nocookie.com";
+        url.pathname = `/embed/${videoId}`;
+        url.searchParams.delete("v");
+      }
+    }
+
+    url.searchParams.set("enablejsapi", "1");
+    url.searchParams.set("playsinline", "1");
+    if (window.location.origin && window.location.origin !== "null") {
+      url.searchParams.set("origin", window.location.origin);
+    }
+    return url.toString();
+  } catch {
+    return src;
+  }
+}
+
 function YoutubeAudioOnlyPlayer({ src }: { src: string }) {
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
+  const apiSrc = useMemo(() => youtubeApiSrc(src), [src]);
 
   function sendCommand(command: "playVideo" | "pauseVideo") {
     iframeRef.current?.contentWindow?.postMessage(
@@ -25,10 +55,12 @@ function YoutubeAudioOnlyPlayer({ src }: { src: string }) {
     );
   }
 
+  useEffect(() => {
+    sendCommand(isPlaying ? "playVideo" : "pauseVideo");
+  }, [isPlaying]);
+
   function togglePlayback() {
-    const nextPlaying = !isPlaying;
-    setIsPlaying(nextPlaying);
-    sendCommand(nextPlaying ? "playVideo" : "pauseVideo");
+    setIsPlaying((current) => !current);
   }
 
   return (
@@ -36,9 +68,12 @@ function YoutubeAudioOnlyPlayer({ src }: { src: string }) {
       <iframe
         ref={iframeRef}
         className="youtube-audio-frame"
-        src={src}
+        src={apiSrc}
         title="숨겨진 음원 플레이어"
         allow="autoplay; encrypted-media"
+        onLoad={() => {
+          if (isPlaying) sendCommand("playVideo");
+        }}
         aria-hidden="true"
         tabIndex={-1}
       />
@@ -82,7 +117,7 @@ export function QuizPanel({ quiz }: { quiz: QuizState }) {
           isResult ? (
             <iframe
               className="question-embed"
-              src={audioEmbedUrl}
+              src={youtubeApiSrc(audioEmbedUrl)}
               title="정답 음원"
               allow="autoplay; encrypted-media; picture-in-picture"
             />
@@ -93,20 +128,12 @@ export function QuizPanel({ quiz }: { quiz: QuizState }) {
           <audio src={quiz.audioUrl} controls />
         ) : null}
         {videoEmbedUrl ? (
-          <iframe className="question-embed" src={videoEmbedUrl} title="영상 문제" allow="autoplay; encrypted-media; picture-in-picture" />
+          <iframe className="question-embed" src={youtubeApiSrc(videoEmbedUrl)} title="영상 문제" allow="autoplay; encrypted-media; picture-in-picture" />
         ) : quiz.videoUrl ? (
           <video src={quiz.videoUrl} controls />
         ) : null}
         {hasQuestionText || !hasMedia ? <p>{quiz.questionText ?? fallback}</p> : null}
       </div>
-
-      {quiz.choices.length > 0 ? (
-        <div className="choice-grid">
-          {quiz.choices.map((choice) => (
-            <span key={choice.id}>{choice.label}</span>
-          ))}
-        </div>
-      ) : null}
 
       {quiz.resultMessage ? <p className="result-message">{quiz.resultMessage}</p> : null}
 

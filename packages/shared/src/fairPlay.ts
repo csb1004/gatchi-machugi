@@ -60,7 +60,7 @@ export function createOriginalResultCompatibilityKey(quiz: QuizState): string {
     return JSON.stringify([quiz.quizTitle, quiz.questionIndex, quiz.totalQuestions]);
   }
 
-  return JSON.stringify(promptIdentityParts(quiz));
+  return JSON.stringify([quiz.quizTitle, quiz.totalQuestions]);
 }
 
 export function requiredParticipantIds(participants: Participant[]): string[] {

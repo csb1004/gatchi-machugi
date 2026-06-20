@@ -52,9 +52,43 @@ describe("QuizPanel", () => {
     );
 
     expect(screen.getByRole("button", { name: "재생" })).toBeInTheDocument();
-    expect(document.querySelector(".youtube-audio-frame")).toHaveAttribute("src", youtubeUrl);
+    expect(document.querySelector(".youtube-audio-frame")?.getAttribute("src")).toContain("youtube-nocookie.com/embed/seoefKzVDOk");
     expect(document.querySelector(".question-embed")).not.toBeInTheDocument();
     expect(document.querySelector("audio")).not.toBeInTheDocument();
+  });
+
+  it("enables the YouTube player API for hidden audio playback", () => {
+    render(
+      <QuizPanel
+        quiz={{
+          ...baseQuiz,
+          questionType: "audio",
+          imageUrl: null,
+          audioUrl: youtubeUrl
+        }}
+      />
+    );
+
+    const src = document.querySelector(".youtube-audio-frame")?.getAttribute("src") ?? "";
+    expect(src).toContain("enablejsapi=1");
+    expect(src).toContain("playsinline=1");
+  });
+
+  it("leaves multiple-choice answers to the answer panel instead of duplicating them", () => {
+    render(
+      <QuizPanel
+        quiz={{
+          ...baseQuiz,
+          questionType: "multiple-choice",
+          choices: [
+            { id: "1", label: "불가능" },
+            { id: "2", label: "가능" }
+          ]
+        }}
+      />
+    );
+
+    expect(document.querySelector(".choice-grid")).not.toBeInTheDocument();
   });
 
   it("shows the YouTube embed on audio result screens", () => {
@@ -71,7 +105,7 @@ describe("QuizPanel", () => {
       />
     );
 
-    expect(screen.getByTitle("정답 음원")).toHaveAttribute("src", youtubeUrl);
+    expect(screen.getByTitle("정답 음원").getAttribute("src")).toContain("youtube-nocookie.com/embed/seoefKzVDOk");
     expect(screen.queryByRole("button", { name: "재생" })).not.toBeInTheDocument();
   });
 });
