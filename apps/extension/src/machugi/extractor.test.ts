@@ -122,6 +122,28 @@ describe("extractQuizState", () => {
     expect(state.answerCandidates).toEqual(["배바닐라"]);
   });
 
+  it("extracts actual Korean result feedback when audio result screens hide the answer text", () => {
+    document.body.innerHTML = `
+      <div class="QuizDetailPlaying_root__k7OA0">
+        <iframe
+          class="MusicDurationEditor_hide__kwrcw"
+          title="YouTube video player"
+          src="https://www.youtube-nocookie.com/embed/seoefKzVDOk?start=0.5&end=141"
+        ></iframe>
+        <div class="QuizDetailAnswerResult_questionResultContainer__NRItV">
+          <article class="ant-typography QuizDetailAnswerResult_questionResultCorrectLabel__JFCE7">정답!</article>
+        </div>
+        <button type="button" class="ant-btn CommonButton_root__6p8FJ NextButton_root__MHkxh"></button>
+      </div>
+    `;
+
+    const state = extractQuizState(document);
+    expect(state.questionType).toBe("audio");
+    expect(state.resultMessage).toBe("정답!");
+    expect(state.answerCandidates).toEqual([]);
+    expect(state.canGoNext).toBe(true);
+  });
+
   it("extracts result feedback and answer from generic visible result markup", () => {
     document.body.innerHTML = `
       <div class="QuizDetailPlaying_root__k7OA0">

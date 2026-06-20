@@ -113,9 +113,7 @@ function showLockNotice(message: string) {
   window.setTimeout(() => notice.remove(), 2400);
 }
 
-async function reportOriginalResultWhenReady(payload: OriginalSubmitAllowedPayload, shouldRetryChoiceFollowup = false) {
-  let followupAttempts = 0;
-
+async function reportOriginalResultWhenReady(payload: OriginalSubmitAllowedPayload) {
   for (let attempt = 0; attempt < 24; attempt += 1) {
     await delay(attempt === 0 ? 350 : 250);
     const quiz = extractQuizState(document);
@@ -128,19 +126,6 @@ async function reportOriginalResultWhenReady(payload: OriginalSubmitAllowedPaylo
         quiz
       });
       return;
-    }
-
-    if (shouldRetryChoiceFollowup && followupAttempts < 3 && quiz.choices.length === 0) {
-      followupAttempts += 1;
-      const retryResult =
-        originalSubmissionLock?.runWithOriginalSubmitBypass(() => submitOriginalAnswerDetailed(payload.hostRawAnswer, document)) ?? {
-          ok: false,
-          method: null
-        };
-
-      if (retryResult.ok && retryResult.method !== "choice") {
-        shouldRetryChoiceFollowup = false;
-      }
     }
   }
 
@@ -171,7 +156,7 @@ async function handleOriginalSubmitAllowed(payload: OriginalSubmitAllowedPayload
     return;
   }
 
-  await reportOriginalResultWhenReady(payload, submitResult.method === "choice");
+  await reportOriginalResultWhenReady(payload);
 }
 
 if (!contentWindow.__gatchiMachugiContentScriptInstalled) {

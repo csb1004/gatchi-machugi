@@ -133,7 +133,7 @@ describe("submitOriginalAnswer", () => {
     expect(click).toHaveBeenCalledTimes(1);
   });
 
-  it("fills a follow-up text input when a matching choice opens one", () => {
+  it("does not fill a follow-up text input after clicking a matching choice", () => {
     document.body.innerHTML = `
       <div class="QuizDetailPlaying_root__abc">
         <button type="button">Choice A</button>
@@ -159,9 +159,9 @@ describe("submitOriginalAnswer", () => {
     const input = document.querySelector("input") as HTMLInputElement;
     const submit = document.querySelector(".NextButton_root__MHkxh") as HTMLButtonElement;
 
-    expect(result).toEqual({ ok: true, method: "choice-then-text" });
-    expect(input.value).toBe("Choice A");
+    expect(result).toEqual({ ok: true, method: "choice" });
+    expect(input.value).toBe("");
     expect(submit).toBeTruthy();
-    expect(submitClicks).toBe(1);
+    expect(submitClicks).toBe(0);
   });
 });

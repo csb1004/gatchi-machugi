@@ -14,7 +14,7 @@ const textAnswerSelector = "textarea, input:not([type]), input[type='text'], inp
 const submitTextPattern = /제출|확인|정답|입력|submit|answer/i;
 const nextButtonPattern = /^(›|>|→|다음)$/i;
 type TextAnswerControl = HTMLInputElement | HTMLTextAreaElement | HTMLElement;
-export type OriginalAnswerSubmitMethod = "choice" | "choice-then-text" | "text";
+export type OriginalAnswerSubmitMethod = "choice" | "text";
 export type OriginalAnswerSubmitResult = { ok: true; method: OriginalAnswerSubmitMethod } | { ok: false; method: null };
 
 function clickElement(element: HTMLElement): true {
@@ -143,11 +143,7 @@ export function submitOriginalAnswerDetailed(rawAnswer: string, root: Document =
   const quizRoot = activeQuizRoot(root);
 
   if (clickChoiceByAnswer(quizRoot, rawAnswer)) {
-    const followupInput = findTextAnswerInput(quizRoot);
-    if (!followupInput) return { ok: true, method: "choice" };
-    return submitTextAnswer(rawAnswer, quizRoot, followupInput)
-      ? { ok: true, method: "choice-then-text" }
-      : { ok: false, method: null };
+    return { ok: true, method: "choice" };
   }
 
   const input = findTextAnswerInput(quizRoot);
