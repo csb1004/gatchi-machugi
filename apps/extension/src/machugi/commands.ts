@@ -142,14 +142,16 @@ function submitTextAnswer(rawAnswer: string, root: ParentNode, input: TextAnswer
 export function submitOriginalAnswerDetailed(rawAnswer: string, root: Document = document): OriginalAnswerSubmitResult {
   const quizRoot = activeQuizRoot(root);
 
+  const input = findTextAnswerInput(quizRoot);
+  if (input) {
+    return submitTextAnswer(rawAnswer, quizRoot, input) ? { ok: true, method: "text" } : { ok: false, method: null };
+  }
+
   if (clickChoiceByAnswer(quizRoot, rawAnswer)) {
     return { ok: true, method: "choice" };
   }
 
-  const input = findTextAnswerInput(quizRoot);
-  if (!input) return { ok: false, method: null };
-
-  return submitTextAnswer(rawAnswer, quizRoot, input) ? { ok: true, method: "text" } : { ok: false, method: null };
+  return { ok: false, method: null };
 }
 
 export function submitOriginalAnswer(rawAnswer: string, root: Document = document): boolean {

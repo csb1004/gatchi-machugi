@@ -10,6 +10,7 @@ import { extractQuizState } from "./machugi/extractor";
 import { runSourceMirrorAction } from "./machugi/sourceActions";
 import { extractSourceMirrorState } from "./machugi/sourceMirror";
 import { createOriginalSubmissionLock, type OriginalSubmissionLockController } from "./machugi/lock";
+import { reportOriginalResultWhenReady as reportOriginalResultWithRetries } from "./originalSubmissionFlow";
 
 const CONTENT_STATE_MESSAGE = "machugi-state";
 const CONTENT_COMMAND_MESSAGE = "machugi-command";
@@ -83,10 +84,6 @@ function delay(ms: number): Promise<void> {
   return new Promise((resolve) => window.setTimeout(resolve, ms));
 }
 
-function hasOriginalResult(quiz: QuizState): boolean {
-  return quiz.resultMessage !== null || quiz.answerCandidates.length > 0;
-}
-
 function showLockNotice(message: string) {
   const existing = document.getElementById("gatchi-machugi-lock-notice");
   existing?.remove();
@@ -114,28 +111,19 @@ function showLockNotice(message: string) {
 }
 
 async function reportOriginalResultWhenReady(payload: OriginalSubmitAllowedPayload) {
-  for (let attempt = 0; attempt < 24; attempt += 1) {
-    await delay(attempt === 0 ? 350 : 250);
-    const quiz = extractQuizState(document);
-    sendState();
-
-    if (hasOriginalResult(quiz)) {
-      sendOriginalResult({
-        roomCode: payload.roomCode,
-        questionKey: payload.questionKey,
-        quiz
-      });
-      return;
-    }
-  }
-
-  const reason = "원본 결과를 아직 읽지 못했습니다. 다시 시도해주세요.";
-  sendOriginalFailure({
-    roomCode: payload.roomCode,
-    questionKey: payload.questionKey,
-    reason
+  await reportOriginalResultWithRetries(payload, {
+    delay,
+    extractQuizState: () => extractQuizState(document),
+    sendState,
+    submitOriginalAnswer: (rawAnswer) =>
+      originalSubmissionLock?.runWithOriginalSubmitBypass(() => submitOriginalAnswerDetailed(rawAnswer, document)) ?? {
+        ok: false,
+        method: null
+      },
+    sendOriginalResult,
+    sendOriginalFailure,
+    showLockNotice
   });
-  showLockNotice(reason);
 }
 
 async function handleOriginalSubmitAllowed(payload: OriginalSubmitAllowedPayload) {

@@ -133,35 +133,25 @@ describe("submitOriginalAnswer", () => {
     expect(click).toHaveBeenCalledTimes(1);
   });
 
-  it("does not fill a follow-up text input after clicking a matching choice", () => {
+  it("submits a follow-up text input before clicking the same choice again", () => {
     document.body.innerHTML = `
       <div class="QuizDetailPlaying_root__abc">
         <button type="button">Choice A</button>
+        <input type="text" />
+        <button class="NextButton_root__MHkxh" type="button">Submit</button>
       </div>
     `;
     const choice = document.querySelector("button") as HTMLButtonElement;
-    let submitClicks = 0;
-    choice.addEventListener("click", () => {
-      const root = document.querySelector(".QuizDetailPlaying_root__abc");
-      const input = document.createElement("input");
-      input.type = "text";
-      const submit = document.createElement("button");
-      submit.className = "NextButton_root__MHkxh";
-      submit.type = "button";
-      submit.textContent = "Submit";
-      submit.addEventListener("click", () => {
-        submitClicks += 1;
-      });
-      root?.append(input, submit);
-    });
+    const choiceClick = vi.spyOn(choice, "click");
+    const submit = document.querySelector(".NextButton_root__MHkxh") as HTMLButtonElement;
+    const submitClick = vi.spyOn(submit, "click");
 
     const result = submitOriginalAnswerDetailed("Choice A", document);
     const input = document.querySelector("input") as HTMLInputElement;
-    const submit = document.querySelector(".NextButton_root__MHkxh") as HTMLButtonElement;
 
-    expect(result).toEqual({ ok: true, method: "choice" });
-    expect(input.value).toBe("");
-    expect(submit).toBeTruthy();
-    expect(submitClicks).toBe(0);
+    expect(result).toEqual({ ok: true, method: "text" });
+    expect(input.value).toBe("Choice A");
+    expect(choiceClick).not.toHaveBeenCalled();
+    expect(submitClick).toHaveBeenCalledTimes(1);
   });
 });
