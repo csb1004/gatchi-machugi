@@ -311,6 +311,160 @@ describe("RoomService", () => {
     );
   });
 
+  it("keeps submissions locked when the original site shows a follow-up input for the same question", async () => {
+    const service = new RoomService();
+    const { roomCode, hostParticipantId } = await service.createRoom({ title: "Room", visibility: "private", hostNickname: "Host" });
+    const player = service.joinParticipant({ roomCode, nickname: "Mina" });
+
+    service.updateQuizState({
+      roomCode,
+      quiz: {
+        ...service.getState(roomCode).quiz,
+        quizTitle: "Choice Quiz",
+        questionIndex: 1,
+        totalQuestions: 10,
+        questionType: "multiple-choice",
+        questionText: "Who is this?",
+        imageUrl: "https://example.com/question.png",
+        choices: [
+          { id: "1", label: "Choice A" },
+          { id: "2", label: "Choice B" }
+        ]
+      }
+    });
+    service.submitAnswer({ roomCode, participantId: hostParticipantId, rawAnswer: "Choice A" });
+    service.submitAnswer({ roomCode, participantId: player.participant.id, rawAnswer: "Choice B" });
+    const questionKey = service.getState(roomCode).fairPlay.questionKey ?? "";
+    service.requestOriginalSubmission({ roomCode, questionKey });
+
+    const state = service.updateQuizState({
+      roomCode,
+      quiz: {
+        ...service.getState(roomCode).quiz,
+        questionType: "free-text",
+        choices: []
+      }
+    });
+
+    expect(state.fairPlay.questionKey).toBe(questionKey);
+    expect(state.fairPlay.originalSubmitStatus).toBe("submitting");
+    expect(state.submissions).toEqual([
+      { participantId: hostParticipantId, submitted: true, skipped: false },
+      { participantId: player.participant.id, submitted: true, skipped: false }
+    ]);
+  });
+
+  it("reveals first-screen answers when a choice result is read through a follow-up answer UI", async () => {
+    const service = new RoomService();
+    const { roomCode, hostParticipantId } = await service.createRoom({ title: "Room", visibility: "private", hostNickname: "Host" });
+    const player = service.joinParticipant({ roomCode, nickname: "Mina" });
+
+    const playingQuiz = {
+      ...service.getState(roomCode).quiz,
+      quizTitle: "Choice Quiz",
+      questionIndex: 2,
+      totalQuestions: 10,
+      questionType: "multiple-choice" as const,
+      questionText: "Pick the answer",
+      imageUrl: "https://example.com/question.png",
+      choices: [
+        { id: "1", label: "Choice A" },
+        { id: "2", label: "Choice B" }
+      ]
+    };
+    service.updateSourceMirror({
+      roomCode,
+      sourceMirror: {
+        kind: "playing",
+        url: "https://machugi.io/quiz/choice/play",
+        title: "Choice Quiz",
+        lastSeenAt: "2026-06-19T00:00:00.000Z",
+        quiz: playingQuiz
+      }
+    });
+    service.submitAnswer({ roomCode, participantId: hostParticipantId, rawAnswer: "Choice A" });
+    service.submitAnswer({ roomCode, participantId: player.participant.id, rawAnswer: "Choice B" });
+    const questionKey = service.getState(roomCode).fairPlay.questionKey ?? "";
+    service.requestOriginalSubmission({ roomCode, questionKey });
+
+    const revealed = service.updateSourceMirror({
+      roomCode,
+      sourceMirror: {
+        kind: "result",
+        url: "https://machugi.io/quiz/choice/play",
+        title: "Choice Quiz",
+        lastSeenAt: "2026-06-19T00:00:01.000Z",
+        quiz: {
+          ...playingQuiz,
+          questionType: "free-text",
+          choices: [],
+          resultMessage: "correct",
+          answerCandidates: ["Choice A"],
+          canGoNext: true
+        }
+      }
+    });
+
+    expect(revealed.phase).toBe("revealed");
+    expect(revealed.revealedSubmissions).toEqual([
+      { participantId: hostParticipantId, submitted: true, skipped: false, rawAnswer: "Choice A", correct: true },
+      { participantId: player.participant.id, submitted: true, skipped: false, rawAnswer: "Choice B", correct: false }
+    ]);
+  });
+
+  it("keeps audio-question submissions while the original site swaps to a follow-up screen", async () => {
+    const service = new RoomService();
+    const { roomCode, hostParticipantId } = await service.createRoom({ title: "Room", visibility: "private", hostNickname: "Host" });
+    const player = service.joinParticipant({ roomCode, nickname: "Mina" });
+
+    const playingQuiz = {
+      ...service.getState(roomCode).quiz,
+      quizTitle: "Music Quiz",
+      questionIndex: 3,
+      totalQuestions: 10,
+      questionType: "free-text" as const,
+      audioUrl: "https://youtube.com/watch?v=question-audio"
+    };
+    service.updateSourceMirror({
+      roomCode,
+      sourceMirror: {
+        kind: "playing",
+        url: "https://machugi.io/quiz/audio/play",
+        title: "Music Quiz",
+        lastSeenAt: "2026-06-19T00:00:00.000Z",
+        quiz: playingQuiz
+      }
+    });
+    service.submitAnswer({ roomCode, participantId: hostParticipantId, rawAnswer: "Song A" });
+    service.submitAnswer({ roomCode, participantId: player.participant.id, rawAnswer: "Song B" });
+    const questionKey = service.getState(roomCode).fairPlay.questionKey ?? "";
+    service.requestOriginalSubmission({ roomCode, questionKey });
+
+    const waiting = service.updateSourceMirror({
+      roomCode,
+      sourceMirror: {
+        kind: "playing",
+        url: "https://machugi.io/quiz/audio/play",
+        title: "Music Quiz",
+        lastSeenAt: "2026-06-19T00:00:01.000Z",
+        quiz: {
+          ...playingQuiz,
+          audioUrl: null,
+          videoUrl: "https://youtube.com/watch?v=result-video",
+          canGoNext: true
+        }
+      }
+    });
+
+    expect(waiting.phase).toBe("playing");
+    expect(waiting.fairPlay.questionKey).toBe(questionKey);
+    expect(waiting.fairPlay.originalSubmitStatus).toBe("submitting");
+    expect(waiting.submissions).toEqual([
+      { participantId: hostParticipantId, submitted: true, skipped: false },
+      { participantId: player.participant.id, submitted: true, skipped: false }
+    ]);
+  });
+
   it("returns to ready when the host extension reports original submission failure", async () => {
     const service = new RoomService();
     const { roomCode, hostParticipantId } = await service.createRoom({ title: "Room", visibility: "private", hostNickname: "Host" });
@@ -505,7 +659,7 @@ describe("RoomService", () => {
     expect(JSON.stringify(state)).not.toContain("Pikachu");
   });
 
-  it("resets the round when only multiple-choice choices change", async () => {
+  it("resets the round when choices are the only available question identity", async () => {
     const service = new RoomService();
     const { roomCode, hostParticipantId } = await service.createRoom({ title: "Room", visibility: "private", hostNickname: "Host" });
     const player = service.joinParticipant({ roomCode, nickname: "Mina" });
@@ -514,8 +668,6 @@ describe("RoomService", () => {
       roomCode,
       quiz: {
         ...service.getState(roomCode).quiz,
-        questionIndex: 1,
-        questionText: "Pick the game",
         questionType: "multiple-choice",
         choices: [
           { id: "a", label: "Blue Archive" },

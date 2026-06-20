@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { allRequiredSubmitted, createQuestionKey, requiredParticipantIds, submittedParticipantIds } from "./fairPlay.js";
+import {
+  allRequiredSubmitted,
+  createOriginalResultCompatibilityKey,
+  createQuestionKey,
+  requiredParticipantIds,
+  submittedParticipantIds
+} from "./fairPlay.js";
 import type { Participant, QuizState, SubmissionStatus } from "./models.js";
 
 const participants: Participant[] = [
@@ -67,14 +73,73 @@ describe("fairPlay helpers", () => {
     expect(first).toBe(second);
   });
 
+  it("keeps the same key when only the answer UI changes for the same visible question", () => {
+    const first = createQuestionKey(
+      createQuizState({
+        quizTitle: "Pokemon",
+        questionIndex: 3,
+        totalQuestions: 10,
+        questionType: "multiple-choice",
+        questionText: "Who is this?",
+        imageUrl: "https://example.com/pokemon.png",
+        choices: [
+          { id: "1", label: "Pikachu" },
+          { id: "2", label: "Eevee" }
+        ]
+      })
+    );
+
+    const second = createQuestionKey(
+      createQuizState({
+        quizTitle: "Pokemon",
+        questionIndex: 3,
+        totalQuestions: 10,
+        questionType: "free-text",
+        questionText: "Who is this?",
+        imageUrl: "https://example.com/pokemon.png",
+        choices: []
+      })
+    );
+
+    expect(first).toBe(second);
+  });
+
   it("returns null for a default quiz state with no active question evidence", () => {
     expect(createQuestionKey(createQuizState())).toBeNull();
   });
 
-  it("keeps distinct choice arrays distinct when choice text contains delimiters", () => {
+  it("matches original result screens by question ordinal instead of answer UI shape", () => {
+    const first = createOriginalResultCompatibilityKey(
+      createQuizState({
+        quizTitle: "Music",
+        questionIndex: 4,
+        totalQuestions: 10,
+        questionType: "multiple-choice",
+        audioUrl: "https://example.com/question-audio",
+        choices: [
+          { id: "1", label: "Song A" },
+          { id: "2", label: "Song B" }
+        ]
+      })
+    );
+
+    const second = createOriginalResultCompatibilityKey(
+      createQuizState({
+        quizTitle: "Music",
+        questionIndex: 4,
+        totalQuestions: 10,
+        questionType: "free-text",
+        videoUrl: "https://example.com/result-video",
+        choices: []
+      })
+    );
+
+    expect(first).toBe(second);
+  });
+
+  it("falls back to choices when there is no stable visible prompt identity", () => {
     const first = createQuestionKey(
       createQuizState({
-        questionIndex: 1,
         choices: [
           { id: "a", label: "b" },
           { id: "c", label: "d" }
@@ -84,7 +149,6 @@ describe("fairPlay helpers", () => {
 
     const second = createQuestionKey(
       createQuizState({
-        questionIndex: 1,
         choices: [{ id: "a", label: "b|c:d" }]
       })
     );

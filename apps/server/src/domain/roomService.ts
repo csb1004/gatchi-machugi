@@ -1,5 +1,6 @@
 import {
   allRequiredSubmitted,
+  createOriginalResultCompatibilityKey,
   createQuestionKey,
   normalizeAnswer,
   requiredParticipantIds,
@@ -31,16 +32,6 @@ function hasOriginalResult(quiz: QuizState): boolean {
 function isCorrectOriginalResult(quiz: QuizState): boolean {
   const message = normalizeAnswer(quiz.resultMessage ?? "");
   return message.includes("정답") || message.includes("correct");
-}
-
-function resultCompatibleQuestionIdentity(quiz: QuizState): string {
-  return JSON.stringify([
-    quiz.quizTitle,
-    quiz.questionIndex,
-    quiz.totalQuestions,
-    quiz.questionType,
-    quiz.choices.map((choice) => [choice.id, choice.label])
-  ]);
 }
 
 interface StoredRoom {
@@ -579,7 +570,7 @@ export class RoomService {
   private matchesCurrentOriginalResult(room: StoredRoom, resultQuiz: QuizState): boolean {
     if (!room.state.fairPlay.questionKey) return false;
     if (createQuestionKey(room.state.quiz) !== room.state.fairPlay.questionKey) return false;
-    return resultCompatibleQuestionIdentity(room.state.quiz) === resultCompatibleQuestionIdentity(resultQuiz);
+    return createOriginalResultCompatibilityKey(room.state.quiz) === createOriginalResultCompatibilityKey(resultQuiz);
   }
 
   private resetRound(room: StoredRoom): void {

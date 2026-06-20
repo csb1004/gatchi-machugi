@@ -1,32 +1,66 @@
 import type { Participant, QuizState, SubmissionStatus } from "./models.js";
 
-export function createQuestionKey(quiz: QuizState): string | null {
-  const hasValue = (value: string | null) => value !== null && value !== "";
-  const hasActiveQuestionEvidence =
+function hasValue(value: string | null): boolean {
+  return value !== null && value !== "";
+}
+
+function hasStableQuestionIdentity(quiz: QuizState): boolean {
+  return (
     quiz.questionIndex !== null ||
     hasValue(quiz.questionText) ||
     hasValue(quiz.imageUrl) ||
     hasValue(quiz.audioUrl) ||
-    hasValue(quiz.videoUrl) ||
-    quiz.choices.length > 0;
+    hasValue(quiz.videoUrl)
+  );
+}
+
+function promptIdentityParts(quiz: QuizState): unknown[] {
+  const hasPromptIdentity =
+    hasValue(quiz.questionText) ||
+    hasValue(quiz.imageUrl) ||
+    hasValue(quiz.audioUrl) ||
+    hasValue(quiz.videoUrl);
+
+  return [
+    quiz.quizTitle,
+    quiz.questionIndex,
+    quiz.totalQuestions,
+    quiz.questionText,
+    quiz.imageUrl,
+    quiz.audioUrl,
+    quiz.videoUrl,
+    hasPromptIdentity ? null : quiz.choices.map((choice) => [choice.id, choice.label])
+  ];
+}
+
+export function createQuestionKey(quiz: QuizState): string | null {
+  const stableIdentity = hasStableQuestionIdentity(quiz);
+  const hasActiveQuestionEvidence = stableIdentity || quiz.choices.length > 0;
 
   if (!hasActiveQuestionEvidence) {
     return null;
   }
 
-  const visibleIdentity = [
+  const visibleIdentity = stableIdentity ? [
     quiz.quizTitle,
     quiz.questionIndex,
     quiz.totalQuestions,
-    quiz.questionType,
     quiz.questionText,
     quiz.imageUrl,
     quiz.audioUrl,
     quiz.videoUrl,
-    quiz.choices.map((choice) => [choice.id, choice.label])
-  ];
+    null
+  ] : promptIdentityParts(quiz);
 
   return JSON.stringify(visibleIdentity);
+}
+
+export function createOriginalResultCompatibilityKey(quiz: QuizState): string {
+  if (quiz.questionIndex !== null) {
+    return JSON.stringify([quiz.quizTitle, quiz.questionIndex, quiz.totalQuestions]);
+  }
+
+  return JSON.stringify(promptIdentityParts(quiz));
 }
 
 export function requiredParticipantIds(participants: Participant[]): string[] {
