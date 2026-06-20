@@ -200,10 +200,11 @@ export function QuizPanel({ quiz }: { quiz: QuizState }) {
         {audioEmbedUrl ? (
           isResult ? (
             <iframe
-              className="question-embed"
+              className="question-embed result-embed"
               src={youtubeApiSrc(audioEmbedUrl)}
               title="정답 음원"
               allow="autoplay; encrypted-media; picture-in-picture"
+              tabIndex={-1}
             />
           ) : (
             <YoutubeAudioOnlyPlayer src={audioEmbedUrl} />

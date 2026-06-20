@@ -492,6 +492,10 @@ h2 {
   background: #101828;
 }
 
+.question-stage .result-embed {
+  pointer-events: none;
+}
+
 .question-stage audio {
   width: min(480px, 100%);
 }

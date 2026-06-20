@@ -176,6 +176,7 @@ export function RoomView(props: {
   const isHost = currentParticipant?.role === "host";
   const resultVisible = hasDisplayedResult(props.state);
   const canAdvanceDisplayedQuestion = displayedCanGoNext(props.state);
+  const canHandleHostEnter = canAdvanceDisplayedQuestion && (props.state.phase === "revealed" || resultVisible);
   const answerLocked =
     props.state.phase !== "playing" ||
     resultVisible ||
@@ -185,7 +186,7 @@ export function RoomView(props: {
   const showAnswerPanel = props.state.phase === "playing" && !answerLocked && Boolean(currentParticipant?.connected);
 
   useEffect(() => {
-    if (!isHost || props.state.phase !== "revealed" || !canAdvanceDisplayedQuestion) return;
+    if (!isHost || !canHandleHostEnter) return;
 
     function handleHostEnter(event: KeyboardEvent) {
       if (event.key !== "Enter" || event.defaultPrevented || isKeyboardCommandTarget(event.target)) return;
@@ -195,7 +196,7 @@ export function RoomView(props: {
 
     document.addEventListener("keydown", handleHostEnter);
     return () => document.removeEventListener("keydown", handleHostEnter);
-  }, [canAdvanceDisplayedQuestion, isHost, props.onSourceAction, props.state.phase]);
+  }, [canHandleHostEnter, isHost, props.onSourceAction]);
 
   return (
     <section className="room-layout" aria-label={`방 ${props.state.roomCode}`}>

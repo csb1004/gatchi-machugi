@@ -180,4 +180,24 @@ describe("QuizPanel", () => {
     expect(screen.getByTitle("정답 음원").getAttribute("src")).toContain("youtube-nocookie.com/embed/seoefKzVDOk");
     expect(screen.queryByRole("button", { name: "일시정지" })).not.toBeInTheDocument();
   });
+
+  it("keeps audio result embeds from stealing host keyboard shortcuts", () => {
+    render(
+      <QuizPanel
+        quiz={{
+          ...baseQuiz,
+          questionType: "audio",
+          imageUrl: null,
+          audioUrl: youtubeUrl,
+          resultMessage: "오답!",
+          answerCandidates: ["Ready Set Go"]
+        }}
+      />
+    );
+
+    const iframe = document.querySelector(".question-embed");
+    expect(iframe).toBeInTheDocument();
+    expect(iframe).toHaveAttribute("tabIndex", "-1");
+    expect(iframe).toHaveClass("result-embed");
+  });
 });
