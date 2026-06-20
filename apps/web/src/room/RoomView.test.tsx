@@ -392,6 +392,46 @@ describe("RoomView", () => {
     expect(onSourceAction).toHaveBeenCalledWith({ name: "next" });
   });
 
+  it("lets the host advance with Enter when the mirrored result can go next", () => {
+    const onSourceAction = vi.fn();
+    render(
+      <RoomView
+        state={{
+          ...baseState,
+          phase: "revealed",
+          quiz: {
+            ...baseState.quiz,
+            canGoNext: false,
+            resultMessage: "?ㅻ떟!",
+            answerCandidates: ["Ice Cream"]
+          },
+          sourceMirror: {
+            kind: "result",
+            url: "https://machugi.io/quiz/KAEfboenNZKAyJ3unQZH",
+            title: "5 second song quiz",
+            lastSeenAt: "2026-06-21T00:00:00.000Z",
+            quiz: {
+              ...baseState.quiz,
+              questionType: "audio",
+              audioUrl: "https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ?start=0.5&end=0",
+              canGoNext: true,
+              resultMessage: "?ㅻ떟!",
+              answerCandidates: ["Ice Cream"]
+            }
+          },
+          revealedSubmissions: [{ participantId: "host", submitted: true, skipped: false, rawAnswer: "Blackpink", correct: false }]
+        }}
+        currentParticipantId="host"
+        onSubmitAnswer={() => undefined}
+        onSourceAction={onSourceAction}
+      />
+    );
+
+    fireEvent.keyDown(document, { key: "Enter" });
+
+    expect(onSourceAction).toHaveBeenCalledWith({ name: "next" });
+  });
+
   it("does not advance with Enter while the host is typing an extra accepted answer", () => {
     const onSourceAction = vi.fn();
     render(
