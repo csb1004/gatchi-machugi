@@ -290,6 +290,37 @@ describe("RoomView", () => {
     expect(document.querySelector(".answer-panel")).not.toBeInTheDocument();
   });
 
+  it("hides the answer form when the mirrored original screen already shows a result", () => {
+    render(
+      <RoomView
+        state={{
+          ...baseState,
+          sourceMirror: {
+            kind: "playing",
+            url: "https://machugi.io/quiz/KAEfboenNZKAyJ3unQZH",
+            title: "5 second song quiz",
+            lastSeenAt: "2026-06-21T00:00:01.000Z",
+            quiz: {
+              ...baseState.quiz,
+              quizTitle: "5 second song quiz",
+              questionType: "audio",
+              audioUrl: "https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ?start=0.5&end=0",
+              resultMessage: "Incorrect!",
+              answerCandidates: ["Ice Cream"],
+              canGoNext: true
+            }
+          }
+        }}
+        currentParticipantId="host"
+        onSubmitAnswer={() => undefined}
+        onSourceAction={() => undefined}
+      />
+    );
+
+    expect(document.querySelector(".answer-panel")).not.toBeInTheDocument();
+    expect(screen.queryByRole("textbox", { name: "?듬?" })).not.toBeInTheDocument();
+  });
+
   it("does not show the room code as the empty chat placeholder", () => {
     render(
       <RoomView

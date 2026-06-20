@@ -48,6 +48,16 @@ function resultLabel(result: RoomState["revealedSubmissions"][number]): string {
   return result.correct ? "정답" : "오답";
 }
 
+function hasResultEvidence(quiz: RoomState["quiz"]): boolean {
+  return Boolean(quiz.resultMessage || quiz.answerCandidates.length > 0);
+}
+
+function hasDisplayedResult(state: RoomState): boolean {
+  if (hasResultEvidence(state.quiz)) return true;
+  if (state.sourceMirror.kind !== "playing" && state.sourceMirror.kind !== "result") return false;
+  return hasResultEvidence(state.sourceMirror.quiz);
+}
+
 function PublicRevealPanel({
   state,
   participantId
@@ -156,8 +166,10 @@ export function RoomView(props: {
   const currentSubmission = props.state.submissions.find((submission) => submission.participantId === props.currentParticipantId);
   const sourceConnected = props.state.sourceWindow.status === "connected";
   const isHost = currentParticipant?.role === "host";
+  const resultVisible = hasDisplayedResult(props.state);
   const answerLocked =
     props.state.phase !== "playing" ||
+    resultVisible ||
     props.state.fairPlay.allRequiredSubmitted ||
     props.state.fairPlay.originalSubmitStatus === "ready" ||
     props.state.fairPlay.originalSubmitStatus === "submitting";

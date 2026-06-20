@@ -853,11 +853,15 @@ export class RoomService {
   }
 
   private publicSourceMirror(room: StoredRoom, sourceMirror: SourceMirrorState): SourceMirrorState {
-    if (
-      (sourceMirror.kind !== "playing" && sourceMirror.kind !== "result") ||
-      room.state.fairPlay.originalSubmitStatus === "result-opened"
-    ) {
+    if (sourceMirror.kind !== "playing" && sourceMirror.kind !== "result") {
       return sourceMirror;
+    }
+
+    if (room.state.fairPlay.originalSubmitStatus === "result-opened") {
+      return {
+        ...sourceMirror,
+        kind: hasOriginalResult(sourceMirror.quiz) ? "result" : sourceMirror.kind
+      };
     }
 
     const quiz = {

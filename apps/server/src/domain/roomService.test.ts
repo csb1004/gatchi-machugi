@@ -1373,6 +1373,65 @@ describe("RoomService", () => {
     expect(revealed.revealedSubmissions.find((submission) => submission.participantId === player.participant.id)?.correct).toBe(false);
   });
 
+  it("publishes result mirrors as result screens after the original answer is opened", async () => {
+    const service = new RoomService();
+    const { roomCode, hostParticipantId } = await service.createRoom({ title: "Room", visibility: "private", hostNickname: "Host" });
+
+    service.updateSourceMirror({
+      roomCode,
+      sourceMirror: {
+        kind: "playing",
+        url: "https://machugi.io/quiz/KAEfboenNZKAyJ3unQZH",
+        title: "5 second song quiz",
+        lastSeenAt: "2026-06-21T00:00:00.000Z",
+        quiz: {
+          ...service.getState(roomCode).quiz,
+          quizTitle: "5 second song quiz",
+          questionType: "audio",
+          audioUrl: "https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ?start=0.5&end=5",
+          canGoNext: true
+        }
+      }
+    });
+    service.submitAnswer({ roomCode, participantId: hostParticipantId, rawAnswer: "Ice Cream" });
+    const questionKey = service.getState(roomCode).fairPlay.questionKey ?? "";
+    service.requestOriginalSubmission({ roomCode, questionKey });
+    service.applyOriginalResult({
+      roomCode,
+      questionKey,
+      quiz: {
+        ...service.getState(roomCode).quiz,
+        audioUrl: "https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ?start=0.5&end=0",
+        resultMessage: "Incorrect!",
+        answerCandidates: ["Ice Cream"],
+        canGoNext: true
+      }
+    });
+
+    const mirrored = service.updateSourceMirror({
+      roomCode,
+      sourceMirror: {
+        kind: "playing",
+        url: "https://machugi.io/quiz/KAEfboenNZKAyJ3unQZH",
+        title: "5 second song quiz",
+        lastSeenAt: "2026-06-21T00:00:01.000Z",
+        quiz: {
+          ...service.getState(roomCode).quiz,
+          audioUrl: "https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ?start=0.5&end=0",
+          resultMessage: "Incorrect!",
+          answerCandidates: ["Ice Cream"],
+          canGoNext: true
+        }
+      }
+    });
+
+    expect(mirrored.phase).toBe("revealed");
+    expect(mirrored.sourceMirror.kind).toBe("result");
+    if (mirrored.sourceMirror.kind !== "result") throw new Error("expected result mirror");
+    expect(mirrored.sourceMirror.quiz.resultMessage).toBe("Incorrect!");
+    expect(mirrored.sourceMirror.quiz.answerCandidates).toEqual(["Ice Cream"]);
+  });
+
   it("accepts the host submitted answer as an alias when the original site marks it correct", async () => {
     const service = new RoomService();
     const { roomCode, hostParticipantId } = await service.createRoom({ title: "Room", visibility: "private", hostNickname: "Host" });
