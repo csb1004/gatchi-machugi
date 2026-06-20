@@ -103,10 +103,51 @@ describe("RoomView", () => {
       />
     );
 
-    expect(screen.getByText("내 결과")).toBeInTheDocument();
-    expect(screen.getByText("오답")).toBeInTheDocument();
-    expect(screen.getByText("내 답: 팅비드")).toBeInTheDocument();
-    expect(screen.getByText("정답: 디안시")).toBeInTheDocument();
+    const personalResult = screen.getByRole("region", { name: "내 결과" });
+    expect(within(personalResult).getByText("내 결과")).toBeInTheDocument();
+    expect(within(personalResult).getByText("오답")).toBeInTheDocument();
+    expect(within(personalResult).getByText("내 답: 팅비드")).toBeInTheDocument();
+    expect(within(personalResult).getByText("정답: 디안시")).toBeInTheDocument();
+  });
+
+  it("shows incorrect revealed answers to every participant and highlights the viewer's own answer", () => {
+    render(
+      <RoomView
+        state={{
+          ...baseState,
+          phase: "revealed",
+          participants: [
+            ...baseState.participants,
+            { id: "p2", nickname: "Yuna", role: "player", connected: true, score: 0 }
+          ],
+          quiz: {
+            ...baseState.quiz,
+            resultMessage: "정답!",
+            answerCandidates: ["피카츄"]
+          },
+          revealedSubmissions: [
+            { participantId: "host", submitted: true, skipped: false, rawAnswer: "피카츄", correct: true },
+            { participantId: "p1", submitted: true, skipped: false, rawAnswer: "라이츄", correct: false },
+            { participantId: "p2", submitted: true, skipped: false, rawAnswer: "피카츄", correct: true }
+          ]
+        }}
+        currentParticipantId="p2"
+        onSubmitAnswer={() => undefined}
+        onSourceAction={() => undefined}
+      />
+    );
+
+    const publicResults = screen.getByRole("region", { name: "공개 결과" });
+    expect(within(publicResults).getByText("오답 공개")).toBeInTheDocument();
+    expect(within(publicResults).getByText("Mina")).toBeInTheDocument();
+    expect(within(publicResults).getByText("라이츄")).toBeInTheDocument();
+    expect(within(publicResults).queryByText("Host")).not.toBeInTheDocument();
+
+    const myAnswer = within(publicResults).getByLabelText("내 답 결과");
+    expect(myAnswer).toHaveClass("correct");
+    expect(within(myAnswer).getByText("내 답")).toBeInTheDocument();
+    expect(within(myAnswer).getByText("정답")).toBeInTheDocument();
+    expect(within(myAnswer).getByText("피카츄")).toBeInTheDocument();
   });
 
   it("labels skipped personal results as not entered", () => {
@@ -131,8 +172,9 @@ describe("RoomView", () => {
       />
     );
 
-    expect(screen.getByText("미제출")).toBeInTheDocument();
-    expect(screen.getByText("내 답: 입력하지 않음")).toBeInTheDocument();
+    const personalResult = screen.getByRole("region", { name: "내 결과" });
+    expect(within(personalResult).getByText("미제출")).toBeInTheDocument();
+    expect(within(personalResult).getByText("내 답: 입력하지 않음")).toBeInTheDocument();
   });
 
   it("lets the host add an accepted answer after reveal", () => {

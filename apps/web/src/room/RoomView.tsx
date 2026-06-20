@@ -38,6 +38,72 @@ function PersonalResultPanel({
   );
 }
 
+function answerTextForResult(result: RoomState["revealedSubmissions"][number]): string {
+  if (result.skipped) return "입력하지 않음";
+  return result.rawAnswer || "-";
+}
+
+function resultLabel(result: RoomState["revealedSubmissions"][number]): string {
+  if (result.skipped) return "미제출";
+  return result.correct ? "정답" : "오답";
+}
+
+function PublicRevealPanel({
+  state,
+  participantId
+}: {
+  state: RoomState;
+  participantId: string;
+}) {
+  if (state.phase !== "revealed") return null;
+
+  const participantNames = new Map(state.participants.map((participant) => [participant.id, participant.nickname]));
+  const currentResult = state.revealedSubmissions.find((submission) => submission.participantId === participantId);
+  const wrongResults = state.revealedSubmissions.filter((submission) => !submission.correct);
+
+  return (
+    <section className="public-results" aria-label="공개 결과">
+      {currentResult ? (
+        <div
+          className={`my-answer-highlight ${currentResult.correct ? "correct" : "incorrect"}`}
+          aria-label="내 답 결과"
+        >
+          <div>
+            <strong>내 답</strong>
+            <span>{answerTextForResult(currentResult)}</span>
+          </div>
+          <em>{resultLabel(currentResult)}</em>
+        </div>
+      ) : null}
+
+      <div className="section-heading">
+        <h2>오답 공개</h2>
+        <span>{wrongResults.length}명</span>
+      </div>
+
+      {wrongResults.length > 0 ? (
+        <div className="wrong-answer-list">
+          {wrongResults.map((result) => {
+            const isMine = result.participantId === participantId;
+            return (
+              <div
+                key={result.participantId}
+                className={`wrong-answer-row${isMine ? " is-mine" : ""}`}
+              >
+                <strong>{participantNames.get(result.participantId) ?? result.participantId}</strong>
+                <span>{answerTextForResult(result)}</span>
+                <em>{isMine ? `내 답 · ${resultLabel(result)}` : resultLabel(result)}</em>
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <p className="wrong-answer-empty">틀린 사람이 없습니다.</p>
+      )}
+    </section>
+  );
+}
+
 function HostAliasPanel({
   isHost,
   state,
@@ -132,6 +198,7 @@ export function RoomView(props: {
         </header>
         <SourceMirrorView state={props.state.sourceMirror} isHost={Boolean(isHost)} onAction={props.onSourceAction} />
         <PersonalResultPanel state={props.state} participantId={props.currentParticipantId} />
+        <PublicRevealPanel state={props.state} participantId={props.currentParticipantId} />
         <HostAliasPanel isHost={Boolean(isHost)} state={props.state} onAddAlias={props.onAddAlias} />
         <AnswerPanel
           disabled={!currentParticipant?.connected || answerLocked}
