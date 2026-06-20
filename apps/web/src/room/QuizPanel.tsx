@@ -1,4 +1,4 @@
-import { Pause, Play, Volume2 } from "lucide-react";
+import { Pause, Play, RotateCcw, Volume2 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { QuizState } from "@gatchi/shared";
 
@@ -39,29 +39,93 @@ function youtubeApiSrc(src: string): string {
   }
 }
 
+function secondsFromParam(value: string | null): number | null {
+  if (!value) return null;
+  const parsed = Number(value.replace(/[^\d.]/g, ""));
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function clipTiming(src: string): { start: number; duration: number } {
+  try {
+    const url = new URL(src, window.location.href);
+    const start = secondsFromParam(url.searchParams.get("start") ?? url.searchParams.get("t")) ?? 0;
+    const end = secondsFromParam(url.searchParams.get("end"));
+    return { start, duration: end && end > start ? end - start : 30 };
+  } catch {
+    return { start: 0, duration: 30 };
+  }
+}
+
+function formatSeconds(value: number): string {
+  const safeValue = Math.max(0, Math.floor(value));
+  const minutes = Math.floor(safeValue / 60);
+  const seconds = String(safeValue % 60).padStart(2, "0");
+  return `${minutes}:${seconds}`;
+}
+
 function YoutubeAudioOnlyPlayer({ src }: { src: string }) {
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [elapsed, setElapsed] = useState(0);
   const apiSrc = useMemo(() => youtubeApiSrc(src), [src]);
+  const timing = useMemo(() => clipTiming(src), [src]);
+  const isEnded = elapsed >= timing.duration;
+  const progress = Math.min(100, (elapsed / timing.duration) * 100);
 
-  function sendCommand(command: "playVideo" | "pauseVideo") {
+  function sendCommand(func: "playVideo" | "pauseVideo" | "seekTo", args: unknown[] = []) {
     iframeRef.current?.contentWindow?.postMessage(
       JSON.stringify({
         event: "command",
-        func: command,
-        args: []
+        func,
+        args
       }),
       "*"
     );
   }
 
+  function playFromStart() {
+    setElapsed(0);
+    sendCommand("seekTo", [timing.start, true]);
+    setIsPlaying(true);
+  }
+
+  useEffect(() => {
+    setElapsed(0);
+    setIsPlaying(false);
+    sendCommand("seekTo", [timing.start, true]);
+  }, [apiSrc, timing.start]);
+
   useEffect(() => {
     sendCommand(isPlaying ? "playVideo" : "pauseVideo");
   }, [isPlaying]);
 
+  useEffect(() => {
+    if (!isPlaying) return;
+
+    const interval = window.setInterval(() => {
+      setElapsed((current) => {
+        const nextElapsed = Math.min(timing.duration, current + 0.25);
+        if (nextElapsed >= timing.duration) {
+          setIsPlaying(false);
+          sendCommand("pauseVideo");
+        }
+        return nextElapsed;
+      });
+    }, 250);
+
+    return () => window.clearInterval(interval);
+  }, [isPlaying, timing.duration]);
+
   function togglePlayback() {
+    if (isEnded) {
+      playFromStart();
+      return;
+    }
+
     setIsPlaying((current) => !current);
   }
+
+  const buttonLabel = isPlaying ? "일시정지" : isEnded ? "다시 듣기" : "재생";
 
   return (
     <div className="youtube-audio-only">
@@ -72,20 +136,37 @@ function YoutubeAudioOnlyPlayer({ src }: { src: string }) {
         title="숨겨진 음원 플레이어"
         allow="autoplay; encrypted-media"
         onLoad={() => {
+          sendCommand("seekTo", [timing.start, true]);
           if (isPlaying) sendCommand("playVideo");
         }}
         aria-hidden="true"
         tabIndex={-1}
       />
       <div className="youtube-audio-shell">
-        <Volume2 size={28} aria-hidden="true" />
-        <div>
-          <strong>음원 문제</strong>
-          <span>영상은 가리고 소리만 재생합니다.</span>
+        <Volume2 size={24} aria-hidden="true" />
+        <div className="audio-progress-stack">
+          <div
+            className="audio-progress-track"
+            role="progressbar"
+            aria-label="재생 진행률"
+            aria-valuemin={0}
+            aria-valuemax={timing.duration}
+            aria-valuenow={Math.min(timing.duration, elapsed)}
+          >
+            <span style={{ width: `${progress}%` }} />
+          </div>
+          <span className="audio-time">
+            {formatSeconds(elapsed)} / {formatSeconds(timing.duration)}
+          </span>
         </div>
-        <button type="button" onClick={togglePlayback} aria-pressed={isPlaying}>
-          {isPlaying ? <Pause size={18} aria-hidden="true" /> : <Play size={18} aria-hidden="true" />}
-          {isPlaying ? "일시정지" : "재생"}
+        <button type="button" onClick={togglePlayback} aria-label={buttonLabel} aria-pressed={isPlaying}>
+          {isPlaying ? (
+            <Pause size={18} aria-hidden="true" />
+          ) : isEnded ? (
+            <RotateCcw size={18} aria-hidden="true" />
+          ) : (
+            <Play size={18} aria-hidden="true" />
+          )}
         </button>
       </div>
     </div>

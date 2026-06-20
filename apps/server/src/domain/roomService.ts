@@ -187,9 +187,11 @@ export class RoomService {
       return room.state;
     }
 
-    const shouldResetRound = this.shouldResetRound(room.state.quiz, input.quiz);
+    const previousQuiz = room.state.quiz;
+    const shouldResetRound = this.shouldResetRound(previousQuiz, input.quiz);
+    const quiz = shouldResetRound ? input.quiz : this.quizForContinuingRound(previousQuiz, input.quiz);
 
-    room.state.quiz = input.quiz;
+    room.state.quiz = quiz;
 
     if (shouldResetRound) {
       this.resetRound(room);
@@ -250,10 +252,14 @@ export class RoomService {
 
     const quiz = quizFromSourceMirror(sourceMirror);
     if (quiz && sourceMirror.kind === "playing") {
-      return this.updateQuizState({
+      const state = this.updateQuizState({
         roomCode: input.roomCode,
         quiz
       });
+      if (state.sourceMirror.kind === "playing") {
+        state.sourceMirror = { ...state.sourceMirror, quiz: state.quiz };
+      }
+      return state;
     }
 
     if (quiz && sourceMirror.kind === "result" && room.state.fairPlay.originalSubmitStatus === "result-opened") {
@@ -564,7 +570,45 @@ export class RoomService {
   }
 
   private shouldResetRound(previousQuiz: QuizState, nextQuiz: QuizState): boolean {
+    if (this.isSameNoOrdinalQuestionUpdate(previousQuiz, nextQuiz)) {
+      return false;
+    }
+
     return createQuestionKey(previousQuiz) !== createQuestionKey(nextQuiz);
+  }
+
+  private isSameNoOrdinalQuestionUpdate(previousQuiz: QuizState, nextQuiz: QuizState): boolean {
+    if (previousQuiz.questionIndex !== null || nextQuiz.questionIndex !== null) return false;
+    if (!createQuestionKey(previousQuiz)) return false;
+    if (previousQuiz.quizTitle !== nextQuiz.quizTitle) return false;
+    if (previousQuiz.totalQuestions !== nextQuiz.totalQuestions) return false;
+    return !this.hasNewNoOrdinalPromptEvidence(previousQuiz, nextQuiz);
+  }
+
+  private hasNewNoOrdinalPromptEvidence(previousQuiz: QuizState, nextQuiz: QuizState): boolean {
+    if (nextQuiz.questionText && nextQuiz.questionText !== previousQuiz.questionText) return true;
+    if (nextQuiz.imageUrl && nextQuiz.imageUrl !== previousQuiz.imageUrl) return true;
+    if (nextQuiz.audioUrl && nextQuiz.audioUrl !== previousQuiz.audioUrl) return true;
+    if (nextQuiz.videoUrl && nextQuiz.videoUrl !== previousQuiz.videoUrl) return true;
+    if (nextQuiz.choices.length > 0 && JSON.stringify(nextQuiz.choices) !== JSON.stringify(previousQuiz.choices)) return true;
+    return false;
+  }
+
+  private quizForContinuingRound(previousQuiz: QuizState, nextQuiz: QuizState): QuizState {
+    if (!this.isSameNoOrdinalQuestionUpdate(previousQuiz, nextQuiz)) return nextQuiz;
+
+    return {
+      ...nextQuiz,
+      questionType:
+        nextQuiz.questionType === "unknown" || nextQuiz.questionType === "free-text"
+          ? previousQuiz.questionType
+          : nextQuiz.questionType,
+      questionText: nextQuiz.questionText ?? previousQuiz.questionText,
+      imageUrl: nextQuiz.imageUrl ?? previousQuiz.imageUrl,
+      audioUrl: nextQuiz.audioUrl ?? previousQuiz.audioUrl,
+      videoUrl: nextQuiz.videoUrl ?? previousQuiz.videoUrl,
+      choices: nextQuiz.choices.length > 0 ? nextQuiz.choices : previousQuiz.choices
+    };
   }
 
   private matchesCurrentOriginalResult(room: StoredRoom, resultQuiz: QuizState): boolean {

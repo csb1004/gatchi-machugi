@@ -34,13 +34,12 @@ const resultQuiz: QuizState = {
 };
 
 describe("reportOriginalResultWhenReady", () => {
-  it("retries the host answer when the original site is still not graded after submission", async () => {
+  it("waits for the result without submitting the host answer into follow-up inputs again", async () => {
     const sendOriginalResult = vi.fn<(result: OriginalResultPayload) => void>();
     const sendOriginalFailure = vi.fn();
     const showLockNotice = vi.fn();
     const sendState = vi.fn();
     const delay = vi.fn(() => Promise.resolve());
-    const submitOriginalAnswer = vi.fn(() => ({ ok: true as const, method: "text" as const }));
     const extractQuizState = vi
       .fn<() => QuizState>()
       .mockReturnValueOnce(playingQuiz)
@@ -51,15 +50,12 @@ describe("reportOriginalResultWhenReady", () => {
       delay,
       extractQuizState,
       sendState,
-      submitOriginalAnswer,
       sendOriginalResult,
       sendOriginalFailure,
       showLockNotice,
-      maxAttempts: 4,
-      maxFollowupSubmissions: 2
+      maxAttempts: 4
     });
 
-    expect(submitOriginalAnswer).toHaveBeenCalledWith("Choice A");
     expect(sendOriginalResult).toHaveBeenCalledWith({
       roomCode: "ABC123",
       questionKey: "q1",

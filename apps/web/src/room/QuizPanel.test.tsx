@@ -1,7 +1,7 @@
 import "@testing-library/jest-dom/vitest";
 import type { QuizState } from "@gatchi/shared";
-import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { act, fireEvent, render, screen } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
 import { QuizPanel } from "./QuizPanel";
 
 const youtubeUrl = "https://www.youtube-nocookie.com/embed/seoefKzVDOk?start=0.5&end=141";
@@ -72,6 +72,57 @@ describe("QuizPanel", () => {
     const src = document.querySelector(".youtube-audio-frame")?.getAttribute("src") ?? "";
     expect(src).toContain("enablejsapi=1");
     expect(src).toContain("playsinline=1");
+  });
+
+  it("shows audio playback as a progress bar without explanatory copy", () => {
+    render(
+      <QuizPanel
+        quiz={{
+          ...baseQuiz,
+          questionType: "audio",
+          imageUrl: null,
+          audioUrl: "https://www.youtube-nocookie.com/embed/seoefKzVDOk?start=10&end=15"
+        }}
+      />
+    );
+
+    expect(screen.getByRole("progressbar")).toHaveAttribute("aria-valuemax", "5");
+    expect(screen.getByText("0:00 / 0:05")).toBeInTheDocument();
+    expect(screen.queryByText("음원 문제")).not.toBeInTheDocument();
+    expect(screen.queryByText("영상은 가리고 소리만 재생합니다.")).not.toBeInTheDocument();
+  });
+
+  it("lets listeners replay a timed audio clip after it reaches the end", () => {
+    vi.useFakeTimers();
+    try {
+      render(
+        <QuizPanel
+          quiz={{
+            ...baseQuiz,
+            questionType: "audio",
+            imageUrl: null,
+            audioUrl: "https://www.youtube-nocookie.com/embed/seoefKzVDOk?start=10&end=15"
+          }}
+        />
+      );
+
+      act(() => {
+        fireEvent.click(screen.getByRole("button", { name: "재생" }));
+      });
+      act(() => {
+        vi.advanceTimersByTime(5000);
+      });
+
+      expect(screen.getByRole("button", { name: "다시 듣기" })).toBeInTheDocument();
+      act(() => {
+        fireEvent.click(screen.getByRole("button", { name: "다시 듣기" }));
+      });
+
+      expect(screen.getByRole("button", { name: "일시정지" })).toBeInTheDocument();
+      expect(screen.getByText("0:00 / 0:05")).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("leaves multiple-choice answers to the answer panel instead of duplicating them", () => {

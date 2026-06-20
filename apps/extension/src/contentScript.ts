@@ -115,11 +115,6 @@ async function reportOriginalResultWhenReady(payload: OriginalSubmitAllowedPaylo
     delay,
     extractQuizState: () => extractQuizState(document),
     sendState,
-    submitOriginalAnswer: (rawAnswer) =>
-      originalSubmissionLock?.runWithOriginalSubmitBypass(() => submitOriginalAnswerDetailed(rawAnswer, document)) ?? {
-        ok: false,
-        method: null
-      },
     sendOriginalResult,
     sendOriginalFailure,
     showLockNotice

@@ -519,6 +519,61 @@ describe("RoomService", () => {
     ]);
   });
 
+  it("keeps no-ordinal audio submissions and replay media when the original listening window expires", async () => {
+    const service = new RoomService();
+    const { roomCode, hostParticipantId } = await service.createRoom({ title: "Room", visibility: "private", hostNickname: "Host" });
+    const player = service.joinParticipant({ roomCode, nickname: "Mina" });
+
+    const playingQuiz = {
+      ...service.getState(roomCode).quiz,
+      quizTitle: "5초 듣고 노래 맞추기",
+      questionIndex: null,
+      totalQuestions: null,
+      questionType: "audio" as const,
+      audioUrl: "https://www.youtube-nocookie.com/embed/question-audio?start=20&end=25"
+    };
+    service.updateSourceMirror({
+      roomCode,
+      sourceMirror: {
+        kind: "playing",
+        url: "https://machugi.io/quiz/audio/play",
+        title: "5초 듣고 노래 맞추기",
+        lastSeenAt: "2026-06-19T00:00:00.000Z",
+        quiz: playingQuiz
+      }
+    });
+    service.submitAnswer({ roomCode, participantId: hostParticipantId, rawAnswer: "경원" });
+    const questionKey = service.getState(roomCode).fairPlay.questionKey ?? "";
+
+    const stillSameRound = service.updateSourceMirror({
+      roomCode,
+      sourceMirror: {
+        kind: "playing",
+        url: "https://machugi.io/quiz/audio/play",
+        title: "5초 듣고 노래 맞추기",
+        lastSeenAt: "2026-06-19T00:00:05.000Z",
+        quiz: {
+          ...playingQuiz,
+          audioUrl: null,
+          timerSecondsRemaining: 0
+        }
+      }
+    });
+
+    expect(stillSameRound.phase).toBe("playing");
+    expect(stillSameRound.fairPlay.questionKey).toBe(questionKey);
+    expect(stillSameRound.submissions).toEqual([
+      { participantId: hostParticipantId, submitted: true, skipped: false }
+    ]);
+    expect(stillSameRound.fairPlay.originalSubmitStatus).toBe("locked");
+    expect(stillSameRound.sourceMirror.kind).toBe("playing");
+    if (stillSameRound.sourceMirror.kind !== "playing") throw new Error("expected playing mirror");
+    expect(stillSameRound.sourceMirror.quiz.audioUrl).toBe("https://www.youtube-nocookie.com/embed/question-audio?start=20&end=25");
+
+    service.submitAnswer({ roomCode, participantId: player.participant.id, rawAnswer: "다른 답" });
+    expect(service.getState(roomCode).fairPlay.originalSubmitStatus).toBe("ready");
+  });
+
   it("keeps no-ordinal choice answers when the original site swaps choices for a plain image result", async () => {
     const service = new RoomService();
     const { roomCode, hostParticipantId } = await service.createRoom({ title: "Room", visibility: "private", hostNickname: "Host" });
