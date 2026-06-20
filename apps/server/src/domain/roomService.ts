@@ -247,6 +247,22 @@ export class RoomService {
       return room.state;
     }
 
+    if (
+      rawQuiz &&
+      playableSourceMirror &&
+      this.shouldPreserveRoundWhileAwaitingOriginalResult(room, room.state.quiz, rawQuiz)
+    ) {
+      room.state.quiz = this.quizForContinuingRound(room, room.state.quiz, rawQuiz);
+      room.state.sourceMirror = {
+        kind: "playing",
+        url: playableSourceMirror.url,
+        title: playableSourceMirror.title,
+        lastSeenAt: playableSourceMirror.lastSeenAt,
+        quiz: room.state.quiz
+      };
+      return room.state;
+    }
+
     const sourceMirror = this.publicSourceMirror(room, input.sourceMirror);
     room.state.sourceMirror = sourceMirror;
 
@@ -583,9 +599,10 @@ export class RoomService {
 
   private shouldPreserveRoundWhileAwaitingOriginalResult(room: StoredRoom, previousQuiz: QuizState, nextQuiz: QuizState): boolean {
     const status = room.state.fairPlay.originalSubmitStatus;
-    if (status !== "ready" && status !== "submitting") return false;
+    if (status !== "locked" && status !== "ready" && status !== "submitting") return false;
     if (!room.state.fairPlay.questionKey) return false;
-    if (hasOriginalResult(nextQuiz) && status !== "ready") return false;
+    if (hasOriginalResult(nextQuiz) && status === "submitting") return false;
+    if (status === "locked" && !hasOriginalResult(nextQuiz)) return false;
     if (!this.hasVisiblePromptIdentity(previousQuiz)) return false;
     if (!hasOriginalResult(nextQuiz) && !nextQuiz.canGoNext) return false;
     if (createQuestionKey(previousQuiz) !== room.state.fairPlay.questionKey) return false;

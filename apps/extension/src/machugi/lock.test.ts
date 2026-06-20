@@ -111,6 +111,61 @@ describe("createOriginalSubmissionLock", () => {
     expect(locked).toHaveBeenCalledWith("아직 제출하지 않은 참가자가 있습니다.");
   });
 
+  it("blocks original multiple-choice clicks while the room is locked", () => {
+    document.body.innerHTML = `
+      <div class="QuizDetailPlaying_root__abc">
+        <div class="QuizDetailAnswerMultipleChoice_questionChoiceContainer__aRzUN">
+          <button type="button">Possible</button>
+          <button type="button">Impossible</button>
+        </div>
+      </div>
+    `;
+    const button = document.querySelector("button") as HTMLButtonElement;
+    const click = vi.fn();
+    const locked = vi.fn();
+    const request = vi.fn();
+    button.addEventListener("click", click);
+
+    controller = createOriginalSubmissionLock(document, {
+      onRequestOriginalSubmit: request,
+      onLockedAttempt: locked
+    });
+    controller.updateRoomState(roomState({ originalSubmitStatus: "locked" }));
+
+    const event = new MouseEvent("click", { bubbles: true, cancelable: true });
+    button.dispatchEvent(event);
+
+    expect(event.defaultPrevented).toBe(true);
+    expect(click).not.toHaveBeenCalled();
+    expect(request).not.toHaveBeenCalled();
+    expect(locked).toHaveBeenCalledWith("아직 제출하지 않은 참가자가 있습니다.");
+  });
+
+  it("requests server authorization for a ready original multiple-choice click", () => {
+    document.body.innerHTML = `
+      <div class="QuizDetailPlaying_root__abc">
+        <div class="QuizDetailAnswerMultipleChoice_questionChoiceContainer__aRzUN">
+          <button type="button">Possible</button>
+          <button type="button">Impossible</button>
+        </div>
+      </div>
+    `;
+    const button = document.querySelector("button") as HTMLButtonElement;
+    const request = vi.fn();
+
+    controller = createOriginalSubmissionLock(document, { onRequestOriginalSubmit: request });
+    controller.updateRoomState(roomState({ originalSubmitStatus: "ready", allRequiredSubmitted: true }));
+
+    button.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+    button.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+
+    expect(request).toHaveBeenCalledTimes(1);
+    expect(request).toHaveBeenCalledWith({
+      roomCode: "ABC123",
+      questionKey: "q1"
+    });
+  });
+
   it("requests server authorization instead of letting a ready submit pass through", () => {
     document.body.innerHTML = `
       <div class="QuizDetailPlaying_root__abc">

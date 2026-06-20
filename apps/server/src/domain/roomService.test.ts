@@ -720,6 +720,106 @@ describe("RoomService", () => {
     ]);
   });
 
+  it("keeps a locked no-ordinal audio round when the original page is submitted early", async () => {
+    const service = new RoomService();
+    const { roomCode, hostParticipantId } = await service.createRoom({ title: "Room", visibility: "private", hostNickname: "Host" });
+    const player = service.joinParticipant({ roomCode, nickname: "Mina" });
+
+    const playingQuiz = {
+      ...service.getState(roomCode).quiz,
+      quizTitle: "5 seconds music",
+      questionIndex: null,
+      totalQuestions: null,
+      questionType: "audio" as const,
+      audioUrl: "https://www.youtube-nocookie.com/embed/EIz09kLzN9k?start=0.5&end=5",
+      canGoNext: true
+    };
+    service.updateQuizState({ roomCode, quiz: playingQuiz });
+    service.submitAnswer({ roomCode, participantId: hostParticipantId, rawAnswer: "Love Lee" });
+    const questionKey = service.getState(roomCode).fairPlay.questionKey ?? "";
+    expect(service.getState(roomCode).fairPlay.originalSubmitStatus).toBe("locked");
+
+    const waiting = service.updateQuizState({
+      roomCode,
+      quiz: {
+        ...playingQuiz,
+        audioUrl: "https://www.youtube-nocookie.com/embed/EIz09kLzN9k?start=0.5&end=0&control=1",
+        resultMessage: "Incorrect!",
+        answerCandidates: ["Love Lee"],
+        canGoNext: true
+      }
+    });
+
+    expect(waiting.phase).toBe("playing");
+    expect(waiting.fairPlay.questionKey).toBe(questionKey);
+    expect(waiting.fairPlay.originalSubmitStatus).toBe("locked");
+    expect(waiting.quiz.audioUrl).toBe("https://www.youtube-nocookie.com/embed/EIz09kLzN9k?start=0.5&end=5");
+    expect(waiting.quiz.resultMessage).toBeNull();
+    expect(waiting.quiz.answerCandidates).toEqual([]);
+    expect(waiting.submissions).toEqual([{ participantId: hostParticipantId, submitted: true, skipped: false }]);
+
+    service.submitAnswer({ roomCode, participantId: player.participant.id, rawAnswer: "Wrong" });
+    expect(service.getState(roomCode).fairPlay.originalSubmitStatus).toBe("ready");
+  });
+
+  it("keeps a locked no-ordinal source result from replacing the current audio prompt", async () => {
+    const service = new RoomService();
+    const { roomCode, hostParticipantId } = await service.createRoom({ title: "Room", visibility: "private", hostNickname: "Host" });
+    const player = service.joinParticipant({ roomCode, nickname: "Mina" });
+
+    const playingQuiz = {
+      ...service.getState(roomCode).quiz,
+      quizTitle: "5 seconds music",
+      questionIndex: null,
+      totalQuestions: null,
+      questionType: "audio" as const,
+      audioUrl: "https://www.youtube-nocookie.com/embed/EIz09kLzN9k?start=0.5&end=5",
+      canGoNext: true
+    };
+    service.updateSourceMirror({
+      roomCode,
+      sourceMirror: {
+        kind: "playing",
+        url: "https://machugi.io/quiz/KAEfboenNZKAyJ3unQZH",
+        title: "5 seconds music",
+        lastSeenAt: "2026-06-21T00:00:00.000Z",
+        quiz: playingQuiz
+      }
+    });
+    service.submitAnswer({ roomCode, participantId: hostParticipantId, rawAnswer: "Love Lee" });
+    const questionKey = service.getState(roomCode).fairPlay.questionKey ?? "";
+    expect(service.getState(roomCode).fairPlay.originalSubmitStatus).toBe("locked");
+
+    const waiting = service.updateSourceMirror({
+      roomCode,
+      sourceMirror: {
+        kind: "result",
+        url: "https://machugi.io/quiz/KAEfboenNZKAyJ3unQZH",
+        title: "5 seconds music",
+        lastSeenAt: "2026-06-21T00:00:01.000Z",
+        quiz: {
+          ...playingQuiz,
+          audioUrl: "https://www.youtube-nocookie.com/embed/EIz09kLzN9k?start=0.5&end=0&control=1",
+          resultMessage: "Incorrect!",
+          answerCandidates: ["Love Lee"],
+          canGoNext: true
+        }
+      }
+    });
+
+    expect(waiting.phase).toBe("playing");
+    expect(waiting.fairPlay.questionKey).toBe(questionKey);
+    expect(waiting.fairPlay.originalSubmitStatus).toBe("locked");
+    expect(waiting.quiz.audioUrl).toBe("https://www.youtube-nocookie.com/embed/EIz09kLzN9k?start=0.5&end=5");
+    expect(waiting.quiz.resultMessage).toBeNull();
+    expect(waiting.sourceMirror.kind).toBe("playing");
+    if (waiting.sourceMirror.kind !== "playing") throw new Error("expected playing mirror");
+    expect(waiting.sourceMirror.quiz.audioUrl).toBe("https://www.youtube-nocookie.com/embed/EIz09kLzN9k?start=0.5&end=5");
+
+    service.submitAnswer({ roomCode, participantId: player.participant.id, rawAnswer: "Wrong" });
+    expect(service.getState(roomCode).fairPlay.originalSubmitStatus).toBe("ready");
+  });
+
   it("preserves question text while waiting on an original result transition", async () => {
     const service = new RoomService();
     const { roomCode, hostParticipantId } = await service.createRoom({ title: "Room", visibility: "private", hostNickname: "Host" });

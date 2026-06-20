@@ -35,6 +35,12 @@ function hasAnswerInputNearButton(button: HTMLButtonElement): boolean {
   return quizRoot ? hasAnswerInput(quizRoot) : false;
 }
 
+function isChoiceAnswerButton(button: HTMLButtonElement): boolean {
+  return Boolean(
+    button.closest("[data-choice], [role='option'], [class*='Choice'], [class*='MultipleChoice']")
+  );
+}
+
 function isOriginalSubmitButton(button: HTMLButtonElement): boolean {
   const form = button.closest("form");
   if (form && hasAnswerInput(form)) return true;
@@ -42,7 +48,12 @@ function isOriginalSubmitButton(button: HTMLButtonElement): boolean {
   const label = `${button.textContent ?? ""} ${button.getAttribute("aria-label") ?? ""}`;
   const className = button.className;
 
-  return button.type === "submit" || submitTextPattern.test(label) || (className.includes("NextButton_root") && hasAnswerInputNearButton(button));
+  return (
+    button.type === "submit" ||
+    submitTextPattern.test(label) ||
+    isChoiceAnswerButton(button) ||
+    (className.includes("NextButton_root") && hasAnswerInputNearButton(button))
+  );
 }
 
 function isOriginalSubmitEvent(event: Event): boolean {
