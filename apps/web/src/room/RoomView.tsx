@@ -171,6 +171,7 @@ export function RoomView(props: {
   onLeaveRoom?: () => void;
 }) {
   const roomLayoutRef = useRef<HTMLElement | null>(null);
+  const hostEnterCatcherRef = useRef<HTMLInputElement | null>(null);
   const currentParticipant = props.state.participants.find((participant) => participant.id === props.currentParticipantId);
   const currentSubmission = props.state.submissions.find((submission) => submission.participantId === props.currentParticipantId);
   const sourceConnected = props.state.sourceWindow.status === "connected";
@@ -208,9 +209,11 @@ export function RoomView(props: {
     }
 
     function focusRoomSurface() {
-      if (isKeyboardCommandTarget(document.activeElement)) return;
-      if (document.activeElement !== document.body && !shouldReclaimHostFocus()) return;
-      roomLayoutRef.current?.focus({ preventScroll: true });
+      const activeElement = document.activeElement;
+      if (activeElement === hostEnterCatcherRef.current) return;
+      if (activeElement instanceof HTMLElement && isKeyboardCommandTarget(activeElement)) return;
+      if (activeElement !== document.body && !shouldReclaimHostFocus()) return;
+      hostEnterCatcherRef.current?.focus({ preventScroll: true });
     }
 
     focusRoomSurface();
@@ -228,6 +231,20 @@ export function RoomView(props: {
 
   return (
     <section ref={roomLayoutRef} tabIndex={-1} className="room-layout" aria-label={`방 ${props.state.roomCode}`}>
+      {isHost && canHandleHostEnter ? (
+        <input
+          ref={hostEnterCatcherRef}
+          className="host-enter-catcher"
+          aria-label="방장 엔터 진행"
+          readOnly
+          tabIndex={-1}
+          onKeyDown={(event) => {
+            if (event.key !== "Enter") return;
+            event.preventDefault();
+            props.onSourceAction({ name: "next" });
+          }}
+        />
+      ) : null}
       <div className="room-main">
         <header className="room-titlebar">
           <div>

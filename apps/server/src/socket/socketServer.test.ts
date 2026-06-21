@@ -106,6 +106,24 @@ function emitAnswerSubmit(
   });
 }
 
+async function waitForRoomPhase(socket: Socket<ServerToClientEvents, ClientToServerEvents>, phase: string) {
+  const timeoutMs = 1000;
+  const deadline = Date.now() + timeoutMs;
+
+  while (Date.now() < deadline) {
+    const remainingMs = Math.max(1, deadline - Date.now());
+    const state = await Promise.race([
+      waitForEvent(socket, "room:state"),
+      new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error(`Timed out waiting for room phase ${phase}`)), remainingMs);
+      })
+    ]);
+    if (state.phase === phase) return state;
+  }
+
+  throw new Error(`Timed out waiting for room phase ${phase}`);
+}
+
 function emitExtensionSource(
   socket: Socket<ServerToClientEvents, ClientToServerEvents>,
   payload: ExtensionSourcePayload
@@ -364,6 +382,106 @@ describe("socket server", () => {
     expect(expiredState.hostExtensionConnected).toBe(false);
     expect(expiredState.phase).toBe("expired");
     expect(roomService.listPublicRooms()).toEqual([]);
+  });
+
+  it("disconnects the stale host extension socket when a replacement extension pairs", async () => {
+    const roomService = new RoomService();
+    const app = createApp({ roomService });
+    const server = createServer(app);
+    createSocketServer(server, { roomService });
+    servers.push(server);
+
+    const port = await listenOnTestPort(server);
+    const baseUrl = `http://127.0.0.1:${port}`;
+
+    const created = await createRoom(baseUrl, { roomName: "Private room", public: false });
+    const participantSocket = await connectClient(baseUrl);
+    sockets.push(participantSocket);
+    const participantJoin = await emitJoin(participantSocket, {
+      roomCode: created.data.roomCode,
+      nickname: "Mina"
+    });
+    expect(participantJoin.ok).toBe(true);
+
+    const firstExtensionSocket = await connectClient(baseUrl);
+    sockets.push(firstExtensionSocket);
+    const secondExtensionSocket = await connectClient(baseUrl);
+    sockets.push(secondExtensionSocket);
+
+    const firstAck = await emitHostPair(firstExtensionSocket, {
+      roomCode: created.data.roomCode,
+      hostCode: created.data.hostCode
+    });
+    expect(firstAck.ok).toBe(true);
+
+    const staleDisconnected = new Promise<void>((resolve) => {
+      firstExtensionSocket.once("disconnect", () => resolve());
+    });
+    const secondAck = await emitHostPair(secondExtensionSocket, {
+      roomCode: created.data.roomCode,
+      hostCode: created.data.hostCode
+    });
+    expect(secondAck.ok).toBe(true);
+
+    await staleDisconnected;
+    expect(firstExtensionSocket.connected).toBe(false);
+    expect(roomService.getState(created.data.roomCode)).toMatchObject({
+      phase: expect.not.stringMatching("expired"),
+      hostExtensionConnected: true
+    });
+    expect(secondExtensionSocket.connected).toBe(true);
+
+    const expiredState = waitForRoomPhase(participantSocket, "expired");
+    secondExtensionSocket.disconnect();
+    await expect(expiredState).resolves.toMatchObject({ phase: "expired" });
+  });
+
+  it("keeps a room alive when the host web session reconnects during the refresh grace", async () => {
+    const roomService = new RoomService();
+    const app = createApp({ roomService });
+    const server = createServer(app);
+    createSocketServer(server, { roomService, hostWebReconnectGraceMs: 80 });
+    servers.push(server);
+
+    const port = await listenOnTestPort(server);
+    const baseUrl = `http://127.0.0.1:${port}`;
+    const created = await createRoom(baseUrl, { roomName: "Refresh room", public: true });
+
+    const participantSocket = await connectClient(baseUrl);
+    sockets.push(participantSocket);
+    const participantJoin = await emitJoin(participantSocket, {
+      roomCode: created.data.roomCode,
+      nickname: "Mina"
+    });
+    expect(participantJoin.ok).toBe(true);
+
+    const hostWebSocket = await connectClient(baseUrl);
+    sockets.push(hostWebSocket);
+    const firstHostJoin = await emitJoin(hostWebSocket, {
+      roomCode: created.data.roomCode,
+      nickname: "Host",
+      participantId: created.data.hostParticipantId,
+      participantCode: created.data.hostCode
+    });
+    expect(firstHostJoin.ok).toBe(true);
+
+    hostWebSocket.disconnect();
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(roomService.getState(created.data.roomCode).phase).not.toBe("expired");
+
+    const restoredHostSocket = await connectClient(baseUrl);
+    sockets.push(restoredHostSocket);
+    const restoredHostJoin = await emitJoin(restoredHostSocket, {
+      roomCode: created.data.roomCode,
+      nickname: "Host",
+      participantId: created.data.hostParticipantId,
+      participantCode: created.data.hostCode
+    });
+    expect(restoredHostJoin.ok).toBe(true);
+
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    expect(roomService.getState(created.data.roomCode).phase).not.toBe("expired");
+    expect(roomService.getState(created.data.roomCode).participants.find((participant) => participant.role === "host")?.connected).toBe(true);
   });
 
   it("expires the room when the host web session leaves the room", async () => {

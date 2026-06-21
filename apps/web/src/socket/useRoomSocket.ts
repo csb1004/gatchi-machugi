@@ -11,9 +11,65 @@ import { useEffect, useMemo, useState } from "react";
 import { io, type Socket } from "socket.io-client";
 
 type RoomSocket = Socket<ServerToClientEvents, ClientToServerEvents>;
+const chatMessageLimit = 100;
+const participantIdStorageKey = "participantId";
+const participantCodeStorageKey = "participantCode";
+const activeRoomCodeStorageKey = "activeRoomCode";
+const activeNicknameStorageKey = "activeNickname";
+
+export interface StoredRoomSession {
+  roomCode: string;
+  nickname: string;
+  participantId: string;
+  participantCode: string;
+}
 
 export function normalizeRoomCode(value: string) {
   return value.trim().toUpperCase();
+}
+
+export function roomCodeFromPath(pathname: string): string | null {
+  const match = pathname.match(/^\/rooms\/([^/?#]+)/i);
+  const pathRoomCode = match?.[1];
+  if (!pathRoomCode) return null;
+
+  let decodedRoomCode: string;
+  try {
+    decodedRoomCode = decodeURIComponent(pathRoomCode);
+  } catch {
+    return null;
+  }
+
+  const roomCode = normalizeRoomCode(decodedRoomCode);
+  return roomCode || null;
+}
+
+export function roomPath(roomCode: string) {
+  return `/rooms/${encodeURIComponent(normalizeRoomCode(roomCode))}`;
+}
+
+export function readStoredRoomSession(): StoredRoomSession | null {
+  const roomCode = localStorage.getItem(activeRoomCodeStorageKey);
+  const nickname = localStorage.getItem(activeNicknameStorageKey);
+  const participantId = localStorage.getItem(participantIdStorageKey);
+  const participantCode = localStorage.getItem(participantCodeStorageKey);
+
+  if (!roomCode || !nickname || !participantId || !participantCode) return null;
+  return {
+    roomCode,
+    nickname,
+    participantId,
+    participantCode
+  };
+}
+
+export function clearStoredRoomSession(roomCode?: string) {
+  if (roomCode && localStorage.getItem(activeRoomCodeStorageKey) !== roomCode) return;
+
+  localStorage.removeItem(activeRoomCodeStorageKey);
+  localStorage.removeItem(activeNicknameStorageKey);
+  localStorage.removeItem(participantIdStorageKey);
+  localStorage.removeItem(participantCodeStorageKey);
 }
 
 export function shouldReturnToLobbyOnState(state: Pick<RoomState, "phase">) {
@@ -47,9 +103,21 @@ function createActionId() {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
+function shouldClearStoredSessionAfterJoinFailure(error: string, input: { participantId?: string; participantCode?: string }) {
+  if (!input.participantId && !input.participantCode) return false;
+
+  return [
+    "Room not found",
+    "Participant code required",
+    "Invalid participant code",
+    "Participant not found",
+    "Participant code missing"
+  ].includes(error);
+}
+
 export function useRoomSocket() {
   const [state, setState] = useState<RoomState | null>(null);
-  const [participantId, setParticipantId] = useState<string | null>(() => localStorage.getItem("participantId"));
+  const [participantId, setParticipantId] = useState<string | null>(() => localStorage.getItem(participantIdStorageKey));
   const [chatMessages, setChatMessages] = useState<ChatMessagePayload[]>([]);
   const [error, setError] = useState<string | null>(null);
   const socket = useMemo<RoomSocket>(() => io("/", { autoConnect: false, transports: ["websocket"] }), []);
@@ -60,6 +128,7 @@ export function useRoomSocket() {
         setState(null);
         setChatMessages([]);
         setError(null);
+        clearStoredRoomSession(nextState.roomCode);
         return;
       }
 
@@ -67,7 +136,7 @@ export function useRoomSocket() {
     }
 
     function handleChat(message: ChatMessagePayload) {
-      setChatMessages((messages) => [...messages, message]);
+      setChatMessages((messages) => [...messages, message].slice(-chatMessageLimit));
     }
 
     function handleSourceActionFailure(payload: { reason: string }) {
@@ -102,13 +171,18 @@ export function useRoomSocket() {
       payload,
       (ack) => {
         if (ack.ok) {
-          localStorage.setItem("participantId", ack.data.participantId);
-          localStorage.setItem("participantCode", ack.data.participantCode);
+          localStorage.setItem(participantIdStorageKey, ack.data.participantId);
+          localStorage.setItem(participantCodeStorageKey, ack.data.participantCode);
+          localStorage.setItem(activeRoomCodeStorageKey, roomCode);
+          localStorage.setItem(activeNicknameStorageKey, payload.nickname);
           setParticipantId(ack.data.participantId);
           setState(ack.data.state);
           return;
         }
 
+        if (shouldClearStoredSessionAfterJoinFailure(ack.error, input)) {
+          clearStoredRoomSession(roomCode);
+        }
         setError(localizeSocketError(ack.error));
       }
     );
@@ -176,6 +250,7 @@ export function useRoomSocket() {
         setState(null);
         setChatMessages([]);
         setError(null);
+        clearStoredRoomSession(leavingRoomCode);
         onLeft?.();
       }
     });

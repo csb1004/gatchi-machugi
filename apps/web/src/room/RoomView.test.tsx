@@ -477,7 +477,7 @@ describe("RoomView", () => {
     expect(onSourceAction).toHaveBeenCalledWith({ name: "next" });
   });
 
-  it("focuses the room surface when a visible result can advance", async () => {
+  it("focuses the host enter catcher when a visible result can advance", async () => {
     render(
       <RoomView
         state={{
@@ -510,7 +510,7 @@ describe("RoomView", () => {
       />
     );
 
-    await waitFor(() => expect(document.querySelector(".room-layout")).toHaveFocus());
+    await waitFor(() => expect(screen.getByLabelText("방장 엔터 진행")).toHaveFocus());
   });
 
   it("lets the host advance when Enter is dispatched from the window", () => {
@@ -599,10 +599,89 @@ describe("RoomView", () => {
         vi.advanceTimersByTime(500);
       });
 
-      expect(document.querySelector(".room-layout")).toHaveFocus();
+      expect(screen.getByLabelText("방장 엔터 진행")).toHaveFocus();
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it("advances from the hidden host enter catcher when the audio result is visible", async () => {
+    const onSourceAction = vi.fn();
+    render(
+      <RoomView
+        state={{
+          ...baseState,
+          phase: "playing",
+          quiz: {
+            ...baseState.quiz,
+            canGoNext: false,
+            resultMessage: null,
+            answerCandidates: []
+          },
+          sourceMirror: {
+            kind: "result",
+            url: "https://machugi.io/quiz/KAEfboenNZKAyJ3unQZH",
+            title: "5 second song quiz",
+            lastSeenAt: "2026-06-21T00:00:00.000Z",
+            quiz: {
+              ...baseState.quiz,
+              questionType: "audio",
+              audioUrl: "https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ?start=0.5&end=0",
+              canGoNext: true,
+              resultMessage: "오답!",
+              answerCandidates: ["Ready Set Go"]
+            }
+          }
+        }}
+        currentParticipantId="host"
+        onSubmitAnswer={() => undefined}
+        onSourceAction={onSourceAction}
+      />
+    );
+
+    const enterCatcher = await screen.findByLabelText("방장 엔터 진행");
+    fireEvent.keyDown(enterCatcher, { key: "Enter" });
+
+    expect(onSourceAction).toHaveBeenCalledWith({ name: "next" });
+  });
+
+  it("does not let a participant advance a revealed question with Enter", () => {
+    const onSourceAction = vi.fn();
+    render(
+      <RoomView
+        state={{
+          ...baseState,
+          phase: "revealed",
+          quiz: {
+            ...baseState.quiz,
+            canGoNext: true,
+            resultMessage: "정답!",
+            answerCandidates: ["디안시"]
+          },
+          sourceMirror: {
+            kind: "result",
+            url: "https://machugi.io/quiz/123/play",
+            title: "Pokemon",
+            lastSeenAt: "2026-06-19T00:00:00.000Z",
+            quiz: {
+              ...baseState.quiz,
+              canGoNext: true,
+              resultMessage: "정답!",
+              answerCandidates: ["디안시"]
+            }
+          },
+          revealedSubmissions: [{ participantId: "p1", submitted: true, skipped: false, rawAnswer: "디안시", correct: true }]
+        }}
+        currentParticipantId="p1"
+        onSubmitAnswer={() => undefined}
+        onSourceAction={onSourceAction}
+      />
+    );
+
+    expect(screen.queryByLabelText("방장 엔터 진행")).not.toBeInTheDocument();
+    fireEvent.keyDown(window, { key: "Enter" });
+
+    expect(onSourceAction).not.toHaveBeenCalled();
   });
 
   it("does not advance with Enter while the host is typing an extra accepted answer", () => {

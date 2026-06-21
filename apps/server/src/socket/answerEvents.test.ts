@@ -800,6 +800,9 @@ describe("answer socket events", () => {
       roomCode: created.data.roomCode,
       hostCode: created.data.hostCode
     });
+    const staleDisconnected = new Promise<void>((resolve) => {
+      firstExtensionSocket.once("disconnect", () => resolve());
+    });
     const secondPair = await emitHostPair(secondExtensionSocket, {
       roomCode: created.data.roomCode,
       hostCode: created.data.hostCode
@@ -810,27 +813,8 @@ describe("answer socket events", () => {
     expect(firstPair.ok).toBe(true);
     expect(secondPair.ok).toBe(true);
     if (!hostWebJoin.ok || !participantJoin.ok || !firstPair.ok || !secondPair.ok) throw new Error("setup failed");
-
-    const staleStateAck = await emitExtensionState(firstExtensionSocket, {
-      roomCode: created.data.roomCode,
-      quiz: {
-        quizTitle: "Stale Quiz",
-        questionIndex: 99,
-        totalQuestions: 100,
-        questionType: "free-text",
-        questionText: "Stale question",
-        imageUrl: null,
-        audioUrl: null,
-        videoUrl: null,
-        choices: [],
-        timerSecondsRemaining: null,
-        canGoNext: false,
-        canGoPrevious: false,
-        resultMessage: null,
-        answerCandidates: []
-      }
-    });
-    expect(staleStateAck).toEqual({ ok: false, error: "Current host extension authorization required" });
+    await staleDisconnected;
+    expect(firstExtensionSocket.connected).toBe(false);
 
     const currentStateAck = await emitExtensionState(secondExtensionSocket, {
       roomCode: created.data.roomCode,
@@ -867,23 +851,18 @@ describe("answer socket events", () => {
     });
 
     const originalSubmit = await originalSubmitPromise;
-    const staleRequestAck = await emitOriginalRequestSubmit(firstExtensionSocket, {
-      roomCode: created.data.roomCode,
-      questionKey: originalSubmit.questionKey
-    });
-    const staleResultAck = await emitOriginalResult(firstExtensionSocket, {
-      roomCode: created.data.roomCode,
-      questionKey: originalSubmit.questionKey,
-      quiz: {
-        ...roomService.getState(created.data.roomCode).quiz,
-        resultMessage: "correct",
-        answerCandidates: ["blue archive"],
-        canGoNext: true
-      }
-    });
-
-    expect(staleRequestAck).toEqual({ ok: false, error: "Current host extension authorization required" });
-    expect(staleResultAck).toEqual({ ok: false, error: "Current host extension authorization required" });
+    await expect(
+      emitOriginalResult(secondExtensionSocket, {
+        roomCode: created.data.roomCode,
+        questionKey: originalSubmit.questionKey,
+        quiz: {
+          ...roomService.getState(created.data.roomCode).quiz,
+          resultMessage: "correct",
+          answerCandidates: ["blue archive"],
+          canGoNext: true
+        }
+      })
+    ).resolves.toEqual({ ok: true, data: undefined });
     expect(roomService.getState(created.data.roomCode).quiz.questionIndex).toBe(1);
   });
 
@@ -906,6 +885,9 @@ describe("answer socket events", () => {
       roomCode: created.data.roomCode,
       hostCode: created.data.hostCode
     });
+    const staleDisconnected = new Promise<void>((resolve) => {
+      firstExtensionSocket.once("disconnect", () => resolve());
+    });
     const secondPair = await emitHostPair(secondExtensionSocket, {
       roomCode: created.data.roomCode,
       hostCode: created.data.hostCode
@@ -914,17 +896,9 @@ describe("answer socket events", () => {
     expect(firstPair.ok).toBe(true);
     expect(secondPair.ok).toBe(true);
     if (!firstPair.ok || !secondPair.ok) throw new Error("setup failed");
+    await staleDisconnected;
+    expect(firstExtensionSocket.connected).toBe(false);
 
-    const staleAck = await emitExtensionSource(firstExtensionSocket, {
-      roomCode: created.data.roomCode,
-      sourceWindow: {
-        status: "connected",
-        url: "https://machugi.io/stale",
-        title: "Stale source",
-        lastSeenAt: "2026-06-19T00:00:00.000Z",
-        message: null
-      }
-    });
     const currentAck = await emitExtensionSource(secondExtensionSocket, {
       roomCode: created.data.roomCode,
       sourceWindow: {
@@ -936,7 +910,6 @@ describe("answer socket events", () => {
       }
     });
 
-    expect(staleAck).toEqual({ ok: false, error: "Current host extension authorization required" });
     expect(currentAck).toEqual({ ok: true, data: undefined });
     expect(roomService.getState(created.data.roomCode).sourceWindow).toMatchObject({
       status: "connected",

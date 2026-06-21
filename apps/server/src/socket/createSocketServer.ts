@@ -37,6 +37,7 @@ interface SocketSession {
 }
 
 type HostPairGatewayAck = HostPairAck & { state: RoomState };
+const defaultHostWebReconnectGraceMs = 5000;
 
 const joinRoomSchema = z.object({
   roomCode: z.string().trim().min(1).transform((value) => value.toUpperCase()),
@@ -215,7 +216,13 @@ function markParticipantDisconnected(roomService: RoomService, socket: SocketSes
   }
 }
 
-export function createSocketServer(httpServer: HttpServer, { roomService }: { roomService: RoomService }) {
+export function createSocketServer(
+  httpServer: HttpServer,
+  {
+    roomService,
+    hostWebReconnectGraceMs = defaultHostWebReconnectGraceMs
+  }: { roomService: RoomService; hostWebReconnectGraceMs?: number }
+) {
   const io = new Server(httpServer, {
     cors: {
       origin: true,
@@ -223,11 +230,40 @@ export function createSocketServer(httpServer: HttpServer, { roomService }: { ro
     }
   });
   const hostExtensionSocketIds = new Map<string, string>();
+  const hostWebDisconnectTimers = new Map<string, ReturnType<typeof setTimeout>>();
+
+  function clearHostWebDisconnectTimer(roomCode: string) {
+    const timer = hostWebDisconnectTimers.get(roomCode);
+    if (!timer) return;
+    clearTimeout(timer);
+    hostWebDisconnectTimers.delete(roomCode);
+  }
 
   function deleteHostExtensionSocketId(roomCode: string, socketId: string) {
     if (hostExtensionSocketIds.get(roomCode) === socketId) {
       hostExtensionSocketIds.delete(roomCode);
     }
+  }
+
+  function expireRoomForHostDisconnect(roomCode: string) {
+    clearHostWebDisconnectTimer(roomCode);
+    try {
+      const state = roomService.expireRoom(roomCode);
+      state.hostExtensionConnected = false;
+      hostExtensionSocketIds.delete(roomCode);
+      io.to(roomCode).emit("host:disconnected");
+      io.to(roomCode).emit("room:state", state);
+    } catch {
+      return;
+    }
+  }
+
+  function scheduleHostWebDisconnect(roomCode: string) {
+    clearHostWebDisconnectTimer(roomCode);
+    hostWebDisconnectTimers.set(
+      roomCode,
+      setTimeout(() => expireRoomForHostDisconnect(roomCode), hostWebReconnectGraceMs)
+    );
   }
 
   function emitOriginalSubmitIfReady(roomCode: string, state: RoomState) {
@@ -292,6 +328,9 @@ export function createSocketServer(httpServer: HttpServer, { roomService }: { ro
         session.participantId = joined.participant.id;
         session.role = joined.participant.role === "host" ? "host" : "participant";
         session.clientKind = "web";
+        if (session.role === "host") {
+          clearHostWebDisconnectTimer(parsed.data.roomCode);
+        }
 
         ack({
           ok: true,
@@ -334,7 +373,16 @@ export function createSocketServer(httpServer: HttpServer, { roomService }: { ro
         const state = joined.state;
         const previousExtensionSocketId = hostExtensionSocketIds.get(parsed.data.roomCode);
         if (previousExtensionSocketId && previousExtensionSocketId !== socket.id) {
-          io.sockets.sockets.get(previousExtensionSocketId)?.leave(parsed.data.roomCode);
+          const previousExtensionSocket = io.sockets.sockets.get(previousExtensionSocketId);
+          const previousExtensionSession = previousExtensionSocket?.data as SocketSession | undefined;
+          previousExtensionSocket?.leave(parsed.data.roomCode);
+          if (previousExtensionSession?.roomCode === parsed.data.roomCode && previousExtensionSession.clientKind === "extension") {
+            delete previousExtensionSession.roomCode;
+            delete previousExtensionSession.participantId;
+            delete previousExtensionSession.role;
+            delete previousExtensionSession.clientKind;
+          }
+          previousExtensionSocket?.disconnect(true);
         }
 
         socket.join(parsed.data.roomCode);
@@ -374,6 +422,7 @@ export function createSocketServer(httpServer: HttpServer, { roomService }: { ro
         requireParticipantSession(session, parsed.data.roomCode, parsed.data.participantId);
 
         if (session.role === "host") {
+          clearHostWebDisconnectTimer(parsed.data.roomCode);
           const extensionSocketId = hostExtensionSocketIds.get(parsed.data.roomCode);
           if (extensionSocketId) {
             io.sockets.sockets.get(extensionSocketId)?.leave(parsed.data.roomCode);
@@ -429,6 +478,7 @@ export function createSocketServer(httpServer: HttpServer, { roomService }: { ro
         requireCurrentHostExtensionSession(session, socket.id, parsed.data.roomCode, hostExtensionSocketIds);
         if (parsed.data.sourceWindow.status === "disconnected") {
           roomService.updateSourceWindow(parsed.data);
+          clearHostWebDisconnectTimer(parsed.data.roomCode);
           const state = roomService.expireRoom(parsed.data.roomCode);
           state.hostExtensionConnected = false;
           deleteHostExtensionSocketId(parsed.data.roomCode, socket.id);
@@ -738,15 +788,11 @@ export function createSocketServer(httpServer: HttpServer, { roomService }: { ro
       }
 
       if (session.role === "host") {
-        try {
-          const state = roomService.expireRoom(session.roomCode);
-          state.hostExtensionConnected = false;
-          io.to(session.roomCode).emit("host:disconnected");
-          io.to(session.roomCode).emit("room:state", state);
-        } catch {
+        if (session.clientKind === "web") {
+          scheduleHostWebDisconnect(session.roomCode);
           return;
         }
-
+        expireRoomForHostDisconnect(session.roomCode);
         return;
       }
 

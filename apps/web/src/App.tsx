@@ -9,11 +9,14 @@ import { createRoom, fetchPublicRooms, type CreatedRoom } from "./api";
 import { ExtensionSetup } from "./host/ExtensionSetup";
 import { HostWorkspace } from "./host/HostWorkspace";
 import { RoomView } from "./room/RoomView";
-import { useRoomSocket } from "./socket/useRoomSocket";
+import { readStoredRoomSession, roomCodeFromPath, roomPath, useRoomSocket } from "./socket/useRoomSocket";
+
+type PairingRoom = Pick<CreatedRoom, "roomCode" | "hostParticipantId" | "hostCode">;
 
 export function App() {
-  const [nickname, setNickname] = useState("");
-  const [roomCode, setRoomCode] = useState("");
+  const initialPathRoomCode = roomCodeFromPath(window.location.pathname);
+  const [nickname, setNickname] = useState(() => readStoredRoomSession()?.nickname ?? "");
+  const [roomCode, setRoomCode] = useState(() => initialPathRoomCode ?? "");
   const [roomName, setRoomName] = useState("마추기 방");
   const [isPublicRoom, setIsPublicRoom] = useState(true);
   const [createdRoom, setCreatedRoom] = useState<CreatedRoom | null>(null);
@@ -22,12 +25,13 @@ export function App() {
   const [roomsStatus, setRoomsStatus] = useState<"idle" | "loading" | "failed">("idle");
   const [extensionSyncStatus, setExtensionSyncStatus] = useState<"idle" | "waiting" | "saved" | "failed">("idle");
   const wasInRoomRef = useRef(false);
+  const restoredRoomRef = useRef<string | null>(null);
   const roomSocket = useRoomSocket();
   const canJoin = useMemo(() => nickname.trim().length > 0 && roomCode.trim().length > 0, [nickname, roomCode]);
   const serverUrl = window.location.origin;
   const extensionReleaseUrl = import.meta.env.VITE_GITHUB_EXTENSION_RELEASE_URL ?? "https://github.com/csb1004/gatchi-machugi/releases";
 
-  function sendPairingSettingsToExtension(room: CreatedRoom) {
+  function sendPairingSettingsToExtension(room: PairingRoom) {
     setExtensionSyncStatus("waiting");
     window.postMessage(
       {
@@ -45,16 +49,50 @@ export function App() {
     }, 1000);
   }
 
-  function extensionSyncLabel() {
+  function extensionSyncLabel(hasPairingRoom: boolean) {
     if (extensionSyncStatus === "saved") return "확장 프로그램에 연결 정보를 저장했습니다.";
     if (extensionSyncStatus === "failed") return "확장 설치 후 다시 저장하세요.";
     if (extensionSyncStatus === "waiting") return "확장 프로그램에 저장 중입니다.";
+    if (hasPairingRoom) return "확장 프로그램에 연결 정보를 다시 저장할 수 있습니다.";
     return "방을 만든 뒤 확장 프로그램에 연결 정보를 저장합니다.";
   }
 
   useEffect(() => {
     void loadPublicRooms();
   }, []);
+
+  useEffect(() => {
+    const pathRoomCode = roomCodeFromPath(window.location.pathname);
+    if (!pathRoomCode) return;
+    setRoomCode(pathRoomCode);
+  }, []);
+
+  useEffect(() => {
+    const pathRoomCode = roomCodeFromPath(window.location.pathname);
+    if (!pathRoomCode || roomSocket.state || restoredRoomRef.current === pathRoomCode) return;
+
+    const stored = readStoredRoomSession();
+    if (!stored || stored.roomCode !== pathRoomCode) return;
+
+    restoredRoomRef.current = pathRoomCode;
+    setNickname(stored.nickname);
+    setRoomCode(stored.roomCode);
+    roomSocket.joinRoom({
+      roomCode: stored.roomCode,
+      nickname: stored.nickname,
+      participantId: stored.participantId,
+      participantCode: stored.participantCode
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!roomSocket.state) return;
+
+    const nextPath = roomPath(roomSocket.state.roomCode);
+    if (window.location.pathname !== nextPath) {
+      window.history.replaceState(null, "", nextPath);
+    }
+  }, [roomSocket.state?.roomCode]);
 
   useEffect(() => {
     if (roomSocket.state) {
@@ -67,9 +105,21 @@ export function App() {
       setCreatedRoom(null);
       setRoomCode("");
       setExtensionSyncStatus("idle");
+      if (window.location.pathname !== "/") {
+        window.history.replaceState(null, "", "/");
+      }
       void loadPublicRooms();
     }
   }, [roomSocket.state]);
+
+  useEffect(() => {
+    if (roomSocket.state || !roomSocket.error || !roomCodeFromPath(window.location.pathname)) return;
+
+    setRoomCode("");
+    if (window.location.pathname !== "/") {
+      window.history.replaceState(null, "", "/");
+    }
+  }, [roomSocket.error, roomSocket.state]);
 
   useEffect(() => {
     function handlePairingAck(event: MessageEvent) {
@@ -117,6 +167,7 @@ export function App() {
         public: isPublicRoom,
         nickname: nickname.trim()
       });
+      window.history.replaceState(null, "", roomPath(created.roomCode));
       setCreatedRoom(created);
       setRoomCode(created.roomCode);
       setCreateStatus("idle");
@@ -134,6 +185,18 @@ export function App() {
 
   if (roomSocket.state && roomSocket.participantId) {
     const currentParticipant = roomSocket.state.participants.find((participant) => participant.id === roomSocket.participantId);
+    const storedRoomSession = readStoredRoomSession();
+    const restoredPairingRoom =
+      currentParticipant?.role === "host" &&
+      storedRoomSession?.roomCode === roomSocket.state.roomCode &&
+      storedRoomSession.participantId === roomSocket.participantId
+        ? {
+            roomCode: storedRoomSession.roomCode,
+            hostParticipantId: storedRoomSession.participantId,
+            hostCode: storedRoomSession.participantCode
+          }
+        : null;
+    const pairingRoom = createdRoom ?? restoredPairingRoom;
 
     return (
       <main className="app-shell room-app-shell">
@@ -156,9 +219,9 @@ export function App() {
               <HostWorkspace
                 state={roomSocket.state}
                 extensionReleaseUrl={extensionReleaseUrl}
-                extensionSyncLabel={extensionSyncLabel()}
+                extensionSyncLabel={extensionSyncLabel(Boolean(pairingRoom))}
                 onResendPairing={() => {
-                  if (createdRoom) sendPairingSettingsToExtension(createdRoom);
+                  if (pairingRoom) sendPairingSettingsToExtension(pairingRoom);
                 }}
               />
               <ExtensionSetup releaseUrl={extensionReleaseUrl} />
@@ -200,7 +263,15 @@ export function App() {
                   autoCapitalize="characters"
                 />
               </label>
-              <button className="primary-button" type="button" disabled={!canJoin} onClick={() => roomSocket.joinRoom({ roomCode, nickname })}>
+              <button
+                className="primary-button"
+                type="button"
+                disabled={!canJoin}
+                onClick={() => {
+                  window.history.replaceState(null, "", roomPath(roomCode));
+                  roomSocket.joinRoom({ roomCode, nickname });
+                }}
+              >
                 <DoorOpen size={18} />
                 방 입장
               </button>

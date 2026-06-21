@@ -349,6 +349,18 @@ h2 {
   align-items: start;
 }
 
+.host-enter-catcher {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  border: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
 .room-main,
 .room-side {
   min-width: 0;
