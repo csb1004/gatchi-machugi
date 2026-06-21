@@ -1,5 +1,5 @@
 import { LogOut, Plus } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ChatMessagePayload, RoomState, SourceMirrorAction } from "@gatchi/shared";
 import { AnswerPanel } from "./AnswerPanel";
 import { ChatPanel } from "./ChatPanel";
@@ -170,6 +170,7 @@ export function RoomView(props: {
   onSourceAction: (action: SourceMirrorAction) => void;
   onLeaveRoom?: () => void;
 }) {
+  const roomLayoutRef = useRef<HTMLElement | null>(null);
   const currentParticipant = props.state.participants.find((participant) => participant.id === props.currentParticipantId);
   const currentSubmission = props.state.submissions.find((submission) => submission.participantId === props.currentParticipantId);
   const sourceConnected = props.state.sourceWindow.status === "connected";
@@ -194,12 +195,29 @@ export function RoomView(props: {
       props.onSourceAction({ name: "next" });
     }
 
-    document.addEventListener("keydown", handleHostEnter);
-    return () => document.removeEventListener("keydown", handleHostEnter);
+    window.addEventListener("keydown", handleHostEnter, true);
+    return () => window.removeEventListener("keydown", handleHostEnter, true);
   }, [canHandleHostEnter, isHost, props.onSourceAction]);
 
+  useEffect(() => {
+    if (!isHost || !canHandleHostEnter) return;
+
+    function focusRoomSurface() {
+      if (isKeyboardCommandTarget(document.activeElement)) return;
+      roomLayoutRef.current?.focus({ preventScroll: true });
+    }
+
+    focusRoomSurface();
+    const firstTimer = window.setTimeout(focusRoomSurface, 0);
+    const secondTimer = window.setTimeout(focusRoomSurface, 250);
+    return () => {
+      window.clearTimeout(firstTimer);
+      window.clearTimeout(secondTimer);
+    };
+  }, [canHandleHostEnter, isHost]);
+
   return (
-    <section className="room-layout" aria-label={`방 ${props.state.roomCode}`}>
+    <section ref={roomLayoutRef} tabIndex={-1} className="room-layout" aria-label={`방 ${props.state.roomCode}`}>
       <div className="room-main">
         <header className="room-titlebar">
           <div>

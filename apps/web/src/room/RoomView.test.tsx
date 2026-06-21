@@ -1,5 +1,5 @@
 import "@testing-library/jest-dom/vitest";
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import type { RoomState } from "@gatchi/shared";
 import { describe, expect, it, vi } from "vitest";
 import { RoomView } from "./RoomView";
@@ -467,6 +467,81 @@ describe("RoomView", () => {
     );
 
     fireEvent.keyDown(document, { key: "Enter" });
+
+    expect(onSourceAction).toHaveBeenCalledWith({ name: "next" });
+  });
+
+  it("focuses the room surface when a visible result can advance", async () => {
+    render(
+      <RoomView
+        state={{
+          ...baseState,
+          phase: "playing",
+          quiz: {
+            ...baseState.quiz,
+            canGoNext: false,
+            resultMessage: null,
+            answerCandidates: []
+          },
+          sourceMirror: {
+            kind: "result",
+            url: "https://machugi.io/quiz/KAEfboenNZKAyJ3unQZH",
+            title: "5 second song quiz",
+            lastSeenAt: "2026-06-21T00:00:00.000Z",
+            quiz: {
+              ...baseState.quiz,
+              questionType: "audio",
+              audioUrl: "https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ?start=0.5&end=0",
+              canGoNext: true,
+              resultMessage: "오답!",
+              answerCandidates: ["Ready Set Go"]
+            }
+          }
+        }}
+        currentParticipantId="host"
+        onSubmitAnswer={() => undefined}
+        onSourceAction={() => undefined}
+      />
+    );
+
+    await waitFor(() => expect(document.querySelector(".room-layout")).toHaveFocus());
+  });
+
+  it("lets the host advance when Enter is dispatched from the window", () => {
+    const onSourceAction = vi.fn();
+    render(
+      <RoomView
+        state={{
+          ...baseState,
+          phase: "playing",
+          quiz: {
+            ...baseState.quiz,
+            canGoNext: false,
+            resultMessage: null,
+            answerCandidates: []
+          },
+          sourceMirror: {
+            kind: "result",
+            url: "https://machugi.io/quiz/KAEfboenNZKAyJ3unQZH",
+            title: "5 second song quiz",
+            lastSeenAt: "2026-06-21T00:00:00.000Z",
+            quiz: {
+              ...baseState.quiz,
+              questionType: "audio",
+              audioUrl: "https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ?start=0.5&end=0",
+              canGoNext: true,
+              resultMessage: "오답!",
+              answerCandidates: ["Ready Set Go"]
+            }
+          }
+        }}
+        currentParticipantId="host"
+        onSubmitAnswer={() => undefined}
+        onSourceAction={onSourceAction}
+      />
+    );
+
+    fireEvent.keyDown(window, { key: "Enter" });
 
     expect(onSourceAction).toHaveBeenCalledWith({ name: "next" });
   });
