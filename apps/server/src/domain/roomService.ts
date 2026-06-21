@@ -533,6 +533,21 @@ export class RoomService {
       }));
   }
 
+  listAdminRooms() {
+    return [...this.rooms.values()]
+      .filter((room) => room.state.phase !== "expired")
+      .map((room) => ({
+        roomCode: room.state.roomCode,
+        title: room.state.settings.title,
+        quizTitle: room.state.quiz.quizTitle,
+        participantCount: room.state.participants.filter((participant) => participant.connected).length,
+        phase: room.state.phase,
+        visibility: room.state.settings.visibility,
+        hostExtensionConnected: room.state.hostExtensionConnected,
+        sourceWindowStatus: room.state.sourceWindow.status
+      }));
+  }
+
   private requireRoom(roomCode: string): StoredRoom {
     const room = this.rooms.get(roomCode);
     if (!room) throw new Error("Room not found");

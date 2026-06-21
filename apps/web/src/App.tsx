@@ -6,6 +6,7 @@ import {
   type PublicRoomSummary
 } from "@gatchi/shared";
 import { createRoom, fetchPublicRooms, type CreatedRoom } from "./api";
+import { AdminPage } from "./admin/AdminPage";
 import { ExtensionSetup } from "./host/ExtensionSetup";
 import { HostWorkspace } from "./host/HostWorkspace";
 import { RoomView } from "./room/RoomView";
@@ -183,6 +184,10 @@ export function App() {
     } catch {
       setCreateStatus("failed");
     }
+  }
+
+  if (window.location.pathname === "/admin") {
+    return <AdminPage />;
   }
 
   if (roomSocket.state && roomSocket.participantId) {

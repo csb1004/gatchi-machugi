@@ -10,10 +10,19 @@ const port = Number(process.env.PORT ?? 3000);
 const roomService = new RoomService();
 const currentDir = dirname(fileURLToPath(import.meta.url));
 const staticDir = process.env.STATIC_DIR ?? resolve(currentDir, "../../web/dist");
-const app = createApp({ roomService, staticDir });
+let socketServer: ReturnType<typeof createSocketServer> | null = null;
+const app = createApp({
+  roomService,
+  staticDir,
+  adminToken: process.env.ADMIN_TOKEN,
+  broadcastRoomState: (roomCode, state) => {
+    socketServer?.to(roomCode).emit("host:disconnected");
+    socketServer?.to(roomCode).emit("room:state", state);
+  }
+});
 const server = createServer(app);
 
-createSocketServer(server, { roomService });
+socketServer = createSocketServer(server, { roomService });
 
 server.listen(port, () => {
   console.log(`@gatchi/server listening on http://localhost:${port}`);

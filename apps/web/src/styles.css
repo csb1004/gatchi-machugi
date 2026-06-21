@@ -326,6 +326,132 @@ h2 {
   font-weight: 800;
 }
 
+.admin-shell {
+  place-items: start center;
+}
+
+.admin-panel {
+  width: min(1120px, 100%);
+  border: 1px solid #d9e0ec;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.96);
+  padding: 24px;
+  box-shadow: 0 16px 42px rgba(22, 31, 48, 0.08);
+}
+
+.admin-toolbar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: end;
+  margin-top: 20px;
+}
+
+.admin-toolbar label {
+  display: grid;
+  gap: 7px;
+  color: #34435a;
+  font-size: 0.9rem;
+  font-weight: 800;
+}
+
+.admin-toolbar input {
+  min-width: 0;
+  height: 42px;
+  border: 1px solid #c9d3e4;
+  border-radius: 6px;
+  padding: 0 12px;
+  background: #ffffff;
+  color: #172033;
+}
+
+.admin-room-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.admin-empty {
+  margin: 0;
+  border: 1px dashed #c9d3e4;
+  border-radius: 8px;
+  padding: 28px;
+  color: #526173;
+  text-align: center;
+  font-weight: 800;
+}
+
+.admin-room-row {
+  display: grid;
+  grid-template-columns: minmax(190px, 0.7fr) minmax(0, 1.4fr) auto;
+  gap: 16px;
+  align-items: center;
+  border: 1px solid #d9e0ec;
+  border-radius: 8px;
+  padding: 14px;
+  background: #ffffff;
+}
+
+.admin-room-row > div:first-child {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.admin-room-row strong {
+  color: #235797;
+  font-size: 1.05rem;
+}
+
+.admin-room-row span,
+.admin-room-row small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-room-row small,
+.admin-room-row dt {
+  color: #667085;
+}
+
+.admin-room-row dl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 14px;
+  margin: 0;
+}
+
+.admin-room-row dt {
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.admin-room-row dd {
+  margin: 2px 0 0;
+  color: #172033;
+  font-weight: 800;
+}
+
+.danger-button {
+  min-height: 42px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 0;
+  border-radius: 6px;
+  padding: 0 14px;
+  background: #d92d45;
+  color: #ffffff;
+  font-weight: 900;
+}
+
+.danger-button:disabled {
+  background: #d0d5dd;
+}
+
 @media (max-width: 720px) {
   .app-shell {
     padding: 14px;
@@ -337,6 +463,12 @@ h2 {
   }
 
   .join-form {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-toolbar,
+  .admin-room-row,
+  .admin-room-row dl {
     grid-template-columns: 1fr;
   }
 }
