@@ -1,5 +1,11 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { extractQuizState } from "./extractor";
+
+const kaefAudioResultFixture = readFileSync(
+  "src/machugi/__fixtures__/kaef-audio-result.html",
+  "utf8"
+);
 
 describe("extractQuizState", () => {
   it("extracts text question and choices from stable data attributes", () => {
@@ -141,6 +147,41 @@ describe("extractQuizState", () => {
     expect(state.questionType).toBe("audio");
     expect(state.resultMessage).toBe("정답!");
     expect(state.answerCandidates).toEqual([]);
+    expect(state.canGoNext).toBe(true);
+  });
+
+  it("extracts visible audio result screens as results instead of fresh audio questions", () => {
+    document.body.innerHTML = `
+      <div class="QuizDetailPlaying_root__k7OA0">
+        <iframe
+          title='TWICE "CHEER UP" M/V'
+          src="https://www.youtube-nocookie.com/embed/c7rCyll5AeY?start=0.5&end=0"
+        ></iframe>
+        <div class="QuizDetailAnswerResult_questionResultContainer__NRItV">
+          <article class="ant-typography QuizDetailAnswerResult_questionResultCorrectLabel__JFCE7">오답!</article>
+          <article class="ant-typography QuizDetailAnswerResult_questionResultAnswer__KzzLh">CHEER UP</article>
+        </div>
+        <button type="button" class="ant-btn CommonButton_root__6p8FJ NextButton_root__MHkxh"></button>
+      </div>
+    `;
+
+    const state = extractQuizState(document);
+    expect(state.questionType).toBe("audio");
+    expect(state.audioUrl).toBe("https://www.youtube-nocookie.com/embed/c7rCyll5AeY?start=0.5&end=0");
+    expect(state.resultMessage).toBe("오답!");
+    expect(state.answerCandidates).toEqual(["CHEER UP"]);
+    expect(state.canGoNext).toBe(true);
+  });
+
+  it("extracts the captured KAEfboenNZKAyJ3unQZH audio result screen as a result", () => {
+    document.title = "5초 듣고 노래 맞추기 - 마추기 아이오";
+    document.body.innerHTML = kaefAudioResultFixture;
+
+    const state = extractQuizState(document);
+    expect(state.quizTitle).toBe("5초 듣고 노래 맞추기");
+    expect(state.questionType).toBe("audio");
+    expect(state.resultMessage).toBe("오답!");
+    expect(state.answerCandidates).toEqual(["Beatbox"]);
     expect(state.canGoNext).toBe(true);
   });
 

@@ -763,7 +763,7 @@ h2 {
 }
 
 .my-answer-highlight em,
-.wrong-answer-row em {
+.player-answer-row em {
   flex: 0 0 auto;
   border-radius: 999px;
   padding: 6px 9px;
@@ -778,17 +778,27 @@ h2 {
 }
 
 .my-answer-highlight.incorrect em,
-.wrong-answer-row em {
+.player-answer-row.incorrect em {
   background: #ffe6ea;
   color: #b4233a;
 }
 
-.wrong-answer-list {
+.player-answer-row.correct em {
+  background: #16865d;
+  color: #ffffff;
+}
+
+.player-answer-row.skipped em {
+  background: #edf1f7;
+  color: #526173;
+}
+
+.player-answer-list {
   display: grid;
   gap: 8px;
 }
 
-.wrong-answer-row {
+.player-answer-row {
   display: grid;
   grid-template-columns: minmax(120px, 0.32fr) minmax(0, 1fr) auto;
   gap: 10px;
@@ -799,28 +809,37 @@ h2 {
   background: #ffffff;
 }
 
-.wrong-answer-row.is-mine {
-  border-color: #f5b8c1;
-  background: #fff8f9;
+.player-answer-row.correct {
+  border-color: #ccebdc;
+  background: #fbfffd;
 }
 
-.wrong-answer-row strong,
-.wrong-answer-row span {
+.player-answer-row.incorrect {
+  border-color: #f5d4da;
+  background: #fffafb;
+}
+
+.player-answer-row.skipped {
+  background: #fbfcff;
+}
+
+.player-answer-row strong,
+.player-answer-row span {
   min-width: 0;
   overflow-wrap: anywhere;
 }
 
-.wrong-answer-row strong {
+.player-answer-row strong {
   color: #172033;
 }
 
-.wrong-answer-row span,
-.wrong-answer-empty {
+.player-answer-row span,
+.player-answer-empty {
   color: #40516c;
   font-weight: 800;
 }
 
-.wrong-answer-empty {
+.player-answer-empty {
   margin: 0;
 }
 

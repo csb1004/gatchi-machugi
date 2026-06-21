@@ -77,7 +77,7 @@ function PublicRevealPanel({
 
   const participantNames = new Map(state.participants.map((participant) => [participant.id, participant.nickname]));
   const currentResult = state.revealedSubmissions.find((submission) => submission.participantId === participantId);
-  const wrongResults = state.revealedSubmissions.filter((submission) => !submission.correct);
+  const otherResults = state.revealedSubmissions.filter((submission) => submission.participantId !== participantId);
 
   return (
     <section className="public-results" aria-label="공개 결과">
@@ -95,28 +95,28 @@ function PublicRevealPanel({
       ) : null}
 
       <div className="section-heading">
-        <h2>오답 공개</h2>
-        <span>{wrongResults.length}명</span>
+        <h2>다른 플레이어가 입력한 답</h2>
+        <span>{otherResults.length}명</span>
       </div>
 
-      {wrongResults.length > 0 ? (
-        <div className="wrong-answer-list">
-          {wrongResults.map((result) => {
-            const isMine = result.participantId === participantId;
+      {otherResults.length > 0 ? (
+        <div className="player-answer-list">
+          {otherResults.map((result) => {
+            const statusClass = result.skipped ? "skipped" : result.correct ? "correct" : "incorrect";
             return (
               <div
                 key={result.participantId}
-                className={`wrong-answer-row${isMine ? " is-mine" : ""}`}
+                className={`player-answer-row ${statusClass}`}
               >
                 <strong>{participantNames.get(result.participantId) ?? result.participantId}</strong>
                 <span>{answerTextForResult(result)}</span>
-                <em>{isMine ? `내 답 · ${resultLabel(result)}` : resultLabel(result)}</em>
+                <em>{resultLabel(result)}</em>
               </div>
             );
           })}
         </div>
       ) : (
-        <p className="wrong-answer-empty">틀린 사람이 없습니다.</p>
+        <p className="player-answer-empty">다른 플레이어의 제출이 없습니다.</p>
       )}
     </section>
   );
@@ -202,17 +202,27 @@ export function RoomView(props: {
   useEffect(() => {
     if (!isHost || !canHandleHostEnter) return;
 
+    function shouldReclaimHostFocus() {
+      const activeElement = document.activeElement;
+      return activeElement instanceof HTMLIFrameElement && activeElement.classList.contains("result-embed");
+    }
+
     function focusRoomSurface() {
       if (isKeyboardCommandTarget(document.activeElement)) return;
+      if (document.activeElement !== document.body && !shouldReclaimHostFocus()) return;
       roomLayoutRef.current?.focus({ preventScroll: true });
     }
 
     focusRoomSurface();
     const firstTimer = window.setTimeout(focusRoomSurface, 0);
     const secondTimer = window.setTimeout(focusRoomSurface, 250);
+    const focusInterval = window.setInterval(focusRoomSurface, 400);
+    const stopTimer = window.setTimeout(() => window.clearInterval(focusInterval), 2500);
     return () => {
       window.clearTimeout(firstTimer);
       window.clearTimeout(secondTimer);
+      window.clearInterval(focusInterval);
+      window.clearTimeout(stopTimer);
     };
   }, [canHandleHostEnter, isHost]);
 

@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { access, mkdir, rm } from "node:fs/promises";
+import { access, copyFile, mkdir, readFile, rm } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
@@ -11,9 +11,12 @@ const extensionDirectory = resolve(scriptDirectory, "..");
 const distDirectory = resolve(extensionDirectory, "dist");
 const releaseDirectory = resolve(extensionDirectory, "release");
 const zipPath = resolve(releaseDirectory, "gatchi-machugi-extension.zip");
+const packageJson = JSON.parse(await readFile(resolve(extensionDirectory, "package.json"), "utf8"));
+const versionedZipPath = resolve(releaseDirectory, `gatchi-machugi-extension-v${packageJson.version}.zip`);
 
 await mkdir(releaseDirectory, { recursive: true });
 await rm(zipPath, { force: true });
+await rm(versionedZipPath, { force: true });
 
 if (process.platform === "win32") {
   await execFileAsync("powershell", [
@@ -27,3 +30,5 @@ if (process.platform === "win32") {
 }
 
 await access(zipPath);
+await copyFile(zipPath, versionedZipPath);
+await access(versionedZipPath);

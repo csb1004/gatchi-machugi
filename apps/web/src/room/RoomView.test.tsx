@@ -1,5 +1,5 @@
 import "@testing-library/jest-dom/vitest";
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import type { RoomState } from "@gatchi/shared";
 import { describe, expect, it, vi } from "vitest";
 import { RoomView } from "./RoomView";
@@ -110,7 +110,7 @@ describe("RoomView", () => {
     expect(within(personalResult).getByText("정답: 디안시")).toBeInTheDocument();
   });
 
-  it("shows incorrect revealed answers to every participant and highlights the viewer's own answer", () => {
+  it("shows every other player's revealed answer and highlights the viewer's own answer", () => {
     render(
       <RoomView
         state={{
@@ -118,36 +118,42 @@ describe("RoomView", () => {
           phase: "revealed",
           participants: [
             ...baseState.participants,
-            { id: "p2", nickname: "Yuna", role: "player", connected: true, score: 0 }
+            { id: "p2", nickname: "Yuna", role: "player", connected: true, score: 0 },
+            { id: "p3", nickname: "Nari", role: "player", connected: true, score: 0 }
           ],
           quiz: {
             ...baseState.quiz,
             resultMessage: "정답!",
-            answerCandidates: ["피카츄"]
+            answerCandidates: []
           },
           revealedSubmissions: [
             { participantId: "host", submitted: true, skipped: false, rawAnswer: "피카츄", correct: true },
             { participantId: "p1", submitted: true, skipped: false, rawAnswer: "라이츄", correct: false },
-            { participantId: "p2", submitted: true, skipped: false, rawAnswer: "피카츄", correct: true }
+            { participantId: "p2", submitted: true, skipped: false, rawAnswer: "피카츄", correct: true },
+            { participantId: "p3", submitted: false, skipped: true, rawAnswer: "", correct: false }
           ]
         }}
-        currentParticipantId="p2"
+        currentParticipantId="p1"
         onSubmitAnswer={() => undefined}
         onSourceAction={() => undefined}
       />
     );
 
     const publicResults = screen.getByRole("region", { name: "공개 결과" });
-    expect(within(publicResults).getByText("오답 공개")).toBeInTheDocument();
-    expect(within(publicResults).getByText("Mina")).toBeInTheDocument();
-    expect(within(publicResults).getByText("라이츄")).toBeInTheDocument();
-    expect(within(publicResults).queryByText("Host")).not.toBeInTheDocument();
+    expect(within(publicResults).getByText("다른 플레이어가 입력한 답")).toBeInTheDocument();
+    expect(within(publicResults).getByText("3명")).toBeInTheDocument();
+    expect(within(publicResults).getByText("Host")).toBeInTheDocument();
+    expect(within(publicResults).getByText("Yuna")).toBeInTheDocument();
+    expect(within(publicResults).getByText("Nari")).toBeInTheDocument();
+    expect(within(publicResults).getAllByText("피카츄")).toHaveLength(2);
+    expect(within(publicResults).getByText("입력하지 않음")).toBeInTheDocument();
+    expect(within(publicResults).queryByText("오답 공개")).not.toBeInTheDocument();
 
     const myAnswer = within(publicResults).getByLabelText("내 답 결과");
-    expect(myAnswer).toHaveClass("correct");
+    expect(myAnswer).toHaveClass("incorrect");
     expect(within(myAnswer).getByText("내 답")).toBeInTheDocument();
-    expect(within(myAnswer).getByText("정답")).toBeInTheDocument();
-    expect(within(myAnswer).getByText("피카츄")).toBeInTheDocument();
+    expect(within(myAnswer).getByText("오답")).toBeInTheDocument();
+    expect(within(myAnswer).getByText("라이츄")).toBeInTheDocument();
   });
 
   it("labels skipped personal results as not entered", () => {
@@ -544,6 +550,59 @@ describe("RoomView", () => {
     fireEvent.keyDown(window, { key: "Enter" });
 
     expect(onSourceAction).toHaveBeenCalledWith({ name: "next" });
+  });
+
+  it("reclaims focus when an audio result iframe steals it after the result appears", () => {
+    vi.useFakeTimers();
+    try {
+      render(
+        <RoomView
+          state={{
+            ...baseState,
+            phase: "playing",
+            quiz: {
+              ...baseState.quiz,
+              canGoNext: false,
+              resultMessage: null,
+              answerCandidates: []
+            },
+            sourceMirror: {
+              kind: "result",
+              url: "https://machugi.io/quiz/KAEfboenNZKAyJ3unQZH",
+              title: "5 second song quiz",
+              lastSeenAt: "2026-06-21T00:00:00.000Z",
+              quiz: {
+                ...baseState.quiz,
+                questionType: "audio",
+                audioUrl: "https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ?start=0.5&end=0",
+                canGoNext: true,
+                resultMessage: "오답!",
+                answerCandidates: ["Ready Set Go"]
+              }
+            }
+          }}
+          currentParticipantId="host"
+          onSubmitAnswer={() => undefined}
+          onSourceAction={() => undefined}
+        />
+      );
+
+      act(() => {
+        vi.advanceTimersByTime(300);
+      });
+
+      const iframe = document.querySelector(".result-embed") as HTMLIFrameElement | null;
+      iframe?.focus();
+      expect(iframe).toHaveFocus();
+
+      act(() => {
+        vi.advanceTimersByTime(500);
+      });
+
+      expect(document.querySelector(".room-layout")).toHaveFocus();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("does not advance with Enter while the host is typing an extra accepted answer", () => {

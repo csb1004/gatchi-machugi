@@ -1,12 +1,12 @@
 {
   "name": "@gatchi/extension",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "type": "module",
   "scripts": {
     "build": "vite build && node scripts/copy-manifest.mjs && node scripts/assert-content-scripts-self-contained.mjs",
     "test": "vitest run",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "zip": "pnpm --filter @gatchi/shared build && pnpm build && node scripts/zip-release.mjs"
+    "zip": "corepack pnpm --filter @gatchi/shared build && corepack pnpm build && node scripts/zip-release.mjs"
   },
   "dependencies": {
     "@gatchi/shared": "workspace:*",

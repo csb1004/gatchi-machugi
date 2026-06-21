@@ -157,6 +157,7 @@ export function extractQuizState(root: Document): QuizState {
     quizRoot,
     root
   );
+  const hasAudioPlayer = quizRoot.querySelector("[class*='MusicPlayer_root'], [class*='MusicDurationEditor_root']") !== null;
   const videoUrl = mediaUrl("[data-question-video], video, [class*='VideoQuizDisplay'] video", quizRoot, root);
   const resultMessageElement = findResultMessageElement(quizRoot);
   const resultMessage = resultMessageElement?.textContent?.trim() || null;
@@ -170,7 +171,7 @@ export function extractQuizState(root: Document): QuizState {
     quizTitle: text("[data-quiz-title], h1", root) ?? titleFromDocument(root),
     questionIndex: numberText("[data-question-index]", quizRoot),
     totalQuestions: numberText("[data-question-total]", quizRoot),
-    questionType: choices.length > 0 ? "multiple-choice" : imageUrl ? "image" : audioUrl ? "audio" : videoUrl ? "video" : "free-text",
+    questionType: choices.length > 0 ? "multiple-choice" : imageUrl ? "image" : audioUrl || hasAudioPlayer ? "audio" : videoUrl ? "video" : "free-text",
     questionText: text("[data-question-text], [data-question], [class*='TextQuizDisplay']", quizRoot),
     imageUrl,
     audioUrl,
