@@ -161,6 +161,42 @@ describe("App host room", () => {
     expect(joinRoom).not.toHaveBeenCalled();
   });
 
+  it("restores the session that belongs to the room URL instead of the last active room", () => {
+    roomSocketState.value = null;
+    roomSocketParticipantId.value = null;
+    window.history.replaceState(null, "", "/rooms/abc123");
+    localStorage.setItem("activeRoomCode", "XYZ999");
+    localStorage.setItem("activeNickname", "지나");
+    localStorage.setItem("participantId", "p-xyz");
+    localStorage.setItem("participantCode", "#X999");
+    localStorage.setItem(
+      "roomSessions",
+      JSON.stringify({
+        ABC123: {
+          roomCode: "ABC123",
+          nickname: "미나",
+          participantId: "p-abc",
+          participantCode: "#A123"
+        },
+        XYZ999: {
+          roomCode: "XYZ999",
+          nickname: "지나",
+          participantId: "p-xyz",
+          participantCode: "#X999"
+        }
+      })
+    );
+
+    render(<App />);
+
+    expect(joinRoom).toHaveBeenCalledWith({
+      roomCode: "ABC123",
+      nickname: "미나",
+      participantId: "p-abc",
+      participantCode: "#A123"
+    });
+  });
+
   it("keeps the URL on the active room and returns to the lobby URL after leaving", async () => {
     window.history.replaceState(null, "", "/");
     const { rerender } = render(<App />);

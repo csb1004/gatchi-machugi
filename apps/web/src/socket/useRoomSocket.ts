@@ -16,6 +16,7 @@ const participantIdStorageKey = "participantId";
 const participantCodeStorageKey = "participantCode";
 const activeRoomCodeStorageKey = "activeRoomCode";
 const activeNicknameStorageKey = "activeNickname";
+const roomSessionsStorageKey = "roomSessions";
 
 export interface StoredRoomSession {
   roomCode: string;
@@ -48,7 +49,7 @@ export function roomPath(roomCode: string) {
   return `/rooms/${encodeURIComponent(normalizeRoomCode(roomCode))}`;
 }
 
-export function readStoredRoomSession(): StoredRoomSession | null {
+function activeStoredRoomSession(): StoredRoomSession | null {
   const roomCode = localStorage.getItem(activeRoomCodeStorageKey);
   const nickname = localStorage.getItem(activeNicknameStorageKey);
   const participantId = localStorage.getItem(participantIdStorageKey);
@@ -63,8 +64,80 @@ export function readStoredRoomSession(): StoredRoomSession | null {
   };
 }
 
+function readStoredRoomSessionMap(): Record<string, StoredRoomSession> {
+  const rawSessions = localStorage.getItem(roomSessionsStorageKey);
+  if (!rawSessions) return {};
+
+  try {
+    const parsed = JSON.parse(rawSessions) as Record<string, Partial<StoredRoomSession>>;
+    return Object.fromEntries(
+      Object.entries(parsed)
+        .map(([key, session]) => {
+          const roomCode = normalizeRoomCode(session.roomCode ?? key);
+          if (!roomCode || !session.nickname || !session.participantId || !session.participantCode) return null;
+          return [
+            roomCode,
+            {
+              roomCode,
+              nickname: session.nickname,
+              participantId: session.participantId,
+              participantCode: session.participantCode
+            }
+          ] as const;
+        })
+        .filter((entry): entry is readonly [string, StoredRoomSession] => Boolean(entry))
+    );
+  } catch {
+    return {};
+  }
+}
+
+function writeStoredRoomSession(session: StoredRoomSession) {
+  const roomCode = normalizeRoomCode(session.roomCode);
+  const nextSession = { ...session, roomCode };
+  const sessions = readStoredRoomSessionMap();
+  sessions[roomCode] = nextSession;
+
+  localStorage.setItem(roomSessionsStorageKey, JSON.stringify(sessions));
+  localStorage.setItem(activeRoomCodeStorageKey, roomCode);
+  localStorage.setItem(activeNicknameStorageKey, nextSession.nickname);
+  localStorage.setItem(participantIdStorageKey, nextSession.participantId);
+  localStorage.setItem(participantCodeStorageKey, nextSession.participantCode);
+}
+
+export function readStoredRoomSession(roomCode?: string): StoredRoomSession | null {
+  const normalizedRoomCode = roomCode ? normalizeRoomCode(roomCode) : null;
+  const sessions = readStoredRoomSessionMap();
+
+  if (normalizedRoomCode) {
+    const storedForRoom = sessions[normalizedRoomCode];
+    if (storedForRoom) return storedForRoom;
+
+    const activeSession = activeStoredRoomSession();
+    return activeSession?.roomCode === normalizedRoomCode ? activeSession : null;
+  }
+
+  const activeSession = activeStoredRoomSession();
+  if (activeSession) return activeSession;
+
+  return null;
+}
+
 export function clearStoredRoomSession(roomCode?: string) {
-  if (roomCode && localStorage.getItem(activeRoomCodeStorageKey) !== roomCode) return;
+  const normalizedRoomCode = roomCode ? normalizeRoomCode(roomCode) : null;
+  if (normalizedRoomCode) {
+    const sessions = readStoredRoomSessionMap();
+    delete sessions[normalizedRoomCode];
+    if (Object.keys(sessions).length > 0) {
+      localStorage.setItem(roomSessionsStorageKey, JSON.stringify(sessions));
+    } else {
+      localStorage.removeItem(roomSessionsStorageKey);
+    }
+  } else {
+    localStorage.removeItem(roomSessionsStorageKey);
+  }
+
+  if (normalizedRoomCode && localStorage.getItem(activeRoomCodeStorageKey) !== normalizedRoomCode) return;
 
   localStorage.removeItem(activeRoomCodeStorageKey);
   localStorage.removeItem(activeNicknameStorageKey);
@@ -171,10 +244,12 @@ export function useRoomSocket() {
       payload,
       (ack) => {
         if (ack.ok) {
-          localStorage.setItem(participantIdStorageKey, ack.data.participantId);
-          localStorage.setItem(participantCodeStorageKey, ack.data.participantCode);
-          localStorage.setItem(activeRoomCodeStorageKey, roomCode);
-          localStorage.setItem(activeNicknameStorageKey, payload.nickname);
+          writeStoredRoomSession({
+            roomCode,
+            nickname: payload.nickname,
+            participantId: ack.data.participantId,
+            participantCode: ack.data.participantCode
+          });
           setParticipantId(ack.data.participantId);
           setState(ack.data.state);
           return;

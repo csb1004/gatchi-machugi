@@ -1,7 +1,7 @@
 import { act, render, waitFor } from "@testing-library/react";
 import type { ChatMessagePayload, RoomState } from "@gatchi/shared";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { useRoomSocket } from "./useRoomSocket";
+import { readStoredRoomSession, useRoomSocket } from "./useRoomSocket";
 
 type Handler = (payload: unknown) => void;
 
@@ -142,6 +142,45 @@ describe("useRoomSocket lifecycle", () => {
     expect(localStorage.getItem("activeNickname")).toBe("Mina");
   });
 
+  it("keeps player sessions for multiple rooms and reads them by room code", async () => {
+    emitMock.mockImplementation((event: string, payload: unknown, ack?: (response: unknown) => void) => {
+      if (event !== "room:join") return;
+      const roomCode = (payload as { roomCode: string }).roomCode;
+      ack?.({
+        ok: true,
+        data: {
+          participantId: roomCode === "ABC123" ? "p-abc" : "p-xyz",
+          participantCode: roomCode === "ABC123" ? "#A123" : "#X999",
+          state: { ...roomState, roomCode }
+        }
+      });
+    });
+    render(<Harness onHook={(nextHook) => (hook = nextHook)} />);
+
+    act(() => {
+      hook.joinRoom({ roomCode: "ABC123", nickname: "Mina" });
+    });
+    await waitFor(() => expect(hook.participantId).toBe("p-abc"));
+
+    act(() => {
+      hook.joinRoom({ roomCode: "XYZ999", nickname: "Jin" });
+    });
+    await waitFor(() => expect(hook.participantId).toBe("p-xyz"));
+
+    expect(readStoredRoomSession("ABC123")).toEqual({
+      roomCode: "ABC123",
+      nickname: "Mina",
+      participantId: "p-abc",
+      participantCode: "#A123"
+    });
+    expect(readStoredRoomSession("XYZ999")).toEqual({
+      roomCode: "XYZ999",
+      nickname: "Jin",
+      participantId: "p-xyz",
+      participantCode: "#X999"
+    });
+  });
+
   it("clears the active room session when the room expires", async () => {
     render(<Harness onHook={(nextHook) => (hook = nextHook)} />);
 
@@ -159,6 +198,44 @@ describe("useRoomSocket lifecycle", () => {
     expect(localStorage.getItem("activeNickname")).toBeNull();
     expect(localStorage.getItem("participantId")).toBeNull();
     expect(localStorage.getItem("participantCode")).toBeNull();
+  });
+
+  it("removes only the expired room from stored room sessions", async () => {
+    localStorage.setItem("activeRoomCode", "ABC123");
+    localStorage.setItem("activeNickname", "Mina");
+    localStorage.setItem("participantId", "p-abc");
+    localStorage.setItem("participantCode", "#A123");
+    localStorage.setItem(
+      "roomSessions",
+      JSON.stringify({
+        ABC123: {
+          roomCode: "ABC123",
+          nickname: "Mina",
+          participantId: "p-abc",
+          participantCode: "#A123"
+        },
+        XYZ999: {
+          roomCode: "XYZ999",
+          nickname: "Jin",
+          participantId: "p-xyz",
+          participantCode: "#X999"
+        }
+      })
+    );
+    render(<Harness onHook={(nextHook) => (hook = nextHook)} />);
+
+    act(() => {
+      emitSocketEvent("room:state", { ...roomState, roomCode: "ABC123", phase: "expired" });
+    });
+
+    await waitFor(() => expect(hook.state).toBeNull());
+    expect(readStoredRoomSession("ABC123")).toBeNull();
+    expect(readStoredRoomSession("XYZ999")).toEqual({
+      roomCode: "XYZ999",
+      nickname: "Jin",
+      participantId: "p-xyz",
+      participantCode: "#X999"
+    });
   });
 
   it("clears stale stored credentials after a credentialed join failure", () => {

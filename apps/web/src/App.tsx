@@ -15,7 +15,9 @@ type PairingRoom = Pick<CreatedRoom, "roomCode" | "hostParticipantId" | "hostCod
 
 export function App() {
   const initialPathRoomCode = roomCodeFromPath(window.location.pathname);
-  const [nickname, setNickname] = useState(() => readStoredRoomSession()?.nickname ?? "");
+  const [nickname, setNickname] = useState(
+    () => readStoredRoomSession(initialPathRoomCode ?? undefined)?.nickname ?? readStoredRoomSession()?.nickname ?? ""
+  );
   const [roomCode, setRoomCode] = useState(() => initialPathRoomCode ?? "");
   const [roomName, setRoomName] = useState("마추기 방");
   const [isPublicRoom, setIsPublicRoom] = useState(true);
@@ -71,7 +73,7 @@ export function App() {
     const pathRoomCode = roomCodeFromPath(window.location.pathname);
     if (!pathRoomCode || roomSocket.state || restoredRoomRef.current === pathRoomCode) return;
 
-    const stored = readStoredRoomSession();
+    const stored = readStoredRoomSession(pathRoomCode);
     if (!stored || stored.roomCode !== pathRoomCode) return;
 
     restoredRoomRef.current = pathRoomCode;
@@ -185,7 +187,7 @@ export function App() {
 
   if (roomSocket.state && roomSocket.participantId) {
     const currentParticipant = roomSocket.state.participants.find((participant) => participant.id === roomSocket.participantId);
-    const storedRoomSession = readStoredRoomSession();
+    const storedRoomSession = readStoredRoomSession(roomSocket.state.roomCode);
     const restoredPairingRoom =
       currentParticipant?.role === "host" &&
       storedRoomSession?.roomCode === roomSocket.state.roomCode &&
