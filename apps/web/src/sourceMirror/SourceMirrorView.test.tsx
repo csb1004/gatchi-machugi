@@ -65,6 +65,15 @@ describe("SourceMirrorView", () => {
     expect(onAction).toHaveBeenCalledWith({ name: "search", query: "pokemon" });
   });
 
+  it("lets the host open a source category from the mirrored home view", () => {
+    const onAction = vi.fn();
+    render(<SourceMirrorView state={home} isHost onAction={onAction} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "게임" }));
+
+    expect(onAction).toHaveBeenCalledWith({ name: "openCategory", categoryId: 1 });
+  });
+
   it("shows search results and lets only the host select them", () => {
     const onAction = vi.fn();
     render(<SourceMirrorView state={results} isHost onAction={onAction} />);
@@ -86,6 +95,12 @@ describe("SourceMirrorView", () => {
     fireEvent.click(screen.getByRole("button", { name: "검색" }));
 
     expect(onAction).toHaveBeenCalledWith({ name: "search", query: "anime" });
+  });
+
+  it("marks the current source category as active", () => {
+    render(<SourceMirrorView state={{ ...results, url: "https://machugi.io/category/1" }} isHost onAction={() => undefined} />);
+
+    expect(screen.getByRole("button", { name: "게임" })).toHaveAttribute("aria-pressed", "true");
   });
 
   it("asks the host extension for more results when the mirrored result list reaches the bottom", () => {

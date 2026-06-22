@@ -1,10 +1,12 @@
 import type { MirrorQuizResult, SourceMirrorAction } from "@gatchi/shared";
 import { useCallback, useEffect, useRef, type UIEvent } from "react";
+import { MirrorCategoryNav } from "./MirrorCategoryNav";
 import { MirrorSearchBox } from "./MirrorSearchBox";
 
 const LOAD_MORE_RETRY_DELAY_MS = 1200;
 
 export function MirrorResultsView(props: {
+  currentUrl: string;
   query: string;
   results: MirrorQuizResult[];
   isHost: boolean;
@@ -60,6 +62,7 @@ export function MirrorResultsView(props: {
 
   return (
     <section className="mirror-results" aria-label="검색 결과">
+      <MirrorCategoryNav currentUrl={props.currentUrl} isHost={props.isHost} onAction={props.onAction} />
       <MirrorSearchBox initialQuery={props.query} isHost={props.isHost} onAction={props.onAction} />
       <div className="section-heading mirror-results-heading">
         <h2>검색 결과</h2>

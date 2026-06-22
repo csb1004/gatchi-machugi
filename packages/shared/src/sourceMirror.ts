@@ -113,6 +113,7 @@ export type SourceMirrorState =
 
 export type SourceMirrorActionName =
   | "focusHome"
+  | "openCategory"
   | "search"
   | "selectResult"
   | "setTimer"
@@ -127,6 +128,7 @@ export type SourceMirrorActionName =
 
 export type SourceMirrorAction =
   | { name: "focusHome"; query?: string }
+  | { name: "openCategory"; categoryId: number }
   | { name: "search"; query: string }
   | { name: "selectResult"; resultId: string; href?: string | null }
   | { name: "setTimer"; timerSeconds: number | null }

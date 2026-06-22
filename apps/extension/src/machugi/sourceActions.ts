@@ -49,6 +49,11 @@ export function createHomeUrl(query?: string): string {
   return url.toString();
 }
 
+export function createCategoryUrl(categoryId: number): string | null {
+  if (!Number.isInteger(categoryId) || categoryId < 1 || categoryId > 10) return null;
+  return `https://machugi.io/category/${categoryId}`;
+}
+
 function openAnchorInCurrentTab(anchor: HTMLAnchorElement): ActionResult {
   anchor.removeAttribute("target");
   anchor.rel = "";
@@ -167,6 +172,12 @@ function runSkipSubmissionSourceCommand(action: Extract<SourceMirrorAction, { na
 export function runSourceMirrorAction(action: SourceMirrorAction, root: Document = document, options?: SourceMirrorActionOptions): ActionResult {
   if (action.name === "focusHome") {
     return navigateCurrentTab(root, createHomeUrl(action.query));
+  }
+
+  if (action.name === "openCategory") {
+    const categoryUrl = createCategoryUrl(action.categoryId);
+    if (!categoryUrl) return { ok: false, reason: "지원하지 않는 카테고리입니다." };
+    return navigateCurrentTab(root, categoryUrl);
   }
 
   if (action.name === "search") return runSearch(action.query, root);

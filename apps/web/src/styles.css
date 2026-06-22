@@ -1258,6 +1258,58 @@ h2 {
   gap: 16px;
 }
 
+.mirror-search {
+  display: grid;
+  gap: 14px;
+}
+
+.mirror-category-nav {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  border-radius: 8px;
+  padding: 8px;
+  background: #28358f;
+  scrollbar-width: thin;
+}
+
+.mirror-category-nav button {
+  flex: 0 0 auto;
+  min-width: 96px;
+  min-height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border: 1px solid rgba(255, 255, 255, 0.36);
+  border-radius: 8px;
+  padding: 0 14px;
+  background: rgba(255, 255, 255, 0.14);
+  color: #ffffff;
+  font-size: 0.88rem;
+  font-weight: 900;
+  white-space: nowrap;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+}
+
+.mirror-category-nav button:hover:not(:disabled),
+.mirror-category-nav button:focus-visible {
+  border-color: #ffffff;
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.mirror-category-nav button.active {
+  border-color: #a7d4ff;
+  background: #ffffff;
+  color: #16467d;
+  box-shadow: 0 6px 14px rgba(13, 24, 76, 0.22);
+}
+
+.mirror-category-nav button:disabled {
+  opacity: 0.72;
+}
+
 .mirror-game-end {
   display: grid;
   gap: 18px;
@@ -1532,5 +1584,15 @@ h2 {
   .mirror-search-bar,
   .mirror-setting-row {
     grid-template-columns: 1fr;
+  }
+
+  .mirror-category-nav {
+    margin-inline: -4px;
+    border-radius: 6px;
+  }
+
+  .mirror-category-nav button {
+    min-width: 84px;
+    padding: 0 12px;
   }
 }

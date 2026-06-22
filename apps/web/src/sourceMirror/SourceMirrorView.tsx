@@ -38,11 +38,19 @@ export function SourceMirrorView(props: {
   }
 
   if (props.state.kind === "home") {
-    return <MirrorSearchView initialQuery={props.state.query} isHost={props.isHost} onAction={sendAction} />;
+    return <MirrorSearchView currentUrl={props.state.url} initialQuery={props.state.query} isHost={props.isHost} onAction={sendAction} />;
   }
 
   if (props.state.kind === "searchResults") {
-    return <MirrorResultsView query={props.state.query} results={props.state.results} isHost={props.isHost} onAction={sendAction} />;
+    return (
+      <MirrorResultsView
+        currentUrl={props.state.url}
+        query={props.state.query}
+        results={props.state.results}
+        isHost={props.isHost}
+        onAction={sendAction}
+      />
+    );
   }
 
   if (props.state.kind === "quizDetail") {

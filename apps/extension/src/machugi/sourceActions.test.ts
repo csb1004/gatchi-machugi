@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { createHomeUrl, runSourceMirrorAction } from "./sourceActions";
+import { createCategoryUrl, createHomeUrl, runSourceMirrorAction } from "./sourceActions";
 
 describe("runSourceMirrorAction", () => {
   it("fills and submits the search input", () => {
@@ -132,5 +132,11 @@ describe("runSourceMirrorAction", () => {
   it("builds a home URL that restores the last search query", () => {
     expect(createHomeUrl("pokemon")).toBe("https://machugi.io/?keyword=pokemon");
     expect(createHomeUrl("")).toBe("https://machugi.io/");
+  });
+
+  it("builds category URLs for supported source categories", () => {
+    expect(createCategoryUrl(1)).toBe("https://machugi.io/category/1");
+    expect(createCategoryUrl(10)).toBe("https://machugi.io/category/10");
+    expect(createCategoryUrl(11)).toBeNull();
   });
 });
