@@ -436,6 +436,60 @@ describe("socket server", () => {
     await expect(expiredState).resolves.toMatchObject({ phase: "expired" });
   });
 
+  it("expires the previous room when the same host extension pairs to a new room", async () => {
+    const roomService = new RoomService();
+    const app = createApp({ roomService });
+    const server = createServer(app);
+    createSocketServer(server, { roomService });
+    servers.push(server);
+
+    const port = await listenOnTestPort(server);
+    const baseUrl = `http://127.0.0.1:${port}`;
+
+    const firstRoom = await createRoom(baseUrl, { roomName: "First public room", public: true });
+    const secondRoom = await createRoom(baseUrl, { roomName: "Second public room", public: true });
+
+    const participantSocket = await connectClient(baseUrl);
+    sockets.push(participantSocket);
+    const participantJoin = await emitJoin(participantSocket, {
+      roomCode: firstRoom.data.roomCode,
+      nickname: "Mina"
+    });
+    expect(participantJoin.ok).toBe(true);
+
+    const extensionSocket = await connectClient(baseUrl);
+    sockets.push(extensionSocket);
+
+    const firstAck = await emitHostPair(extensionSocket, {
+      roomCode: firstRoom.data.roomCode,
+      hostCode: firstRoom.data.hostCode
+    });
+    expect(firstAck.ok).toBe(true);
+
+    const disconnectedEvent = waitForEvent(participantSocket, "host:disconnected");
+    const expiredState = waitForRoomPhase(participantSocket, "expired");
+    const secondAck = await emitHostPair(extensionSocket, {
+      roomCode: secondRoom.data.roomCode,
+      hostCode: secondRoom.data.hostCode
+    });
+    expect(secondAck.ok).toBe(true);
+    await disconnectedEvent;
+    await expect(expiredState).resolves.toMatchObject({
+      phase: "expired",
+      hostExtensionConnected: false
+    });
+
+    expect(roomService.getState(firstRoom.data.roomCode)).toMatchObject({
+      phase: "expired",
+      hostExtensionConnected: false
+    });
+    expect(roomService.getState(secondRoom.data.roomCode)).toMatchObject({
+      phase: expect.not.stringMatching("expired"),
+      hostExtensionConnected: true
+    });
+    expect(roomService.listPublicRooms().map((room) => room.roomCode)).not.toContain(firstRoom.data.roomCode);
+  });
+
   it("keeps a room alive when the host web session reconnects during the refresh grace", async () => {
     const roomService = new RoomService();
     const app = createApp({ roomService });

@@ -388,7 +388,11 @@ export function createSocketServer(
         socket.join(parsed.data.roomCode);
         if (previousRoomCode && previousRoomCode !== parsed.data.roomCode) {
           socket.leave(previousRoomCode);
-          deleteHostExtensionSocketId(previousRoomCode, socket.id);
+          if (hostExtensionSocketIds.get(previousRoomCode) === socket.id) {
+            expireRoomForHostDisconnect(previousRoomCode);
+          } else {
+            deleteHostExtensionSocketId(previousRoomCode, socket.id);
+          }
         }
         session.roomCode = parsed.data.roomCode;
         session.participantId = joined.participant.id;
