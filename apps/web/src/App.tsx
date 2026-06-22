@@ -54,7 +54,7 @@ export function App() {
 
   function extensionSyncLabel(hasPairingRoom: boolean) {
     if (extensionSyncStatus === "saved") return "확장 프로그램에 연결 정보를 저장했습니다.";
-    if (extensionSyncStatus === "failed") return "확장 설치 후 다시 저장하세요.";
+    if (extensionSyncStatus === "failed") return "확장 설치/업데이트 직후라면 방장 화면을 새로고침한 뒤 다시 저장하세요.";
     if (extensionSyncStatus === "waiting") return "확장 프로그램에 저장 중입니다.";
     if (hasPairingRoom) return "확장 프로그램에 연결 정보를 다시 저장할 수 있습니다.";
     return "방을 만든 뒤 확장 프로그램에 연결 정보를 저장합니다.";
@@ -358,7 +358,7 @@ export function App() {
                 <li>방장 화면에서 마추기아이오 원본 화면을 열고 퀴즈를 고릅니다.</li>
                 <li>GitHub Releases에서 가치 마추기 확장 프로그램 zip을 내려받아 압축을 풉니다.</li>
                 <li>chrome://extensions에서 개발자 모드를 켜고 압축 해제된 확장 프로그램을 로드합니다.</li>
-                <li>확장을 새로 설치하거나 업데이트했다면 방장 화면에서 다시 저장합니다.</li>
+                <li>확장을 새로 설치하거나 업데이트했다면 방장 화면을 새로고침한 뒤 다시 저장합니다.</li>
                 <li>확장이 연결되면 참가자는 방 코드로 입장합니다.</li>
               </ol>
             </div>

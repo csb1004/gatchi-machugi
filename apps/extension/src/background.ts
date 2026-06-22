@@ -59,9 +59,18 @@ let pairedMachugiFrame: MachugiFrameTarget | null = null;
 let latestRoomState: RoomState | null = null;
 let unregisterBridgeHandlers: Array<() => void> = [];
 
-interface PairHostOptions {
-  resetSourceToHome?: boolean;
-}
+const installScriptTargets = [
+  {
+    matches: ["https://machugi.io/*", "https://*.machugi.io/*"],
+    files: ["contentScript.js"],
+    allFrames: true
+  },
+  {
+    matches: ["https://*.up.railway.app/*", "https://*.railway.app/*", "http://localhost/*", "http://127.0.0.1/*"],
+    files: ["appBridge.js"],
+    allFrames: false
+  }
+] satisfies Array<{ matches: string[]; files: string[]; allFrames: boolean }>;
 
 function isRuntimeMessage(message: unknown): message is RuntimeMessage {
   return typeof message === "object" && message !== null && "type" in message;
@@ -252,7 +261,7 @@ function rememberRoomState(state: RoomState | undefined): void {
   void sendFairPlayStateToPairedMachugiFrame(state);
 }
 
-function registerPairedBridge(roomCode: string, appTabId: number | null, options: { requestState?: boolean } = {}) {
+function registerPairedBridge(roomCode: string, appTabId: number | null) {
   pairedRoomCode = roomCode;
   pairedAppTabId = appTabId;
   unregisterBridgeHandlers.forEach((unregister) => unregister());
@@ -270,54 +279,18 @@ function registerPairedBridge(roomCode: string, appTabId: number | null, options
       rememberRoomState(state);
     })
   ];
-  if (options.requestState === false) return;
-
   void requestStateFromPairedMachugiFrame().catch((error) => {
     console.error("연결된 원본 창에서 문제 상태를 요청하지 못했습니다.", error);
   });
 }
 
-async function resetPairedSourceToHome(roomCode: string): Promise<boolean> {
-  if (!pairedMachugiFrame) return false;
-
-  const delivered = await sendMessageToPairedMachugiFrame({
-    type: CONTENT_SOURCE_ACTION_MESSAGE,
-    payload: {
-      roomCode,
-      actionId: `source-home-${Date.now()}`,
-      action: { name: "focusHome" }
-    } satisfies SourceMirrorActionPayload
-  }).catch((error) => {
-    console.error("원본 창을 기본 화면으로 이동하지 못했습니다.", error);
-    return false;
-  });
-
-  if (delivered) {
-    globalThis.setTimeout(() => {
-      void requestStateFromPairedMachugiFrame().catch((error) => {
-        console.error("기본 화면 이동 후 원본 창 상태를 요청하지 못했습니다.", error);
-      });
-    }, 400);
-  }
-
-  return delivered;
-}
-
-async function pairHost(payload: PairingSettings, appTabId: number | null, options: PairHostOptions = {}): Promise<PairHostResponse> {
+async function pairHost(payload: PairingSettings, appTabId: number | null): Promise<PairHostResponse> {
   const settings = normalizePairingSettingsForStorage(payload);
 
   try {
     const pairResult = await socketClient.connectAndPair(payload);
-    registerPairedBridge(pairResult.roomCode, appTabId, { requestState: !options.resetSourceToHome });
+    registerPairedBridge(pairResult.roomCode, appTabId);
     rememberRoomState(pairResult.state);
-    if (options.resetSourceToHome) {
-      const reset = await resetPairedSourceToHome(pairResult.roomCode);
-      if (!reset) {
-        void requestStateFromPairedMachugiFrame().catch((error) => {
-          console.error("연결된 원본 창에서 문제 상태를 요청하지 못했습니다.", error);
-        });
-      }
-    }
     await savePairingSettings(settings);
     return {
       ok: true,
@@ -531,6 +504,56 @@ async function useCurrentTabAsSource(): Promise<SourceResponse> {
   return { ok: true };
 }
 
+function queryTabsByUrl(url: string[]): Promise<chrome.tabs.Tab[]> {
+  return new Promise((resolve, reject) => {
+    chrome.tabs.query({ url }, (tabs) => {
+      if (chrome.runtime.lastError) {
+        reject(new Error(chrome.runtime.lastError.message));
+        return;
+      }
+
+      resolve(tabs);
+    });
+  });
+}
+
+function executeScriptInTab(details: chrome.scripting.ScriptInjection<unknown[], unknown>): Promise<void> {
+  return new Promise((resolve, reject) => {
+    chrome.scripting.executeScript(details, () => {
+      if (chrome.runtime.lastError) {
+        reject(new Error(chrome.runtime.lastError.message));
+        return;
+      }
+
+      resolve();
+    });
+  });
+}
+
+async function injectContentScriptsIntoExistingTabs(): Promise<void> {
+  await Promise.all(
+    installScriptTargets.map(async ({ matches, files, allFrames }) => {
+      const tabs = await queryTabsByUrl(matches).catch(() => []);
+      await Promise.all(
+        tabs.map(async (tab) => {
+          if (typeof tab.id !== "number") return;
+
+          await executeScriptInTab({
+            target: { tabId: tab.id, allFrames },
+            files
+          }).catch((error) => {
+            console.debug("Content script injection skipped.", error);
+          });
+        })
+      );
+    })
+  );
+}
+
+chrome.runtime.onInstalled.addListener(() => {
+  void injectContentScriptsIntoExistingTabs();
+});
+
 chrome.runtime.onMessage.addListener((message: unknown, sender, sendResponse) => {
   if (isRuntimeMessage(message)) {
     const messageType = message.type;
@@ -633,7 +656,7 @@ chrome.runtime.onMessage.addListener((message: unknown, sender, sendResponse) =>
 
   if (!isPairHostRequestMessage(message)) {
     if (isAppPairingSettingsMessage(message)) {
-      void pairHost(message.payload, sender.tab?.id ?? null, { resetSourceToHome: true }).then(sendResponse);
+      void pairHost(message.payload, sender.tab?.id ?? null).then(sendResponse);
       return true;
     }
 
