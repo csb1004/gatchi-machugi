@@ -34,12 +34,20 @@ const categories: Category[] = [
   { id: 10, label: "병맛", Icon: Laugh }
 ];
 
-function activeCategoryId(url: string | null): number | null {
+function supportedCategoryId(categoryId: number): number | null {
+  return Number.isInteger(categoryId) && categoryId >= 1 && categoryId <= 10 ? categoryId : null;
+}
+
+export function activeCategoryId(url: string | null): number | null {
   if (!url) return null;
 
   try {
-    const match = new URL(url).pathname.match(/^\/category\/(\d+)\/?$/);
-    return match?.[1] ? Number(match[1]) : null;
+    const parsed = new URL(url);
+    const categoryType = parsed.searchParams.get("category_type");
+    if (categoryType) return supportedCategoryId(Number(categoryType));
+
+    const match = parsed.pathname.match(/^\/category\/(\d+)\/?$/);
+    return match?.[1] ? supportedCategoryId(Number(match[1])) : null;
   } catch {
     return null;
   }
@@ -47,10 +55,12 @@ function activeCategoryId(url: string | null): number | null {
 
 export function MirrorCategoryNav(props: {
   currentUrl: string | null;
+  homeQuery: string;
   isHost: boolean;
   onAction: (action: SourceMirrorAction) => void;
 }) {
   const activeId = activeCategoryId(props.currentUrl);
+  const homeQuery = props.homeQuery.trim();
 
   return (
     <nav className="mirror-category-nav" aria-label="마추기 카테고리">
@@ -64,7 +74,15 @@ export function MirrorCategoryNav(props: {
             disabled={!props.isHost}
             aria-pressed={isActive}
             onClick={() => {
-              props.onAction(id === null ? { name: "focusHome" } : { name: "openCategory", categoryId: id });
+              props.onAction(
+                id === null
+                  ? homeQuery
+                    ? { name: "focusHome", query: homeQuery }
+                    : { name: "focusHome" }
+                  : homeQuery
+                    ? { name: "openCategory", categoryId: id, query: homeQuery }
+                    : { name: "openCategory", categoryId: id }
+              );
             }}
           >
             <Icon size={16} />

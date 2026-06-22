@@ -1,7 +1,7 @@
 import { Search } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { SourceMirrorAction } from "@gatchi/shared";
-import { MirrorCategoryNav } from "./MirrorCategoryNav";
+import { activeCategoryId, MirrorCategoryNav } from "./MirrorCategoryNav";
 
 export function MirrorSearchBox(props: {
   initialQuery: string;
@@ -16,9 +16,17 @@ export function MirrorSearchBox(props: {
   }, [props.initialQuery]);
 
   function submit() {
+    if (!props.isHost) return;
+
     const trimmed = query.trim();
-    if (!trimmed || !props.isHost) return;
-    props.onAction({ name: "search", query: trimmed });
+    const categoryId = activeCategoryId(props.currentUrl);
+    props.onAction(
+      trimmed
+        ? categoryId
+          ? { name: "search", query: trimmed, categoryId }
+          : { name: "search", query: trimmed }
+        : { name: "focusHome" }
+    );
   }
 
   return (
@@ -36,12 +44,17 @@ export function MirrorSearchBox(props: {
             }}
           />
         </label>
-        <button type="button" disabled={!props.isHost || !query.trim()} onClick={submit}>
+        <button type="button" disabled={!props.isHost} onClick={submit}>
           <Search size={18} />
           검색
         </button>
       </div>
-      <MirrorCategoryNav currentUrl={props.currentUrl} isHost={props.isHost} onAction={props.onAction} />
+      <MirrorCategoryNav
+        currentUrl={props.currentUrl}
+        homeQuery={props.initialQuery}
+        isHost={props.isHost}
+        onAction={props.onAction}
+      />
     </>
   );
 }

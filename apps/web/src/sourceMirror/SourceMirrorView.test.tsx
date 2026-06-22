@@ -30,6 +30,11 @@ const results: SourceMirrorState = {
   ]
 };
 
+const categoryResults: SourceMirrorState = {
+  ...results,
+  url: "https://machugi.io/search?sortType=BEST&category_type=1&keyword=pokemon"
+};
+
 const quizDetail: SourceMirrorState = {
   kind: "quizDetail",
   url: "https://machugi.io/quiz/123",
@@ -74,6 +79,15 @@ describe("SourceMirrorView", () => {
     expect(onAction).toHaveBeenCalledWith({ name: "openCategory", categoryId: 1 });
   });
 
+  it("returns to machugi home when searching with an empty query", () => {
+    const onAction = vi.fn();
+    render(<SourceMirrorView state={home} isHost onAction={onAction} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "검색" }));
+
+    expect(onAction).toHaveBeenCalledWith({ name: "focusHome" });
+  });
+
   it("shows search results and lets only the host select them", () => {
     const onAction = vi.fn();
     render(<SourceMirrorView state={results} isHost onAction={onAction} />);
@@ -97,8 +111,42 @@ describe("SourceMirrorView", () => {
     expect(onAction).toHaveBeenCalledWith({ name: "search", query: "anime" });
   });
 
+  it("returns the all-category button to the last search results", () => {
+    const onAction = vi.fn();
+    render(<SourceMirrorView state={results} isHost onAction={onAction} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "전체" }));
+
+    expect(onAction).toHaveBeenCalledWith({ name: "focusHome", query: "pokemon" });
+  });
+
+  it("keeps the search query when applying a category from results", () => {
+    const onAction = vi.fn();
+    render(<SourceMirrorView state={results} isHost onAction={onAction} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "게임" }));
+
+    expect(onAction).toHaveBeenCalledWith({ name: "openCategory", categoryId: 1, query: "pokemon" });
+  });
+
+  it("keeps the selected category when searching again", () => {
+    const onAction = vi.fn();
+    render(<SourceMirrorView state={categoryResults} isHost onAction={onAction} />);
+
+    fireEvent.change(screen.getByLabelText("검색어"), { target: { value: "anime" } });
+    fireEvent.click(screen.getByRole("button", { name: "검색" }));
+
+    expect(onAction).toHaveBeenCalledWith({ name: "search", query: "anime", categoryId: 1 });
+  });
+
   it("marks the current source category as active", () => {
     render(<SourceMirrorView state={{ ...results, url: "https://machugi.io/category/1" }} isHost onAction={() => undefined} />);
+
+    expect(screen.getByRole("button", { name: "게임" })).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("marks a search category filter as active", () => {
+    render(<SourceMirrorView state={categoryResults} isHost onAction={() => undefined} />);
 
     expect(screen.getByRole("button", { name: "게임" })).toHaveAttribute("aria-pressed", "true");
   });

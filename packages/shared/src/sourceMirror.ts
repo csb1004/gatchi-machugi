@@ -128,8 +128,8 @@ export type SourceMirrorActionName =
 
 export type SourceMirrorAction =
   | { name: "focusHome"; query?: string }
-  | { name: "openCategory"; categoryId: number }
-  | { name: "search"; query: string }
+  | { name: "openCategory"; categoryId: number; query?: string }
+  | { name: "search"; query: string; categoryId?: number }
   | { name: "selectResult"; resultId: string; href?: string | null }
   | { name: "setTimer"; timerSeconds: number | null }
   | { name: "setQuestionCount"; questionCount: number | null }

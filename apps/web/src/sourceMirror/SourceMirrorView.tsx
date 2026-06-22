@@ -20,6 +20,7 @@ export function SourceMirrorView(props: {
 
   function sendAction(action: SourceMirrorAction) {
     if (action.name === "search") lastSearchQuery.current = action.query.trim();
+    if (action.name === "openCategory" && action.query) lastSearchQuery.current = action.query.trim();
     props.onAction(action);
   }
 

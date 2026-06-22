@@ -13,6 +13,8 @@ const searchInputSelector = [
   "input[name*='search' i]"
 ].join(", ");
 const startButtonPattern = /시작|풀기|start/i;
+const firstCategoryId = 1;
+const lastCategoryId = 10;
 
 function setInputValue(input: HTMLInputElement, value: string): void {
   const descriptor = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(input), "value");
@@ -40,17 +42,39 @@ function navigateCurrentTab(root: Document, href: string): ActionResult {
   return { ok: true };
 }
 
-export function createHomeUrl(query?: string): string {
-  const normalizedQuery = query?.trim();
+function supportedCategoryId(categoryId: number | null | undefined): categoryId is number {
+  return (
+    categoryId !== null &&
+    categoryId !== undefined &&
+    Number.isInteger(categoryId) &&
+    categoryId >= firstCategoryId &&
+    categoryId <= lastCategoryId
+  );
+}
+
+export function createSearchUrl(query: string, categoryId?: number | null): string {
+  const normalizedQuery = query.trim();
   if (!normalizedQuery) return "https://machugi.io/";
 
-  const url = new URL("https://machugi.io/");
+  const url = new URL("https://machugi.io/search");
+  url.searchParams.set("sortType", "BEST");
+  if (supportedCategoryId(categoryId)) url.searchParams.set("category_type", String(categoryId));
   url.searchParams.set("keyword", normalizedQuery);
   return url.toString();
 }
 
-export function createCategoryUrl(categoryId: number): string | null {
-  if (!Number.isInteger(categoryId) || categoryId < 1 || categoryId > 10) return null;
+export function createHomeUrl(query?: string): string {
+  const normalizedQuery = query?.trim();
+  if (!normalizedQuery) return "https://machugi.io/";
+
+  return createSearchUrl(normalizedQuery);
+}
+
+export function createCategoryUrl(categoryId: number, query?: string): string | null {
+  if (!supportedCategoryId(categoryId)) return null;
+  const normalizedQuery = query?.trim();
+  if (normalizedQuery) return createSearchUrl(normalizedQuery, categoryId);
+
   return `https://machugi.io/category/${categoryId}`;
 }
 
@@ -87,7 +111,9 @@ function clickOptionByNumber(root: Document, value: number | null, nounPattern: 
   return true;
 }
 
-function runSearch(query: string, root: Document): ActionResult {
+function runSearch(query: string, root: Document, categoryId?: number): ActionResult {
+  if (supportedCategoryId(categoryId)) return navigateCurrentTab(root, createSearchUrl(query, categoryId));
+
   const input = root.querySelector<HTMLInputElement>(searchInputSelector);
   if (!input) return { ok: false, reason: "검색창을 찾을 수 없습니다." };
 
@@ -175,12 +201,12 @@ export function runSourceMirrorAction(action: SourceMirrorAction, root: Document
   }
 
   if (action.name === "openCategory") {
-    const categoryUrl = createCategoryUrl(action.categoryId);
+    const categoryUrl = createCategoryUrl(action.categoryId, action.query);
     if (!categoryUrl) return { ok: false, reason: "지원하지 않는 카테고리입니다." };
     return navigateCurrentTab(root, categoryUrl);
   }
 
-  if (action.name === "search") return runSearch(action.query, root);
+  if (action.name === "search") return runSearch(action.query, root, action.categoryId);
   if (action.name === "selectResult") return runSelectResult(action.href, action.resultId, root);
   if (action.name === "loadMoreResults") return runLoadMoreResults(root);
   if (action.name === "setTimer") {
