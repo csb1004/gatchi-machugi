@@ -62,8 +62,8 @@ export function MirrorResultsView(props: {
 
   return (
     <section className="mirror-results" aria-label="검색 결과">
-      <MirrorCategoryNav currentUrl={props.currentUrl} isHost={props.isHost} onAction={props.onAction} />
       <MirrorSearchBox initialQuery={props.query} isHost={props.isHost} onAction={props.onAction} />
+      <MirrorCategoryNav currentUrl={props.currentUrl} isHost={props.isHost} onAction={props.onAction} />
       <div className="section-heading mirror-results-heading">
         <h2>검색 결과</h2>
         <span>{props.results.length}개</span>

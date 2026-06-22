@@ -103,6 +103,12 @@ describe("SourceMirrorView", () => {
     expect(screen.getByRole("button", { name: "게임" })).toHaveAttribute("aria-pressed", "true");
   });
 
+  it("places the category bar below the search input in results", () => {
+    const { container } = render(<SourceMirrorView state={results} isHost onAction={() => undefined} />);
+
+    expect(container.querySelector(".mirror-search-bar + .mirror-category-nav")).not.toBeNull();
+  });
+
   it("asks the host extension for more results when the mirrored result list reaches the bottom", () => {
     const onAction = vi.fn();
     render(<SourceMirrorView state={results} isHost onAction={onAction} />);
