@@ -3,6 +3,7 @@ import type {
   ClientToServerEvents,
   JoinRoomPayload,
   QuizCommandName,
+  RoomSettings,
   RoomState,
   ServerToClientEvents,
   SourceMirrorAction
@@ -311,6 +312,14 @@ export function useRoomSocket() {
     );
   }
 
+  function updateSettings(settings: Partial<RoomSettings>) {
+    if (!state) return;
+
+    socket.emit("room:update-settings", { roomCode: state.roomCode, settings }, (ack) => {
+      if (!ack.ok) setError(localizeSocketError(ack.error));
+    });
+  }
+
   function leaveRoom(onLeft?: () => void) {
     if (!state || !participantId) return;
 
@@ -342,6 +351,7 @@ export function useRoomSocket() {
     sendChat,
     sendHostCommand,
     sendSourceAction,
+    updateSettings,
     leaveRoom
   };
 }

@@ -142,6 +142,25 @@ describe("useRoomSocket lifecycle", () => {
     expect(localStorage.getItem("activeNickname")).toBe("Mina");
   });
 
+  it("sends room setting updates for the active room", async () => {
+    render(<Harness onHook={(nextHook) => (hook = nextHook)} />);
+
+    act(() => {
+      hook.joinRoom({ roomCode: "ABC123", nickname: "Mina" });
+    });
+    await waitFor(() => expect(hook.state?.roomCode).toBe("ABC123"));
+
+    act(() => {
+      hook.updateSettings({ imageScale: 1.2 });
+    });
+
+    expect(emitMock).toHaveBeenCalledWith(
+      "room:update-settings",
+      { roomCode: "ABC123", settings: { imageScale: 1.2 } },
+      expect.any(Function)
+    );
+  });
+
   it("keeps player sessions for multiple rooms and reads them by room code", async () => {
     emitMock.mockImplementation((event: string, payload: unknown, ack?: (response: unknown) => void) => {
       if (event !== "room:join") return;

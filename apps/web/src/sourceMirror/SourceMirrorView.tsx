@@ -1,6 +1,14 @@
-import { ArrowRight, Home, SkipForward } from "lucide-react";
+import { ArrowRight, Home, Minus, Plus, SkipForward } from "lucide-react";
 import { useRef } from "react";
-import type { SourceMirrorAction, SourceMirrorState } from "@gatchi/shared";
+import {
+  clampImageScale,
+  DEFAULT_IMAGE_SCALE,
+  IMAGE_SCALE_MAX,
+  IMAGE_SCALE_MIN,
+  IMAGE_SCALE_STEP,
+  type SourceMirrorAction,
+  type SourceMirrorState
+} from "@gatchi/shared";
 import { QuizPanel } from "../room/QuizPanel";
 import { MirrorGameEndView } from "./MirrorGameEndView";
 import { MirrorResultsView } from "./MirrorResultsView";
@@ -8,10 +16,51 @@ import { MirrorSearchView } from "./MirrorSearchView";
 import { MirrorSetupView } from "./MirrorSetupView";
 import { MirrorUnsupportedView } from "./MirrorUnsupportedView";
 
+function ImageScaleControl({
+  imageScale,
+  onImageScaleChange
+}: {
+  imageScale: number;
+  onImageScaleChange: (imageScale: number) => void;
+}) {
+  const normalizedImageScale = clampImageScale(imageScale);
+  const percent = Math.round(normalizedImageScale * 100);
+
+  function adjust(delta: number) {
+    onImageScaleChange(clampImageScale(normalizedImageScale + delta));
+  }
+
+  return (
+    <div className="mirror-image-scale-control" aria-label="이미지 크기">
+      <button
+        type="button"
+        aria-label="이미지 작게"
+        title="이미지 작게"
+        disabled={normalizedImageScale <= IMAGE_SCALE_MIN}
+        onClick={() => adjust(-IMAGE_SCALE_STEP)}
+      >
+        <Minus size={16} aria-hidden="true" />
+      </button>
+      <span>{percent}%</span>
+      <button
+        type="button"
+        aria-label="이미지 크게"
+        title="이미지 크게"
+        disabled={normalizedImageScale >= IMAGE_SCALE_MAX}
+        onClick={() => adjust(IMAGE_SCALE_STEP)}
+      >
+        <Plus size={16} aria-hidden="true" />
+      </button>
+    </div>
+  );
+}
+
 export function SourceMirrorView(props: {
   state: SourceMirrorState;
   isHost: boolean;
   onAction: (action: SourceMirrorAction) => void;
+  imageScale?: number | undefined;
+  onImageScaleChange?: ((imageScale: number) => void) | undefined;
 }) {
   const lastSearchQuery = useRef("");
   if (props.state.kind === "home" || props.state.kind === "searchResults") {
@@ -69,6 +118,9 @@ export function SourceMirrorView(props: {
   }
 
   if (props.state.kind === "playing" || props.state.kind === "result") {
+    const imageScale = clampImageScale(props.imageScale ?? DEFAULT_IMAGE_SCALE);
+    const showImageScaleControl = props.isHost && Boolean(props.state.quiz.imageUrl) && Boolean(props.onImageScaleChange);
+
     return (
       <section className="mirror-playable" aria-label="마추기 진행 화면">
         {props.isHost ? (
@@ -78,6 +130,9 @@ export function SourceMirrorView(props: {
               홈 화면
             </button>
             <div className="mirror-host-primary-actions">
+              {showImageScaleControl && props.onImageScaleChange ? (
+                <ImageScaleControl imageScale={imageScale} onImageScaleChange={props.onImageScaleChange} />
+              ) : null}
               {props.state.kind === "playing" ? (
                 <button type="button" onClick={() => sendAction({ name: "skip" })}>
                   <SkipForward size={17} />
@@ -91,7 +146,7 @@ export function SourceMirrorView(props: {
             </div>
           </div>
         ) : null}
-        <QuizPanel quiz={props.state.quiz} />
+        <QuizPanel quiz={props.state.quiz} imageScale={imageScale} />
       </section>
     );
   }

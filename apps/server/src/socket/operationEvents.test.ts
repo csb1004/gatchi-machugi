@@ -4,8 +4,10 @@ import type {
   ClientToServerEvents,
   JoinRoomPayload,
   OriginalResultPayload,
+  RoomState,
   SendChatPayload,
-  ServerToClientEvents
+  ServerToClientEvents,
+  UpdateSettingsPayload
 } from "@gatchi/shared";
 import { afterEach, describe, expect, it } from "vitest";
 import { io as createClient, type Socket } from "socket.io-client";
@@ -86,9 +88,30 @@ function emitOriginalResult(
   });
 }
 
+function emitUpdateSettings(
+  socket: Socket<ServerToClientEvents, ClientToServerEvents>,
+  payload: UpdateSettingsPayload
+): Promise<{ ok: true; data: void } | { ok: false; error: string }> {
+  return new Promise((resolve) => {
+    socket.emit("room:update-settings", payload, ((response: unknown) => resolve(response as never)) as never);
+  });
+}
+
 function waitForChat(socket: Socket<ServerToClientEvents, ClientToServerEvents>): Promise<ChatMessagePayload> {
   return new Promise((resolve) => {
     socket.once("chat:message", resolve);
+  });
+}
+
+function waitForImageScale(socket: Socket<ServerToClientEvents, ClientToServerEvents>, imageScale: number): Promise<RoomState> {
+  return new Promise((resolve) => {
+    const handleState = (state: RoomState) => {
+      if (state.settings.imageScale !== imageScale) return;
+      socket.off("room:state", handleState);
+      resolve(state);
+    };
+
+    socket.on("room:state", handleState);
   });
 }
 
@@ -172,6 +195,44 @@ describe("operation socket events", () => {
     });
 
     expect(ack).toEqual({ ok: false, error: "Host authorization required" });
+  });
+
+  it("broadcasts host image scale setting updates to the room", async () => {
+    const roomService = new RoomService();
+    const app = createApp({ roomService });
+    const server = createServer(app);
+    createSocketServer(server, { roomService });
+    servers.push(server);
+
+    const port = await listenOnTestPort(server);
+    const baseUrl = `http://127.0.0.1:${port}`;
+    const room = await createRoom(baseUrl);
+    const hostSocket = await connectClient(baseUrl);
+    sockets.push(hostSocket);
+    const participantSocket = await connectClient(baseUrl);
+    sockets.push(participantSocket);
+
+    const hostJoin = await emitJoin(hostSocket, {
+      roomCode: room.roomCode,
+      nickname: "Host",
+      participantId: room.hostParticipantId,
+      participantCode: room.hostCode
+    });
+    expect(hostJoin.ok).toBe(true);
+    const participantJoin = await emitJoin(participantSocket, { roomCode: room.roomCode, nickname: "Mina" });
+    expect(participantJoin.ok).toBe(true);
+
+    const nextState = waitForImageScale(participantSocket, 1.2);
+    const ack = await emitUpdateSettings(hostSocket, {
+      roomCode: room.roomCode,
+      settings: { imageScale: 1.2 }
+    });
+
+    expect(ack).toEqual({ ok: true, data: undefined });
+    await expect(nextState).resolves.toMatchObject({
+      settings: expect.objectContaining({ imageScale: 1.2 })
+    });
+    expect(roomService.getState(room.roomCode).settings.imageScale).toBe(1.2);
   });
 
   it("rejects original result from a host web socket", async () => {

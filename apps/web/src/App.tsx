@@ -216,6 +216,7 @@ export function App() {
             onAddAlias={roomSocket.addAlias}
             onSendChat={roomSocket.sendChat}
             onSourceAction={roomSocket.sendSourceAction}
+            onImageScaleChange={(imageScale) => roomSocket.updateSettings({ imageScale })}
             onLeaveRoom={() => {
               roomSocket.leaveRoom();
             }}

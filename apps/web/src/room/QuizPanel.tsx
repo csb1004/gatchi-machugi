@@ -1,6 +1,6 @@
 import { Pause, Play, RotateCcw, Volume2 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
-import type { QuizState } from "@gatchi/shared";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { clampImageScale, DEFAULT_IMAGE_SCALE, type QuizState } from "@gatchi/shared";
 
 function isEmbedUrl(url: string | null): url is string {
   return Boolean(url && /(?:youtube(?:-nocookie)?\.com\/embed|youtube\.com\/watch|youtu\.be)/i.test(url));
@@ -176,12 +176,14 @@ function YoutubeAudioOnlyPlayer({ src }: { src: string }) {
   );
 }
 
-export function QuizPanel({ quiz }: { quiz: QuizState }) {
+export function QuizPanel({ quiz, imageScale = DEFAULT_IMAGE_SCALE }: { quiz: QuizState; imageScale?: number }) {
   const hasMedia = Boolean(quiz.imageUrl || quiz.audioUrl || quiz.videoUrl);
   const hasQuestionText = Boolean(quiz.questionText);
   const audioEmbedUrl = isEmbedUrl(quiz.audioUrl) ? quiz.audioUrl : null;
   const videoEmbedUrl = isEmbedUrl(quiz.videoUrl) ? quiz.videoUrl : null;
   const isResult = isResultQuiz(quiz);
+  const normalizedImageScale = clampImageScale(imageScale);
+  const imageStyle = { "--question-image-scale": String(normalizedImageScale) } as CSSProperties;
   const progress =
     quiz.questionIndex !== null && quiz.totalQuestions !== null ? `${quiz.questionIndex} / ${quiz.totalQuestions}` : quiz.questionType;
   const fallback = quiz.quizTitle
@@ -196,7 +198,7 @@ export function QuizPanel({ quiz }: { quiz: QuizState }) {
       </div>
 
       <div className="question-stage">
-        {quiz.imageUrl ? <img src={quiz.imageUrl} alt="" /> : null}
+        {quiz.imageUrl ? <img src={quiz.imageUrl} alt="" style={imageStyle} /> : null}
         {audioEmbedUrl ? (
           isResult ? (
             <iframe

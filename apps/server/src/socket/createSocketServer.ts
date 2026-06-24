@@ -25,6 +25,7 @@ import type {
   SourceMirrorPayload,
   SubmitAnswerPayload
 } from "@gatchi/shared";
+import { IMAGE_SCALE_MAX, IMAGE_SCALE_MIN } from "@gatchi/shared";
 import { Server } from "socket.io";
 import { z } from "zod";
 import type { RoomService } from "../domain/roomService.js";
@@ -148,7 +149,8 @@ const updateSettingsSchema = z.object({
     visibility: z.enum(["public", "private"]).optional(),
     submissionVisibility: z.enum(["status-only", "hidden"]).optional(),
     timerSeconds: z.number().int().positive().nullable().optional(),
-    title: z.string().trim().min(1).max(100).optional()
+    title: z.string().trim().min(1).max(100).optional(),
+    imageScale: z.number().finite().min(IMAGE_SCALE_MIN).max(IMAGE_SCALE_MAX).optional()
   })
 });
 
@@ -200,6 +202,7 @@ function definedSettings(settings: z.infer<typeof updateSettingsSchema>["setting
   if (settings.submissionVisibility !== undefined) next.submissionVisibility = settings.submissionVisibility;
   if (settings.timerSeconds !== undefined) next.timerSeconds = settings.timerSeconds;
   if (settings.title !== undefined) next.title = settings.title;
+  if (settings.imageScale !== undefined) next.imageScale = settings.imageScale;
   return next;
 }
 

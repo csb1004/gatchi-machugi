@@ -7,6 +7,8 @@ import {
   scoreSubmissions,
   submittedParticipantIds,
   type ChatMessagePayload,
+  clampImageScale,
+  DEFAULT_IMAGE_SCALE,
   type OriginalSubmitAllowedPayload,
   type Participant,
   type QuizState,
@@ -491,7 +493,11 @@ export class RoomService {
 
   updateSettings(input: { roomCode: string; settings: Partial<RoomSettings> }): RoomState {
     const room = this.requireRoom(input.roomCode);
-    room.state.settings = { ...room.state.settings, ...input.settings };
+    room.state.settings = {
+      ...room.state.settings,
+      ...input.settings,
+      ...(input.settings.imageScale !== undefined ? { imageScale: clampImageScale(input.settings.imageScale) } : {})
+    };
     return room.state;
   }
 
@@ -825,7 +831,8 @@ export class RoomService {
         title: input.title,
         visibility: input.visibility,
         submissionVisibility: "status-only",
-        timerSeconds: null
+        timerSeconds: null,
+        imageScale: DEFAULT_IMAGE_SCALE
       },
       participants: [],
       quiz: {

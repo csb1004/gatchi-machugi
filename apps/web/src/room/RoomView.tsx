@@ -168,6 +168,7 @@ export function RoomView(props: {
   onAddAlias?: (alias: string) => void;
   onSendChat?: (text: string) => void;
   onSourceAction: (action: SourceMirrorAction) => void;
+  onImageScaleChange?: (imageScale: number) => void;
   onLeaveRoom?: () => void;
 }) {
   const roomLayoutRef = useRef<HTMLElement | null>(null);
@@ -264,7 +265,13 @@ export function RoomView(props: {
             </button>
           </div>
         </header>
-        <SourceMirrorView state={props.state.sourceMirror} isHost={Boolean(isHost)} onAction={props.onSourceAction} />
+        <SourceMirrorView
+          state={props.state.sourceMirror}
+          isHost={Boolean(isHost)}
+          imageScale={props.state.settings.imageScale}
+          onAction={props.onSourceAction}
+          onImageScaleChange={props.onImageScaleChange}
+        />
         <PersonalResultPanel state={props.state} participantId={props.currentParticipantId} />
         <PublicRevealPanel state={props.state} participantId={props.currentParticipantId} />
         <HostAliasPanel isHost={Boolean(isHost)} state={props.state} onAddAlias={props.onAddAlias} />

@@ -31,6 +31,12 @@ describe("QuizPanel", () => {
     expect(screen.queryByText("원본 탭에서 문제를 준비하는 중입니다.")).not.toBeInTheDocument();
   });
 
+  it("applies the shared image scale to question images", () => {
+    render(<QuizPanel quiz={baseQuiz} imageScale={1.3} />);
+
+    expect(document.querySelector("img")).toHaveStyle({ "--question-image-scale": "1.3" });
+  });
+
   it("shows answer candidates from the original result screen", () => {
     render(<QuizPanel quiz={{ ...baseQuiz, resultMessage: "오답!", answerCandidates: ["이브이"] }} />);
 

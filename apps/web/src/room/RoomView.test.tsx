@@ -71,6 +71,20 @@ const baseState: RoomState = {
   chatMessageCount: 0
 };
 
+function playingMirrorWithImage(imageUrl: string): RoomState["sourceMirror"] {
+  if (baseState.sourceMirror.kind !== "playing") {
+    throw new Error("Expected the base source mirror to be playing");
+  }
+
+  return {
+    ...baseState.sourceMirror,
+    quiz: {
+      ...baseState.sourceMirror.quiz,
+      imageUrl
+    }
+  };
+}
+
 describe("RoomView", () => {
   it("shows submission status without raw answer before reveal", () => {
     render(<RoomView state={baseState} currentParticipantId="host" onSubmitAnswer={() => undefined} onSourceAction={() => undefined} />);
@@ -79,6 +93,43 @@ describe("RoomView", () => {
     expect(screen.getByText("Mina 제출함")).toBeInTheDocument();
     expect(screen.queryByText("rawAnswer")).not.toBeInTheDocument();
     expect(screen.queryByText("blue archive")).not.toBeInTheDocument();
+  });
+
+  it("lets the host adjust the shared image size", () => {
+    const onImageScaleChange = vi.fn();
+    render(
+      <RoomView
+        state={{
+          ...baseState,
+          settings: { ...baseState.settings, imageScale: 1 },
+          sourceMirror: playingMirrorWithImage("https://images.machugi.io/question.png")
+        }}
+        currentParticipantId="host"
+        onSubmitAnswer={() => undefined}
+        onSourceAction={() => undefined}
+        onImageScaleChange={onImageScaleChange}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "이미지 크게" }));
+    expect(onImageScaleChange).toHaveBeenCalledWith(1.1);
+  });
+
+  it("does not show image size controls to players", () => {
+    render(
+      <RoomView
+        state={{
+          ...baseState,
+          sourceMirror: playingMirrorWithImage("https://images.machugi.io/question.png")
+        }}
+        currentParticipantId="p1"
+        onSubmitAnswer={() => undefined}
+        onSourceAction={() => undefined}
+      />
+    );
+
+    expect(screen.queryByRole("button", { name: "이미지 크게" })).not.toBeInTheDocument();
+    expect(document.querySelector("img")).toHaveStyle({ "--question-image-scale": "1" });
   });
 
   it("shows the current participant's own result after reveal", () => {

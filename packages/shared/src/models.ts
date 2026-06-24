@@ -6,6 +6,19 @@ export type ParticipantRole = "host" | "player";
 export type QuestionType = "unknown" | "text" | "image" | "audio" | "video" | "ox" | "multiple-choice" | "free-text";
 export type SubmissionVisibility = "status-only" | "hidden";
 
+export const DEFAULT_IMAGE_SCALE = 1;
+export const IMAGE_SCALE_MIN = 0.6;
+export const IMAGE_SCALE_MAX = 1.6;
+export const IMAGE_SCALE_STEP = 0.1;
+
+export function clampImageScale(value: number | null | undefined): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) return DEFAULT_IMAGE_SCALE;
+
+  const stepped = Math.round(value / IMAGE_SCALE_STEP) * IMAGE_SCALE_STEP;
+  const clamped = Math.min(IMAGE_SCALE_MAX, Math.max(IMAGE_SCALE_MIN, stepped));
+  return Number(clamped.toFixed(2));
+}
+
 export interface PublicRoomSummary {
   roomCode: string;
   title: string;
@@ -60,6 +73,7 @@ export interface RoomSettings {
   submissionVisibility: SubmissionVisibility;
   timerSeconds: number | null;
   title: string;
+  imageScale?: number;
 }
 
 export interface SubmissionStatus {

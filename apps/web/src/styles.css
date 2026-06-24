@@ -613,18 +613,28 @@ h2 {
   padding: 18px;
   background: #fbfcff;
   text-align: center;
-  overflow: hidden;
+  overflow: auto;
 }
 
 .question-stage img,
 .question-stage video {
   display: block;
   width: auto;
-  max-width: min(100%, 760px);
   height: auto;
-  max-height: min(420px, 62vh);
   border-radius: 6px;
   object-fit: contain;
+}
+
+.question-stage img {
+  width: min(calc(100% * var(--question-image-scale, 1)), calc(760px * var(--question-image-scale, 1)));
+  max-width: none;
+  max-height: min(calc(420px * var(--question-image-scale, 1)), calc(62vh * var(--question-image-scale, 1)));
+  transition: width 140ms ease, max-height 140ms ease;
+}
+
+.question-stage video {
+  max-width: min(100%, 760px);
+  max-height: min(420px, 62vh);
 }
 
 .question-stage iframe {
@@ -1496,6 +1506,35 @@ h2 {
   gap: 8px;
   flex-wrap: wrap;
   justify-content: flex-end;
+}
+
+.mirror-image-scale-control {
+  min-height: 38px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 5px;
+  border: 1px solid #bfd0e5;
+  border-radius: 8px;
+  background: #eef5ff;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.65);
+}
+
+.mirror-host-actions .mirror-image-scale-control button {
+  min-height: 30px;
+  width: 34px;
+  padding: 0;
+  justify-content: center;
+  border-color: #9fb9dc;
+  background: #ffffff;
+}
+
+.mirror-image-scale-control span {
+  min-width: 44px;
+  text-align: center;
+  color: #0b3f7f;
+  font-size: 0.88rem;
+  font-weight: 900;
 }
 
 .mirror-host-actions button {
